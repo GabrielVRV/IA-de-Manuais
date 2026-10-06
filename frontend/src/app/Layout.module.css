@@ -1,0 +1,25 @@
+.shell {
+  min-height: 100vh;
+}
+
+.header {
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.inner {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: var(--space-4);
+}
+
+main.inner {
+  padding-top: var(--space-8);
+}
+
+.brand {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
