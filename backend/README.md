@@ -19,6 +19,10 @@ src/manual_assistant/
 **Regra de dependência:** as setas apontam sempre para dentro
 (`presentation`/`infrastructure` → `application` → `domain`). Ela é verificada
 automaticamente pelo `import-linter`; um import na direção errada quebra o CI.
+Um segundo contrato proíbe o núcleo (`domain` e `application`) de importar frameworks
+(FastAPI, Pydantic...).
+
+O vocabulário do domínio e as portas estão descritos em [docs/dominio.md](../docs/dominio.md).
 
 ## Rodando localmente (Windows / PowerShell)
 
