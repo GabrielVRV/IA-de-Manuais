@@ -1,0 +1,10 @@
+# Normaliza finais de linha para LF no repositório (evita diffs falsos no Windows
+# e scripts quebrados dentro do container Linux).
+* text=auto eol=lf
+
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+
+*.png binary
+*.jpg binary
+*.pdf binary

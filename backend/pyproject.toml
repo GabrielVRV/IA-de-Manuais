@@ -1,0 +1,100 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "manual-assistant"
+dynamic = ["version"]
+description = "API do assistente de IA para consulta de manuais técnicos de equipamentos."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.142",
+    "uvicorn[standard]>=0.32",
+    "pydantic-settings>=2.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "httpx2>=2.13",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "import-linter>=2.1",
+]
+
+[tool.hatch.version]
+path = "src/manual_assistant/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/manual_assistant"]
+
+# --------------------------------------------------------------------------- #
+# Lint / format
+# --------------------------------------------------------------------------- #
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort
+    "N",        # pep8-naming
+    "B",        # bugbear
+    "UP",       # pyupgrade
+    "SIM",      # simplify
+    "C4",       # comprehensions
+    "PT",       # pytest style
+    "ARG",      # unused arguments
+    "S",        # bandit (security)
+    "RUF",      # ruff-specific
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]  # assert é o idioma do pytest
+
+# --------------------------------------------------------------------------- #
+# Type checking
+# --------------------------------------------------------------------------- #
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src", "tests"]
+plugins = ["pydantic.mypy"]
+
+# --------------------------------------------------------------------------- #
+# Testes
+# --------------------------------------------------------------------------- #
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+
+[tool.coverage.run]
+source = ["manual_assistant"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+# --------------------------------------------------------------------------- #
+# Regra de dependência da Clean Architecture (verificada no CI)
+# Camadas de cima podem importar as de baixo; nunca o contrário.
+# Presentation e Infrastructure são adaptadores irmãos: não se conhecem.
+# --------------------------------------------------------------------------- #
+[tool.importlinter]
+root_package = "manual_assistant"
+
+[[tool.importlinter.contracts]]
+name = "Clean Architecture: regra de dependência"
+type = "layers"
+layers = [
+    "manual_assistant.main",
+    "manual_assistant.presentation | manual_assistant.infrastructure",
+    "manual_assistant.application",
+    "manual_assistant.domain",
+]

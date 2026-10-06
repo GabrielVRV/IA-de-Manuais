@@ -1,0 +1,11 @@
+services:
+  api:
+    build: ./backend
+    image: manual-assistant-api:latest
+    container_name: manual-assistant-api
+    env_file:
+      - path: ./backend/.env
+        required: false
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
