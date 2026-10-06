@@ -31,7 +31,7 @@ Decisões de arquitetura ficam registradas em [`docs/adr/`](docs/adr/).
 ```
 .
 ├── backend/               # API Python (ver backend/README.md)
-├── frontend/              # SPA React (degrau 2)
+├── frontend/              # SPA React (ver frontend/README.md)
 ├── docs/adr/              # Registros de decisões de arquitetura
 ├── docker-compose.yml
 └── .github/workflows/     # CI
@@ -42,7 +42,7 @@ Decisões de arquitetura ficam registradas em [`docs/adr/`](docs/adr/).
 | #  | Degrau                                                                              | Status |
 |----|-------------------------------------------------------------------------------------|--------|
 | 1  | Fundação: repositório, esqueleto Clean Architecture, health check, Docker, CI       | ✅     |
-| 2  | Frontend: React + Vite + TypeScript, consumindo o health check; build para o XAMPP  | ⏳     |
+| 2  | Frontend: React + Vite + TypeScript, consumindo o health check; build para o XAMPP  | ✅     |
 | 3  | Domínio: entidades (Manual, Trecho, Pergunta, Resposta) e portas (LLM, vetores...)  | ⏳     |
 | 4  | Persistência: PostgreSQL + pgvector no compose, migrações com Alembic               | ⏳     |
 | 5  | Ingestão: upload de PDF → extração → divisão em trechos → embeddings → indexação    | ⏳     |
@@ -60,10 +60,24 @@ Decisões de arquitetura ficam registradas em [`docs/adr/`](docs/adr/).
 - Todo commit em `main` precisa passar no CI: lint, tipagem estrita, regra de
   dependência entre camadas e testes.
 
-## Subindo com Docker
+## Rodando o projeto
+
+**Backend (Docker):**
 
 ```bash
 cp backend/.env.example backend/.env
 docker compose up -d --build
 curl http://localhost:8000/api/v1/health
 ```
+
+**Frontend (XAMPP):**
+
+```powershell
+cd frontend
+npm install
+npm run deploy:xampp -- -Destino "C:\xampp\htdocs\ia-manuais"
+```
+
+Depois, ajuste o `config.json` publicado para o endereço da API e inclua o endereço do
+frontend em `APP_CORS_ORIGINS`, no `backend/.env`. Detalhes em
+[frontend/README.md](frontend/README.md).

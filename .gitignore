@@ -21,6 +21,7 @@ htmlcov/
 # Node / frontend
 node_modules/
 frontend/dist/
+frontend/coverage/
 
 # Manuais e dados locais (nunca versionar documentos da empresa)
 data/

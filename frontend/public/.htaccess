@@ -1,0 +1,14 @@
+# Regras de cache para o Apache do XAMPP.
+<IfModule mod_headers.c>
+  # Sempre revalidar: garante que um novo deploy ou uma edicao do config.json
+  # cheguem ao usuario sem precisar limpar o cache do navegador.
+  <FilesMatch "^(index\.html|config\.json)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+
+  # Arquivos gerados pelo build tem hash no nome (ex.: index-a1B2c3D4.js):
+  # podem ficar em cache indefinidamente, pois cada versao tem um nome novo.
+  <FilesMatch "-[A-Za-z0-9_-]{8}\.(js|css)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+</IfModule>
