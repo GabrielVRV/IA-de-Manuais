@@ -24,7 +24,8 @@ trechos, indexados por significado (embeddings) e, a cada pergunta, só os trech
 relevantes são enviados ao LLM. Assim a resposta fica presa ao conteúdo dos manuais e o
 custo por pergunta fica baixo.
 
-Decisões de arquitetura ficam registradas em [`docs/adr/`](docs/adr/).
+Decisões de arquitetura ficam registradas em [`docs/adr/`](docs/adr/) e o vocabulário do
+negócio em [`docs/dominio.md`](docs/dominio.md).
 
 ## Estrutura do repositório
 
@@ -43,7 +44,7 @@ Decisões de arquitetura ficam registradas em [`docs/adr/`](docs/adr/).
 |----|-------------------------------------------------------------------------------------|--------|
 | 1  | Fundação: repositório, esqueleto Clean Architecture, health check, Docker, CI       | ✅     |
 | 2  | Frontend: React + Vite + TypeScript, consumindo o health check; build para o XAMPP  | ✅     |
-| 3  | Domínio: entidades (Manual, Trecho, Pergunta, Resposta) e portas (LLM, vetores...)  | ⏳     |
+| 3  | Domínio: entidades (Manual, Trecho, Pergunta, Resposta) e portas (LLM, vetores...)  | ✅     |
 | 4  | Persistência: PostgreSQL + pgvector no compose, migrações com Alembic               | ⏳     |
 | 5  | Ingestão: upload de PDF → extração → divisão em trechos → embeddings → indexação    | ⏳     |
 | 6  | Adaptadores de LLM: Gemini e OpenAI, selecionáveis por variável de ambiente         | ⏳     |

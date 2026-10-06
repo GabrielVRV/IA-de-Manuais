@@ -50,6 +50,7 @@ select = [
     "C4",       # comprehensions
     "PT",       # pytest style
     "ARG",      # unused arguments
+    "DTZ",      # datas sempre com fuso horário
     "S",        # bandit (security)
     "RUF",      # ruff-specific
 ]
@@ -80,6 +81,8 @@ branch = true
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
+# Interfaces (Protocol) não têm comportamento para testar.
+exclude_also = ["class .*\\bProtocol\\):"]
 
 # --------------------------------------------------------------------------- #
 # Regra de dependência da Clean Architecture (verificada no CI)
@@ -88,6 +91,7 @@ skip_covered = true
 # --------------------------------------------------------------------------- #
 [tool.importlinter]
 root_package = "manual_assistant"
+include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "Clean Architecture: regra de dependência"
@@ -98,3 +102,9 @@ layers = [
     "manual_assistant.application",
     "manual_assistant.domain",
 ]
+
+[[tool.importlinter.contracts]]
+name = "Núcleo (domínio + aplicação) livre de frameworks"
+type = "forbidden"
+source_modules = ["manual_assistant.domain", "manual_assistant.application"]
+forbidden_modules = ["fastapi", "starlette", "pydantic", "pydantic_settings", "uvicorn"]
