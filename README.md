@@ -46,8 +46,8 @@ negócio em [`docs/dominio.md`](docs/dominio.md).
 | 2  | Frontend: React + Vite + TypeScript, consumindo o health check; build para o XAMPP  | ✅     |
 | 3  | Domínio: entidades (Manual, Trecho, Pergunta, Resposta) e portas (LLM, vetores...)  | ✅     |
 | 4  | Persistência: PostgreSQL + pgvector no compose, migrações com Alembic               | ✅     |
-| 5  | Ingestão: upload de PDF → extração → divisão em trechos → embeddings → indexação    | ⏳     |
-| 6  | Adaptadores de LLM: Gemini e OpenAI, selecionáveis por variável de ambiente         | ⏳     |
+| 5  | Ingestão: casos de uso, leitura de PDF, divisão em trechos e armazenamento          | ✅     |
+| 6  | Provedores de IA (Gemini/OpenAI) e API de manuais (upload, listagem, exclusão)      | ⏳     |
 | 7  | Caso de uso "Perguntar" (RAG) com citação de manual e página                         | ⏳     |
 | 8  | Chat no frontend com resposta em streaming                                          | ⏳     |
 | 9  | Autenticação e área administrativa de manuais                                       | ⏳     |
