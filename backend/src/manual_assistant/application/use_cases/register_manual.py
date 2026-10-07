@@ -31,6 +31,10 @@ class RegisterManualUseCase:
         self._max_bytes = max_bytes
         self._clock = clock
 
+    @property
+    def max_bytes(self) -> int:
+        return self._max_bytes
+
     async def execute(self, *, title: str, file_name: str, content: bytes) -> Manual:
         self._validate(content)
         manual = Manual.register(title=title, file_name=file_name, now=self._clock())

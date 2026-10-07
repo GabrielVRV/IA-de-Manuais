@@ -1,23 +1,14 @@
 from fastapi.testclient import TestClient
 
 from manual_assistant import __version__
-from manual_assistant.application.use_cases.check_health import CheckHealthUseCase
-from manual_assistant.presentation.http.app import create_http_app
-from manual_assistant.presentation.http.dependencies import UseCases
 from tests.fakes import FakeHealthIndicator
+from tests.http_app import FRONTEND_ORIGIN, FakeBackend
 
 HEALTH_URL = "/api/v1/health"
-FRONTEND_ORIGIN = "http://servidor-interno"
 
 
 def make_client(*indicators: FakeHealthIndicator) -> TestClient:
-    app = create_http_app(
-        title="test",
-        version=__version__,
-        cors_origins=[FRONTEND_ORIGIN],
-        use_cases=UseCases(check_health=CheckHealthUseCase(indicators)),
-    )
-    return TestClient(app)
+    return TestClient(FakeBackend(health_indicators=list(indicators)).build_app())
 
 
 def test_reports_healthy_when_all_dependencies_are_up() -> None:

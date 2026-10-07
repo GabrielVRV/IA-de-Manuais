@@ -28,6 +28,7 @@ def postgres_settings() -> Iterator[Settings]:
             db_name=container.dbname,
             db_user=container.username,
             db_password=container.password,
+            gemini_api_key="chave-de-teste",  # create_app exige; nenhum teste chama a IA real
         )
         upgrade_to_head(settings.database_url)
         yield settings

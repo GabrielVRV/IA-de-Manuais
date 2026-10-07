@@ -8,6 +8,11 @@ from dataclasses import dataclass, field
 
 from manual_assistant.application.errors import StoredFileNotFoundError
 from manual_assistant.application.ports.embedding_provider import Embedding
+from manual_assistant.application.ports.language_model import (
+    Completion,
+    CompletionRequest,
+    TokenUsage,
+)
 from manual_assistant.application.ports.text_chunker import TextFragment
 from manual_assistant.application.ports.vector_store import EmbeddedChunk
 from manual_assistant.domain.chunk import ScoredChunk
@@ -31,6 +36,7 @@ class FakeHealthIndicator:
 class InMemoryManualRepository:
     manuals: dict[ManualId, Manual] = field(default_factory=dict)
     error_on_save: Exception | None = None
+    error_on_list: Exception | None = None
     saved_statuses: list[str] = field(default_factory=list)
 
     async def save(self, manual: Manual) -> None:
@@ -43,6 +49,8 @@ class InMemoryManualRepository:
         return self.manuals.get(manual_id)
 
     async def list_all(self) -> Sequence[Manual]:
+        if self.error_on_list is not None:
+            raise self.error_on_list
         return sorted(self.manuals.values(), key=lambda m: m.created_at, reverse=True)
 
     async def delete(self, manual_id: ManualId) -> None:
@@ -126,3 +134,15 @@ class InMemoryVectorStore:
 
     async def delete_by_manual(self, manual_id: ManualId) -> None:
         self.items.pop(manual_id, None)
+
+
+@dataclass
+class FakeLanguageModel:
+    answer: str = "Resposta gerada."
+    requests: list[CompletionRequest] = field(default_factory=list)
+
+    async def complete(self, request: CompletionRequest) -> Completion:
+        self.requests.append(request)
+        return Completion(
+            text=self.answer, model="fake-model", usage=TokenUsage(input_tokens=1, output_tokens=1)
+        )
