@@ -29,7 +29,10 @@ class VectorStore(Protocol):
         limit: int,
         min_score: float = 0.0,
     ) -> Sequence[ScoredChunk]:
-        """Trechos mais parecidos com a consulta, do mais para o menos relevante."""
+        """Trechos mais parecidos com a consulta, do mais para o menos relevante.
+
+        Retorna apenas trechos de manuais indexados (``Manual.is_searchable``).
+        """
         ...
 
     async def delete_by_manual(self, manual_id: ManualId) -> None: ...

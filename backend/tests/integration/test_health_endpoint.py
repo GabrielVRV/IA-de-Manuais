@@ -2,8 +2,6 @@ from fastapi.testclient import TestClient
 
 from manual_assistant import __version__
 from manual_assistant.application.use_cases.check_health import CheckHealthUseCase
-from manual_assistant.infrastructure.settings import Settings
-from manual_assistant.main import create_app
 from manual_assistant.presentation.http.app import create_http_app
 from manual_assistant.presentation.http.dependencies import UseCases
 from tests.fakes import FakeHealthIndicator
@@ -22,13 +20,17 @@ def make_client(*indicators: FakeHealthIndicator) -> TestClient:
     return TestClient(app)
 
 
-def test_composed_app_reports_healthy() -> None:
-    client = TestClient(create_app(Settings(_env_file=None, environment="test")))
+def test_reports_healthy_when_all_dependencies_are_up() -> None:
+    client = make_client(FakeHealthIndicator("database"))
 
     response = client.get(HEALTH_URL)
 
     assert response.status_code == 200
-    assert response.json() == {"status": "up", "version": __version__, "components": {}}
+    assert response.json() == {
+        "status": "up",
+        "version": __version__,
+        "components": {"database": "up"},
+    }
 
 
 def test_returns_503_when_a_dependency_is_down() -> None:

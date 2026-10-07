@@ -1,4 +1,5 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from contextlib import AbstractAsyncContextManager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +9,8 @@ from manual_assistant.presentation.http.routers import health
 
 API_PREFIX = "/api/v1"
 
+Lifespan = Callable[[FastAPI], AbstractAsyncContextManager[None]]
+
 
 def create_http_app(
     *,
@@ -15,6 +18,7 @@ def create_http_app(
     version: str,
     cors_origins: Sequence[str],
     use_cases: UseCases,
+    lifespan: Lifespan | None = None,
 ) -> FastAPI:
     app = FastAPI(
         title=title,
@@ -22,6 +26,7 @@ def create_http_app(
         docs_url="/api/docs",
         redoc_url=None,
         openapi_url="/api/openapi.json",
+        lifespan=lifespan,
     )
     app.state.use_cases = use_cases
 

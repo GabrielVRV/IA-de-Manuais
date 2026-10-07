@@ -5,7 +5,11 @@ from manual_assistant.domain.manual import Manual, ManualId
 
 
 class ManualRepository(Protocol):
-    """Persistência dos manuais cadastrados (metadados e status, não o conteúdo)."""
+    """Persistência dos manuais cadastrados (metadados e status, não o conteúdo).
+
+    Raises (todos os métodos):
+        ExternalServiceError: se o armazenamento falhar.
+    """
 
     async def save(self, manual: Manual) -> None:
         """Insere o manual ou atualiza o existente com o mesmo id."""
