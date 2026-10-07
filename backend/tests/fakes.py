@@ -139,10 +139,13 @@ class InMemoryVectorStore:
 @dataclass
 class FakeLanguageModel:
     answer: str = "Resposta gerada."
+    error: Exception | None = None
     requests: list[CompletionRequest] = field(default_factory=list)
 
     async def complete(self, request: CompletionRequest) -> Completion:
         self.requests.append(request)
+        if self.error is not None:
+            raise self.error
         return Completion(
             text=self.answer, model="fake-model", usage=TokenUsage(input_tokens=1, output_tokens=1)
         )

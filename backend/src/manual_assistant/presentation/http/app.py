@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from manual_assistant.presentation.http.dependencies import UseCases
 from manual_assistant.presentation.http.errors import register_error_handlers
-from manual_assistant.presentation.http.routers import health, manuals
+from manual_assistant.presentation.http.routers import health, manuals, questions
 
 API_PREFIX = "/api/v1"
 
@@ -42,4 +42,5 @@ def create_http_app(
     register_error_handlers(app)
     app.include_router(health.router, prefix=API_PREFIX)
     app.include_router(manuals.router, prefix=API_PREFIX)
+    app.include_router(questions.router, prefix=API_PREFIX)
     return app

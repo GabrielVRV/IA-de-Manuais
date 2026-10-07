@@ -11,6 +11,7 @@ from fastapi import FastAPI
 
 from manual_assistant import __version__
 from manual_assistant.application.errors import ExternalServiceError
+from manual_assistant.application.use_cases.ask_question import AskQuestionUseCase
 from manual_assistant.application.use_cases.check_health import CheckHealthUseCase
 from manual_assistant.application.use_cases.delete_manual import DeleteManualUseCase
 from manual_assistant.application.use_cases.get_manual import GetManualUseCase
@@ -74,6 +75,13 @@ def create_app(
         get_manual=GetManualUseCase(repository),
         delete_manual=DeleteManualUseCase(
             repository=repository, vector_store=vector_store, storage=storage
+        ),
+        ask_question=AskQuestionUseCase(
+            embeddings=ai.embeddings,
+            vector_store=vector_store,
+            language_model=ai.language_model,
+            top_k=settings.rag_top_k,
+            min_score=settings.rag_min_score,
         ),
     )
     recover_interrupted = RecoverInterruptedIndexingUseCase(repository)

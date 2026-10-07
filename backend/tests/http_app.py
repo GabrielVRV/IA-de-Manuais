@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from manual_assistant import __version__
 from manual_assistant.application.ports.health_indicator import HealthIndicator
+from manual_assistant.application.use_cases.ask_question import AskQuestionUseCase
 from manual_assistant.application.use_cases.check_health import CheckHealthUseCase
 from manual_assistant.application.use_cases.delete_manual import DeleteManualUseCase
 from manual_assistant.application.use_cases.get_manual import GetManualUseCase
@@ -18,6 +19,7 @@ from manual_assistant.presentation.http.app import create_http_app
 from manual_assistant.presentation.http.dependencies import UseCases
 from tests.fakes import (
     FakeEmbeddingProvider,
+    FakeLanguageModel,
     InMemoryFileStorage,
     InMemoryManualRepository,
     InMemoryVectorStore,
@@ -34,6 +36,7 @@ class FakeBackend:
     storage: InMemoryFileStorage = field(default_factory=InMemoryFileStorage)
     embeddings: FakeEmbeddingProvider = field(default_factory=FakeEmbeddingProvider)
     vector_store: InMemoryVectorStore = field(default_factory=InMemoryVectorStore)
+    language_model: FakeLanguageModel = field(default_factory=FakeLanguageModel)
     health_indicators: list[HealthIndicator] = field(default_factory=list)
     max_upload_bytes: int = 1024 * 1024
 
@@ -55,6 +58,11 @@ class FakeBackend:
             get_manual=GetManualUseCase(self.repository),
             delete_manual=DeleteManualUseCase(
                 repository=self.repository, vector_store=self.vector_store, storage=self.storage
+            ),
+            ask_question=AskQuestionUseCase(
+                embeddings=self.embeddings,
+                vector_store=self.vector_store,
+                language_model=self.language_model,
             ),
         )
         return create_http_app(

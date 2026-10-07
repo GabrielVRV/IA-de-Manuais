@@ -3,6 +3,7 @@ from typing import Annotated, cast
 
 from fastapi import Depends, Request
 
+from manual_assistant.application.use_cases.ask_question import AskQuestionUseCase
 from manual_assistant.application.use_cases.check_health import CheckHealthUseCase
 from manual_assistant.application.use_cases.delete_manual import DeleteManualUseCase
 from manual_assistant.application.use_cases.get_manual import GetManualUseCase
@@ -21,6 +22,7 @@ class UseCases:
     list_manuals: ListManualsUseCase
     get_manual: GetManualUseCase
     delete_manual: DeleteManualUseCase
+    ask_question: AskQuestionUseCase
 
 
 def get_use_cases(request: Request) -> UseCases:

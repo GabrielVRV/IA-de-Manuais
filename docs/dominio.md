@@ -51,6 +51,21 @@ PENDENTE ──▶ PROCESSANDO ──▶ INDEXADO
 | `IndexManualUseCase`    | Lê, divide, gera embeddings e indexa; registra falhas no próprio manual      |
 | `ListManualsUseCase`    | Lista os manuais, do mais recente para o mais antigo                         |
 | `DeleteManualUseCase`   | Remove trechos, cadastro e arquivo original                                  |
+| `AskQuestionUseCase`    | Busca os trechos relevantes, pede a resposta ao modelo e cita as fontes      |
+
+## Como uma pergunta é respondida
+
+1. A pergunta vira um embedding e os `APP_RAG_TOP_K` trechos mais parecidos são buscados
+   (só de manuais indexados).
+2. Os trechos vão numerados no prompt (`<trecho id="1" manual="..." paginas="12-13">`), com
+   regras fixas: responder **somente** com base neles, citar o número de cada informação e
+   responder `NAO_ENCONTRADO` quando a resposta não estiver lá.
+3. As citações exibidas saem dos números que o modelo **realmente citou**. Vários trechos do
+   mesmo manual viram uma citação só, com as páginas unidas.
+4. Se a busca não encontrar nenhum trecho, o modelo nem é chamado (custo zero).
+
+O texto dos manuais é tratado como **dado, não instrução**: um PDF com algo como "ignore
+as regras" não altera o comportamento do assistente.
 
 Os adaptadores traduzem as exceções das bibliotecas para os erros da aplicação
 (`UnreadableDocumentError`, `ExternalServiceError`). Assim, trocar o Gemini pela OpenAI
