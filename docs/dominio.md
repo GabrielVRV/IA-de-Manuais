@@ -32,14 +32,25 @@ PENDENTE ──▶ PROCESSANDO ──▶ INDEXADO
 
 ## Portas (o que o núcleo exige do mundo externo)
 
-| Porta               | Responsabilidade                                      | Implementação prevista      |
-| ------------------- | ----------------------------------------------------- | --------------------------- |
-| `ManualRepository`  | Guardar os manuais e seus status                      | PostgreSQL (degrau 4)       |
-| `DocumentParser`    | Extrair o texto do PDF, página a página               | PyMuPDF (degrau 5)          |
-| `TextChunker`       | Dividir as páginas em trechos                         | Divisor próprio (degrau 5)  |
-| `EmbeddingProvider` | Gerar embeddings de trechos e perguntas               | Gemini / OpenAI (degrau 6)  |
-| `VectorStore`       | Indexar trechos e buscar por similaridade             | pgvector (degrau 4/5)       |
-| `LanguageModel`     | Gerar a resposta a partir dos trechos encontrados     | Gemini / OpenAI (degrau 6)  |
+| Porta               | Responsabilidade                                  | Implementação                           |
+| ------------------- | ------------------------------------------------- | --------------------------------------- |
+| `ManualRepository`  | Guardar os manuais e seus status                  | `SqlAlchemyManualRepository` (Postgres) |
+| `FileStorage`       | Guardar o PDF original de cada manual             | `LocalFileStorage` (pasta/volume)       |
+| `DocumentParser`    | Extrair o texto do PDF, página a página           | `PdfiumDocumentParser` (pypdfium2)      |
+| `TextChunker`       | Dividir as páginas em trechos                     | `LineChunker` (por linhas, sobreposto)  |
+| `EmbeddingProvider` | Gerar embeddings de trechos e perguntas           | Gemini / OpenAI (degrau 6)              |
+| `VectorStore`       | Indexar trechos e buscar por similaridade         | `PgVectorStore` (pgvector)              |
+| `LanguageModel`     | Gerar a resposta a partir dos trechos encontrados | Gemini / OpenAI (degrau 6)              |
+
+## Casos de uso
+
+| Caso de uso             | O que faz                                                                   |
+| ----------------------- | --------------------------------------------------------------------------- |
+| `CheckHealthUseCase`    | Consolida a saúde da API e de suas dependências                              |
+| `RegisterManualUseCase` | Valida o PDF (conteúdo e tamanho), guarda o arquivo e cadastra como pendente |
+| `IndexManualUseCase`    | Lê, divide, gera embeddings e indexa; registra falhas no próprio manual      |
+| `ListManualsUseCase`    | Lista os manuais, do mais recente para o mais antigo                         |
+| `DeleteManualUseCase`   | Remove trechos, cadastro e arquivo original                                  |
 
 Os adaptadores traduzem as exceções das bibliotecas para os erros da aplicação
 (`UnreadableDocumentError`, `ExternalServiceError`). Assim, trocar o Gemini pela OpenAI

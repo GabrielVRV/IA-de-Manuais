@@ -16,6 +16,7 @@ dependencies = [
     "asyncpg>=0.32",
     "alembic>=1.20",
     "pgvector>=0.5",
+    "pypdfium2>=5.14",
 ]
 
 [project.optional-dependencies]
@@ -65,6 +66,7 @@ select = [
     "S101",        # assert é o idioma do pytest
     "S105", "S106", # senhas falsas em testes
 ]
+"tests/fakes.py" = ["ARG002"]  # fakes seguem a assinatura da porta, mesmo sem usar tudo
 "**/migrations/versions/*" = ["N999"]  # o Alembic nomeia as migrações começando por número
 
 # --------------------------------------------------------------------------- #
@@ -75,6 +77,10 @@ python_version = "3.11"
 strict = true
 files = ["src", "tests"]
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["pypdfium2", "pypdfium2.*"]  # biblioteca sem anotações de tipo publicadas
+ignore_missing_imports = true
 
 # --------------------------------------------------------------------------- #
 # Testes
