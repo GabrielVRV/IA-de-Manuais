@@ -12,6 +12,10 @@ dependencies = [
     "fastapi>=0.142",
     "uvicorn[standard]>=0.32",
     "pydantic-settings>=2.7",
+    "sqlalchemy[asyncio]>=2.1",
+    "asyncpg>=0.32",
+    "alembic>=1.20",
+    "pgvector>=0.5",
 ]
 
 [project.optional-dependencies]
@@ -22,6 +26,7 @@ dev = [
     "ruff>=0.8",
     "mypy>=1.13",
     "import-linter>=2.1",
+    "testcontainers[postgres]>=4.15",
 ]
 
 [tool.hatch.version]
@@ -56,7 +61,11 @@ select = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]  # assert é o idioma do pytest
+"tests/**" = [
+    "S101",        # assert é o idioma do pytest
+    "S105", "S106", # senhas falsas em testes
+]
+"**/migrations/versions/*" = ["N999"]  # o Alembic nomeia as migrações começando por número
 
 # --------------------------------------------------------------------------- #
 # Type checking
@@ -73,6 +82,9 @@ plugins = ["pydantic.mypy"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
+markers = [
+    "db: sobe um PostgreSQL real via Docker (pule com: pytest -m 'not db')",
+]
 
 [tool.coverage.run]
 source = ["manual_assistant"]

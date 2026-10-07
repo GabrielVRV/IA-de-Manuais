@@ -45,7 +45,7 @@ negócio em [`docs/dominio.md`](docs/dominio.md).
 | 1  | Fundação: repositório, esqueleto Clean Architecture, health check, Docker, CI       | ✅     |
 | 2  | Frontend: React + Vite + TypeScript, consumindo o health check; build para o XAMPP  | ✅     |
 | 3  | Domínio: entidades (Manual, Trecho, Pergunta, Resposta) e portas (LLM, vetores...)  | ✅     |
-| 4  | Persistência: PostgreSQL + pgvector no compose, migrações com Alembic               | ⏳     |
+| 4  | Persistência: PostgreSQL + pgvector no compose, migrações com Alembic               | ✅     |
 | 5  | Ingestão: upload de PDF → extração → divisão em trechos → embeddings → indexação    | ⏳     |
 | 6  | Adaptadores de LLM: Gemini e OpenAI, selecionáveis por variável de ambiente         | ⏳     |
 | 7  | Caso de uso "Perguntar" (RAG) com citação de manual e página                         | ⏳     |
@@ -63,13 +63,16 @@ negócio em [`docs/dominio.md`](docs/dominio.md).
 
 ## Rodando o projeto
 
-**Backend (Docker):**
+**Backend + banco (Docker):**
 
 ```bash
-cp backend/.env.example backend/.env
+cp .env.example .env                  # defina DB_PASSWORD
+cp backend/.env.example backend/.env  # configurações da API (CORS, chaves de IA...)
 docker compose up -d --build
 curl http://localhost:8000/api/v1/health
 ```
+
+As migrações do banco são aplicadas automaticamente quando a API inicia.
 
 **Frontend (XAMPP):**
 

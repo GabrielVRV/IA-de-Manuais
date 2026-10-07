@@ -1,11 +1,45 @@
+# Variáveis lidas do arquivo .env na raiz (copie de .env.example).
+name: manual-assistant
+
 services:
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: manual-assistant-db
+    environment:
+      POSTGRES_DB: ${DB_NAME:-manuais}
+      POSTGRES_USER: ${DB_USER:-manuais}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no arquivo .env da raiz}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      # Exposto só para a própria máquina (ferramentas de banco, desenvolvimento local).
+      - "127.0.0.1:${DB_PUBLISHED_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   api:
     build: ./backend
     image: manual-assistant-api:latest
     container_name: manual-assistant-api
+    depends_on:
+      db:
+        condition: service_healthy
     env_file:
       - path: ./backend/.env
         required: false
+    environment:
+      APP_DB_HOST: db
+      APP_DB_PORT: 5432
+      APP_DB_NAME: ${DB_NAME:-manuais}
+      APP_DB_USER: ${DB_USER:-manuais}
+      APP_DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no arquivo .env da raiz}
     ports:
       - "8000:8000"
     restart: unless-stopped
+
+volumes:
+  db-data:

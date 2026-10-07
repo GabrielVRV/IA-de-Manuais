@@ -31,4 +31,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=4)"
 
-CMD ["uvicorn", "--factory", "manual_assistant.main:create_app", "--host", "0.0.0.0", "--port", "8000"]
+# Aplica as migrações pendentes e só então inicia a API.
+CMD ["sh", "-c", "python -m manual_assistant.infrastructure.persistence.migrate && exec uvicorn --factory manual_assistant.main:create_app --host 0.0.0.0 --port 8000"]
