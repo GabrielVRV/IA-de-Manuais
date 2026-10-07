@@ -25,6 +25,12 @@ def test_uses_development_defaults() -> None:
     assert settings.cors_origins == ["http://localhost:5173"]
 
 
+def test_thinking_budget_can_be_disabled_with_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_GEMINI_THINKING_BUDGET", "none")
+
+    assert Settings(_env_file=None, db_password="x").gemini_thinking_budget is None
+
+
 def test_requires_a_database_password() -> None:
     with pytest.raises(ValidationError, match="db_password"):
         Settings(_env_file=None)

@@ -14,6 +14,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        env_parse_none_str="none",  # ex.: APP_GEMINI_THINKING_BUDGET=none
     )
 
     app_name: str = "Assistente de Manuais"
@@ -33,6 +34,11 @@ class Settings(BaseSettings):
     storage_dir: Path = Path("data/manuals")
     max_upload_mb: int = Field(default=50, gt=0)
 
+    # Busca e resposta (RAG)
+    rag_top_k: int = Field(default=6, ge=1, le=20)
+    # 0 = sem corte: com o Gemini, trechos sem relação ainda pontuam ~0,6.
+    rag_min_score: float = Field(default=0.0, ge=0.0, le=1.0)
+
     # Provedor de IA
     ai_provider: Literal["gemini", "openai"] = "gemini"
     ai_timeout_seconds: float = Field(default=60, gt=0)
@@ -41,7 +47,8 @@ class Settings(BaseSettings):
     gemini_api_key: SecretStr | None = None
     gemini_chat_model: str = "gemini-3.5-flash"
     gemini_embedding_model: str = "gemini-embedding-001"
-    gemini_thinking_budget: int = Field(default=0, ge=0)
+    # 0 desliga o raciocínio; "none" não envia o parâmetro (obrigatório nos modelos *-lite).
+    gemini_thinking_budget: int | None = Field(default=0, ge=0)
 
     openai_api_key: SecretStr | None = None
     openai_chat_model: str = "gpt-4.1-mini"

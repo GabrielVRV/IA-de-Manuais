@@ -65,6 +65,17 @@ async def test_uploaded_manual_is_indexed_and_searchable(
     assert "180 bar" in results[0].chunk.text
 
 
+async def test_answers_questions_citing_the_uploaded_manual(client: TestClient) -> None:
+    files = {"file": ("prensa.pdf", build_pdf("Pressão máxima: 180 bar"), "application/pdf")}
+    client.post(URL, files=files, data={"title": "Prensa P-200"})
+
+    body = client.post("/api/v1/questions", json={"question": "Qual a pressão?"}).json()
+
+    assert body["found"] is True
+    assert body["citations"][0]["manual_title"] == "Prensa P-200"
+    assert body["citations"][0]["pages_label"] == "p. 1"
+
+
 async def test_deleting_removes_everything(client: TestClient, settings: Settings) -> None:
     files = {"file": ("m.pdf", build_pdf("Conteúdo"), "application/pdf")}
     manual_id = client.post(URL, files=files).json()["id"]

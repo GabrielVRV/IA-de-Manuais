@@ -109,9 +109,13 @@ class TestEmbeddings:
         (httpx.Response(401, json={"error": {"code": 401, "message": "bad key"}}), "chave de API"),
         (httpx.Response(429, json={"error": {"code": 429, "message": "quota"}}), "Cota"),
         (httpx.Response(500, json={"error": {"code": 500, "message": "boom"}}), "HTTP 500"),
+        (
+            httpx.Response(400, json={"error": {"code": 400, "message": "invalid argument"}}),
+            r"HTTP 400\): invalid argument",
+        ),
         (httpx.ConnectError("sem rede"), "Sem resposta"),
     ],
-    ids=["chave-invalida", "cota", "erro-servidor", "sem-rede"],
+    ids=["chave-invalida", "cota", "erro-servidor", "requisicao-invalida", "sem-rede"],
 )
 async def test_translates_failures(
     api: FakeGeminiApi,
@@ -146,6 +150,15 @@ class TestLanguageModel:
         assert config["temperature"] == 0.2
         assert config["maxOutputTokens"] == 512
         assert config["thinkingConfig"]["thinking_budget"] == 0
+
+    async def test_omits_thinking_config_when_budget_is_none(self, api: FakeGeminiApi) -> None:
+        model = GeminiLanguageModel(
+            api.client(), model="gemini-3.5-flash-lite", thinking_budget=None
+        )
+
+        await model.complete(self.REQUEST)
+
+        assert "thinkingConfig" not in api.requests[0][1]["generationConfig"]
 
     async def test_maps_text_model_and_billed_tokens(self, api: FakeGeminiApi) -> None:
         completion = await GeminiLanguageModel(api.client(), model="m").complete(self.REQUEST)

@@ -55,6 +55,7 @@ uvicorn --factory manual_assistant.main:create_app --reload
 | `GET /api/v1/manuals/{id}`            | Consulta um manual (use para acompanhar a indexação)       |
 | `POST /api/v1/manuals/{id}/reindex`   | Reprocessa (após falha ou troca de provedor de IA)         |
 | `DELETE /api/v1/manuals/{id}`         | Exclui o manual, seus trechos e o PDF original             |
+| `POST /api/v1/questions`              | Responde `{"question": "..."}` com o texto, `found` e as citações (manual e páginas) |
 
 Status de um manual: `pending → processing → indexed | failed`. Em caso de falha, o
 motivo aparece em `failure_reason`. Se a API reiniciar no meio de uma indexação, o manual

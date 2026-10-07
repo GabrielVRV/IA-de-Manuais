@@ -55,7 +55,10 @@ def _describe(error: errors.APIError, operation: str) -> str:
         return f"Gemini recusou a chave de API ao {operation} (verifique APP_GEMINI_API_KEY)"
     if error.code == 429:
         return f"Cota do Gemini excedida ao {operation}"
-    return f"Gemini falhou ao {operation} (HTTP {error.code})"
+    # O motivo informado pelo Google revela erros de configuração (ex.: parâmetro não
+    # suportado pelo modelo) sem expor a chave.
+    detail = f": {error.message[:200]}" if error.message else ""
+    return f"Gemini falhou ao {operation} (HTTP {error.code}){detail}"
 
 
 class GeminiEmbeddingProvider:
@@ -104,12 +107,20 @@ class GeminiEmbeddingProvider:
 
 
 class GeminiLanguageModel:
-    def __init__(self, client: genai.Client, *, model: str, thinking_budget: int = 0) -> None:
+    def __init__(
+        self, client: genai.Client, *, model: str, thinking_budget: int | None = 0
+    ) -> None:
         self._client = client
         self._model = model
         # 0 desliga o "raciocínio": responder a partir de trechos não precisa dele, e os
         # tokens de raciocínio são cobrados e consomem o limite de saída.
-        self._thinking_budget = thinking_budget
+        # None não envia a configuração: modelos sem raciocínio (ex.: flash-lite) recusam
+        # qualquer thinking_budget com "invalid argument".
+        self._thinking_config = (
+            None
+            if thinking_budget is None
+            else types.ThinkingConfig(thinking_budget=thinking_budget)
+        )
 
     async def complete(self, request: CompletionRequest) -> Completion:
         async with _translate_errors("gerar a resposta"):
@@ -120,7 +131,7 @@ class GeminiLanguageModel:
                     system_instruction=request.system_instruction,
                     temperature=request.temperature,
                     max_output_tokens=request.max_output_tokens,
-                    thinking_config=types.ThinkingConfig(thinking_budget=self._thinking_budget),
+                    thinking_config=self._thinking_config,
                     automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
                 ),
             )
