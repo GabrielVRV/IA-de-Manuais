@@ -37,9 +37,13 @@ services:
       APP_DB_NAME: ${DB_NAME:-manuais}
       APP_DB_USER: ${DB_USER:-manuais}
       APP_DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no arquivo .env da raiz}
+      APP_STORAGE_DIR: /home/app/data/manuals
+    volumes:
+      - manual-files:/home/app/data  # PDFs originais (necessários para reprocessar)
     ports:
       - "8000:8000"
     restart: unless-stopped
 
 volumes:
   db-data:
+  manual-files:

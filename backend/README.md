@@ -46,6 +46,35 @@ uvicorn --factory manual_assistant.main:create_app --reload
 - Health check: <http://localhost:8000/api/v1/health>
 - Documentação interativa (Swagger): <http://localhost:8000/api/docs>
 
+## API de manuais
+
+| Método e rota                         | O que faz                                                  |
+| ------------------------------------- | ---------------------------------------------------------- |
+| `POST /api/v1/manuals`                | Envia um PDF (`file`, `title` opcional). Responde **202** e indexa em segundo plano |
+| `GET /api/v1/manuals`                 | Lista os manuais com o status de cada um                   |
+| `GET /api/v1/manuals/{id}`            | Consulta um manual (use para acompanhar a indexação)       |
+| `POST /api/v1/manuals/{id}/reindex`   | Reprocessa (após falha ou troca de provedor de IA)         |
+| `DELETE /api/v1/manuals/{id}`         | Exclui o manual, seus trechos e o PDF original             |
+
+Status de um manual: `pending → processing → indexed | failed`. Em caso de falha, o
+motivo aparece em `failure_reason`. Se a API reiniciar no meio de uma indexação, o manual
+é marcado como falha na próxima inicialização e pode ser reprocessado.
+
+O jeito mais fácil de testar é pelo Swagger (`/api/docs`): abra `POST /manuals`, clique
+em *Try it out* e escolha um PDF.
+
+## Provedores de IA
+
+Configurados no `.env` (ver `.env.example` e o [ADR 0005](../docs/adr/0005-provedores-de-ia.md)):
+
+```ini
+APP_AI_PROVIDER=gemini        # ou openai
+APP_GEMINI_API_KEY=...        # a API não inicia sem a chave do provedor escolhido
+```
+
+> Use o **plano pago** da API. No plano gratuito, os trechos dos manuais enviados podem
+> ser usados pelo provedor para treinar modelos.
+
 ## Banco de dados e migrações
 
 - O esquema é versionado com **Alembic** em
@@ -68,9 +97,12 @@ ruff check .            # lint
 ruff format --check .   # formatação (use `ruff format .` para corrigir)
 mypy                    # tipagem estática (modo strict)
 lint-imports            # regra de dependência da Clean Architecture
-pytest --cov            # testes + cobertura (precisa do Docker em execução)
-pytest -m "not db"      # só os testes que não dependem do banco
+pytest --cov                       # testes + cobertura (precisa do Docker em execução)
+pytest -m "not db and not live"    # só os testes que não dependem de banco nem de IA real
+pytest -m live                     # chama a API real do provedor de IA (gasta cota)
 ```
 
-Os testes marcados com `db` sobem um PostgreSQL descartável via
-[Testcontainers](https://testcontainers.com/), com a mesma imagem da produção.
+- Os testes marcados com `db` sobem um PostgreSQL descartável via
+  [Testcontainers](https://testcontainers.com/), com a mesma imagem da produção.
+- Os testes `live` não rodam por padrão nem no CI. Use-os para validar uma chave nova ou
+  uma troca de modelo.

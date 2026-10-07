@@ -19,7 +19,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-RUN useradd --create-home --uid 1000 app
+RUN useradd --create-home --uid 1000 app \
+    # Pasta dos PDFs: criada com o dono certo para o volume herdar a permissão.
+    && mkdir -p /home/app/data/manuals \
+    && chown -R app:app /home/app/data
 
 COPY --from=builder /wheels /wheels
 RUN pip install /wheels/* && rm -rf /wheels

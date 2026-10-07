@@ -45,13 +45,27 @@ class IndexManualUseCase:
         self._vector_store = vector_store
 
     async def execute(self, manual_id: ManualId) -> Manual:
+        return await self.run(await self.prepare(manual_id))
+
+    async def prepare(self, manual_id: ManualId) -> Manual:
+        """Etapa rápida e síncrona: valida e marca como "processando".
+
+        Separada de ``run`` para que a API responda na hora (404, 409) e deixe o
+        trabalho pesado em segundo plano.
+
+        Raises:
+            ManualNotFoundError: se o manual não existir.
+            InvalidStateTransitionError: se ele já estiver em processamento.
+        """
         manual = await self._repository.get(manual_id)
         if manual is None:
             raise ManualNotFoundError(manual_id)
-
         manual.start_processing()
         await self._repository.save(manual)
+        return manual
 
+    async def run(self, manual: Manual) -> Manual:
+        """Etapa demorada: indexa um manual já preparado e registra o resultado nele."""
         # Captura tudo de propósito: o resultado, sucesso ou falha, precisa ficar no manual.
         try:
             page_count, chunk_count = await self._index(manual)
