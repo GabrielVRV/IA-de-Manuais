@@ -10,6 +10,8 @@ import { createRoot } from 'react-dom/client'
 import { App } from '@/app/App'
 import { loadRuntimeConfig } from '@/app/config/runtime-config'
 import { StartupError } from '@/app/StartupError'
+import { HttpQuestionGateway } from '@/features/chat/infrastructure/http-question-gateway'
+import { QuestionGatewayContext } from '@/features/chat/presentation/question-gateway-context'
 import { HttpHealthGateway } from '@/features/health/infrastructure/http-health-gateway'
 import { HealthGatewayContext } from '@/features/health/presentation/health-gateway-context'
 import { HttpClient } from '@/shared/http/http-client'
@@ -26,7 +28,9 @@ async function bootstrap(): Promise<void> {
     root.render(
       <StrictMode>
         <HealthGatewayContext value={new HttpHealthGateway(http)}>
-          <App />
+          <QuestionGatewayContext value={new HttpQuestionGateway(http)}>
+            <App />
+          </QuestionGatewayContext>
         </HealthGatewayContext>
       </StrictMode>,
     )

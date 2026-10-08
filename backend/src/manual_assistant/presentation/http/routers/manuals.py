@@ -1,8 +1,9 @@
 from pathlib import PureWindowsPath
 from typing import Annotated, Any
+from urllib.parse import quote
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, File, Form, Response, UploadFile, status
 
 from manual_assistant.domain.manual import TITLE_MAX_LENGTH, ManualId
 from manual_assistant.presentation.http.dependencies import UseCasesDep
@@ -53,6 +54,24 @@ async def list_manuals(use_cases: UseCasesDep) -> list[ManualResponse]:
 @router.get("/{manual_id}", responses=NOT_FOUND, summary="Consulta um manual e seu status")
 async def get_manual(manual_id: UUID, use_cases: UseCasesDep) -> ManualResponse:
     return ManualResponse.from_entity(await use_cases.get_manual.execute(ManualId(manual_id)))
+
+
+@router.get(
+    "/{manual_id}/file",
+    response_class=Response,
+    responses={**NOT_FOUND, status.HTTP_200_OK: {"content": {"application/pdf": {}}}},
+    summary="Abre o PDF original (use #page=N na URL para ir direto à página)",
+)
+async def get_manual_file(manual_id: UUID, use_cases: UseCasesDep) -> Response:
+    manual_file = await use_cases.get_manual_file.execute(ManualId(manual_id))
+    return Response(
+        content=manual_file.content,
+        media_type="application/pdf",
+        headers={
+            # inline: o navegador abre o PDF em vez de baixar; filename* aceita acentos.
+            "Content-Disposition": f"inline; filename*=UTF-8''{quote(manual_file.file_name)}",
+        },
+    )
 
 
 @router.post(

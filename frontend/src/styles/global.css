@@ -7,6 +7,7 @@
   --color-text: #1b2430;
   --color-text-muted: #5b6878;
   --color-primary: #1f5fbf;
+  --color-on-primary: #ffffff;
   --color-neutral: #8a96a5;
   --color-success: #1e8e4e;
   --color-warning: #c27c0e;
@@ -43,6 +44,7 @@
     --color-text: #e6ebf1;
     --color-text-muted: #9aa7b6;
     --color-primary: #6aa3ff;
+    --color-on-primary: #0f141a;
     --color-neutral: #6c7887;
     --color-success: #3ccf7f;
     --color-warning: #f0b041;
