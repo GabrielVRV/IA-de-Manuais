@@ -50,8 +50,10 @@ negócio em [`docs/dominio.md`](docs/dominio.md).
 | 6  | Provedores de IA (Gemini/OpenAI) e API de manuais (upload, listagem, exclusão)      | ✅     |
 | 7  | Caso de uso "Perguntar" (RAG) com citação de manual e página                         | ✅     |
 | 8  | Chat no frontend: respostas com fontes clicáveis (abre o PDF na página citada)      | ✅     |
-| 9  | Autenticação e área administrativa de manuais                                       | ⏳     |
-| 10 | Observabilidade: logs estruturados, custo de tokens, feedback 👍/👎 nas respostas    | ⏳     |
+| 9a | Usuários, login (cookie HttpOnly + Argon2) e proteção das rotas da API              | ✅     |
+| 9b | Telas de login, de usuários e de acompanhamento dos manuais                         | ⏳     |
+| 10 | Sincronização automática dos manuais com o SharePoint (Microsoft Graph)             | ⏳     |
+| 11 | Observabilidade: logs estruturados, custo de tokens, feedback 👍/👎 nas respostas    | ⏳     |
 
 ## Convenções
 

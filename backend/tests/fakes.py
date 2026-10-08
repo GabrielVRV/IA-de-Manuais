@@ -18,6 +18,7 @@ from manual_assistant.application.ports.vector_store import EmbeddedChunk
 from manual_assistant.domain.chunk import ScoredChunk
 from manual_assistant.domain.manual import Manual, ManualId
 from manual_assistant.domain.pages import Page, PageRange
+from manual_assistant.domain.user import User, UserId
 
 
 @dataclass
@@ -149,3 +150,20 @@ class FakeLanguageModel:
         return Completion(
             text=self.answer, model="fake-model", usage=TokenUsage(input_tokens=1, output_tokens=1)
         )
+
+
+@dataclass
+class InMemoryUserRepository:
+    users: dict[UserId, User] = field(default_factory=dict)
+
+    async def save(self, user: User) -> None:
+        self.users[user.id] = user
+
+    async def get(self, user_id: UserId) -> User | None:
+        return self.users.get(user_id)
+
+    async def get_by_username(self, username: str) -> User | None:
+        return next((u for u in self.users.values() if u.username == username), None)
+
+    async def list_all(self) -> Sequence[User]:
+        return sorted(self.users.values(), key=lambda u: u.display_name)

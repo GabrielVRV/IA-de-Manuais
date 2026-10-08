@@ -21,6 +21,8 @@ dependencies = [
     "google-genai>=2.28",
     "openai>=3.26",
     "httpx2>=2.13",  # cliente HTTP usado pelo SDK da OpenAI
+    "argon2-cffi>=25.1",
+    "pyjwt>=2.15",
 ]
 
 [project.optional-dependencies]
@@ -119,7 +121,7 @@ include_external_packages = true
 name = "Clean Architecture: regra de dependência"
 type = "layers"
 layers = [
-    "manual_assistant.main",
+    "manual_assistant.main | manual_assistant.cli",
     "manual_assistant.presentation | manual_assistant.infrastructure",
     "manual_assistant.application",
     "manual_assistant.domain",

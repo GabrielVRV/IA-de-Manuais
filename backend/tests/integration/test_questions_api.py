@@ -1,5 +1,4 @@
 import pytest
-from fastapi.testclient import TestClient
 
 from manual_assistant.application.errors import ExternalServiceError
 from manual_assistant.domain.chunk import ScoredChunk
@@ -24,7 +23,7 @@ def backend() -> FakeBackend:
 
 
 def test_answers_with_formatted_citations(backend: FakeBackend) -> None:
-    response = TestClient(backend.build_app()).post(URL, json={"question": "Pressão máxima?"})
+    response = backend.client_logged_in_as().post(URL, json={"question": "Pressão máxima?"})
 
     assert response.status_code == 200
     assert response.json() == {
@@ -44,7 +43,7 @@ def test_answers_with_formatted_citations(backend: FakeBackend) -> None:
 def test_reports_when_the_answer_is_not_in_the_manuals(backend: FakeBackend) -> None:
     backend.language_model.answer = "NAO_ENCONTRADO"
 
-    body = TestClient(backend.build_app()).post(URL, json={"question": "Como faço café?"}).json()
+    body = backend.client_logged_in_as().post(URL, json={"question": "Como faço café?"}).json()
 
     assert body["found"] is False
     assert body["citations"] == []
@@ -53,7 +52,7 @@ def test_reports_when_the_answer_is_not_in_the_manuals(backend: FakeBackend) -> 
 
 @pytest.mark.parametrize("question", ["", "oi", "x" * 2001])
 def test_rejects_invalid_questions(backend: FakeBackend, question: str) -> None:
-    response = TestClient(backend.build_app()).post(URL, json={"question": question})
+    response = backend.client_logged_in_as().post(URL, json={"question": question})
 
     assert response.status_code == 422
 
@@ -61,7 +60,7 @@ def test_rejects_invalid_questions(backend: FakeBackend, question: str) -> None:
 def test_returns_503_when_the_ai_provider_fails(backend: FakeBackend) -> None:
     backend.language_model.error = ExternalServiceError("Gemini falhou ao gerar a resposta")
 
-    response = TestClient(backend.build_app()).post(URL, json={"question": "Pressão máxima?"})
+    response = backend.client_logged_in_as().post(URL, json={"question": "Pressão máxima?"})
 
     assert response.status_code == 503
     assert "Gemini" in response.json()["detail"]

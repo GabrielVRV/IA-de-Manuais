@@ -1,6 +1,6 @@
 """Fluxo completo com banco real, PDF real e armazenamento real; só a IA é falsa."""
 
-from collections.abc import Iterator
+from collections.abc import AsyncIterator
 from pathlib import Path
 
 import pytest
@@ -10,17 +10,21 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from manual_assistant.application.use_cases.recover_interrupted_indexing import (
     INTERRUPTED_REASON,
 )
+from manual_assistant.domain.user import UserRole
 from manual_assistant.infrastructure.ai.factory import AiProviders
 from manual_assistant.infrastructure.persistence.manual_repository import (
     SqlAlchemyManualRepository,
 )
 from manual_assistant.infrastructure.persistence.models import EMBEDDING_DIMENSIONS
+from manual_assistant.infrastructure.persistence.user_repository import SqlAlchemyUserRepository
 from manual_assistant.infrastructure.persistence.vector_store import PgVectorStore
 from manual_assistant.infrastructure.settings import Settings
 from manual_assistant.main import create_app
 from tests.factories import make_manual
 from tests.fakes import FakeEmbeddingProvider, FakeLanguageModel
+from tests.http_app import login
 from tests.pdf_builder import build_pdf
+from tests.security import fast_hasher, make_user
 
 # Fixtures do banco são assíncronas: todos os testes do módulo rodam com anyio.
 pytestmark = [pytest.mark.db, pytest.mark.anyio]
@@ -33,16 +37,21 @@ def settings(postgres_settings: Settings, tmp_path: Path) -> Settings:
     return postgres_settings.model_copy(update={"storage_dir": tmp_path / "manuais"})
 
 
-@pytest.fixture
-def client(
-    settings: Settings,
-    session_factory: async_sessionmaker[AsyncSession],  # noqa: ARG001 - limpa o banco ao final
-) -> Iterator[TestClient]:
-    ai = AiProviders(
+def fake_ai() -> AiProviders:
+    return AiProviders(
         embeddings=FakeEmbeddingProvider(dimensions=EMBEDDING_DIMENSIONS),
         language_model=FakeLanguageModel(),
     )
-    with TestClient(create_app(settings, ai_providers=ai)) as client:
+
+
+@pytest.fixture
+async def client(
+    settings: Settings, session_factory: async_sessionmaker[AsyncSession]
+) -> AsyncIterator[TestClient]:
+    await SqlAlchemyUserRepository(session_factory).save(make_user("admin", role=UserRole.ADMIN))
+    app = create_app(settings, ai_providers=fake_ai(), password_hasher=fast_hasher())
+    with TestClient(app) as client:
+        login(client, "admin")
         yield client
 
 
@@ -92,9 +101,10 @@ async def test_startup_fails_indexing_interrupted_by_a_restart(
     stuck = make_manual()
     stuck.start_processing()
     await repository.save(stuck)
-    ai = AiProviders(FakeEmbeddingProvider(dimensions=EMBEDDING_DIMENSIONS), FakeLanguageModel())
+    await SqlAlchemyUserRepository(session_factory).save(make_user("admin", role=UserRole.ADMIN))
 
-    with TestClient(create_app(settings, ai_providers=ai)) as client:
+    with TestClient(create_app(settings, ai_providers=fake_ai())) as client:
+        login(client, "admin")
         manual = client.get(f"{URL}/{stuck.id}").json()
 
     assert manual["status"] == "failed"

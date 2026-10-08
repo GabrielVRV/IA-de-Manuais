@@ -29,6 +29,7 @@ def postgres_settings() -> Iterator[Settings]:
             db_user=container.username,
             db_password=container.password,
             gemini_api_key="chave-de-teste",  # create_app exige; nenhum teste chama a IA real
+            auth_secret_key="segredo-de-teste-com-mais-de-32-caracteres",
         )
         upgrade_to_head(settings.database_url)
         yield settings
@@ -40,7 +41,7 @@ async def engine(postgres_settings: Settings) -> AsyncIterator[AsyncEngine]:
     yield engine
     # Isola os testes: cada um começa com o banco vazio.
     async with engine.begin() as connection:
-        await connection.execute(text("TRUNCATE manuals, chunks CASCADE"))
+        await connection.execute(text("TRUNCATE manuals, chunks, users CASCADE"))
     await engine.dispose()
 
 

@@ -46,6 +46,35 @@ uvicorn --factory manual_assistant.main:create_app --reload
 - Health check: <http://localhost:8000/api/v1/health>
 - Documentação interativa (Swagger): <http://localhost:8000/api/docs>
 
+## Usuários e acesso
+
+Todas as rotas exigem login, exceto `/api/v1/health` e `/api/v1/auth/login`. Detalhes no
+[ADR 0007](../docs/adr/0007-autenticacao-e-controle-de-acesso.md).
+
+| Perfil  | Pode                                                   |
+| ------- | ------------------------------------------------------ |
+| `user`  | Usar o chat e abrir os manuais citados                 |
+| `admin` | Tudo do `user` + enviar/reprocessar/excluir manuais e gerenciar usuários |
+
+**Primeiro administrador** (no servidor; a senha é pedida sem aparecer na tela):
+
+```powershell
+docker compose exec api python -m manual_assistant.cli create-admin --username seu.login --name "Seu Nome"
+```
+
+| Método e rota                              | O que faz                                          |
+| ------------------------------------------ | -------------------------------------------------- |
+| `POST /api/v1/auth/login`                  | Entra; a sessão fica num cookie HttpOnly           |
+| `POST /api/v1/auth/logout`                 | Sai                                                |
+| `GET /api/v1/auth/me`                      | Usuário da sessão                                  |
+| `POST /api/v1/auth/change-password`        | Troca a própria senha                              |
+| `GET/POST /api/v1/users`                   | Lista / cria usuários com senha provisória (admin) |
+| `POST /api/v1/users/{id}/reset-password`   | Define uma nova senha provisória (admin)           |
+| `PATCH /api/v1/users/{id}`                 | Ativa/desativa ou muda o perfil (admin)            |
+
+Pelo Swagger (`/api/docs`), faça o `POST /auth/login` primeiro: o navegador guarda o
+cookie e as demais chamadas passam a funcionar.
+
 ## API de manuais
 
 | Método e rota                         | O que faz                                                  |

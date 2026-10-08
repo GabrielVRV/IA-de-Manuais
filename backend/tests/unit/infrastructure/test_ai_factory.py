@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from manual_assistant.infrastructure.ai.factory import AiConfigurationError, build_ai_providers
@@ -12,8 +14,13 @@ from manual_assistant.infrastructure.ai.openai_provider import (
 from manual_assistant.infrastructure.settings import Settings
 
 
-def settings(**values: object) -> Settings:
-    return Settings(_env_file=None, db_password="x", **values)  # type: ignore[arg-type]
+def settings(**values: Any) -> Settings:
+    return Settings(
+        _env_file=None,
+        db_password="x",
+        auth_secret_key="segredo-de-teste-com-mais-de-32-caracteres",
+        **values,
+    )
 
 
 def test_builds_gemini_providers() -> None:
