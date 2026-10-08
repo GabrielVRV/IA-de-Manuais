@@ -6,14 +6,22 @@ import './styles/global.css'
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { HashRouter } from 'react-router'
 
 import { App } from '@/app/App'
 import { loadRuntimeConfig } from '@/app/config/runtime-config'
 import { StartupError } from '@/app/StartupError'
+import { HttpAuthGateway } from '@/features/auth/infrastructure/http-auth-gateway'
+import { AuthGatewayContext } from '@/features/auth/presentation/session-context'
+import { SessionProvider } from '@/features/auth/presentation/SessionProvider'
 import { HttpQuestionGateway } from '@/features/chat/infrastructure/http-question-gateway'
 import { QuestionGatewayContext } from '@/features/chat/presentation/question-gateway-context'
 import { HttpHealthGateway } from '@/features/health/infrastructure/http-health-gateway'
 import { HealthGatewayContext } from '@/features/health/presentation/health-gateway-context'
+import { HttpManualsGateway } from '@/features/manuals/infrastructure/http-manuals-gateway'
+import { ManualsGatewayContext } from '@/features/manuals/presentation/manuals-gateway-context'
+import { HttpUsersGateway } from '@/features/users/infrastructure/http-users-gateway'
+import { UsersGatewayContext } from '@/features/users/presentation/users-gateway-context'
 import { HttpClient } from '@/shared/http/http-client'
 
 async function bootstrap(): Promise<void> {
@@ -27,11 +35,22 @@ async function bootstrap(): Promise<void> {
 
     root.render(
       <StrictMode>
-        <HealthGatewayContext value={new HttpHealthGateway(http)}>
-          <QuestionGatewayContext value={new HttpQuestionGateway(http)}>
-            <App />
-          </QuestionGatewayContext>
-        </HealthGatewayContext>
+        <AuthGatewayContext value={new HttpAuthGateway(http)}>
+          <HealthGatewayContext value={new HttpHealthGateway(http)}>
+            <QuestionGatewayContext value={new HttpQuestionGateway(http)}>
+              <ManualsGatewayContext value={new HttpManualsGateway(http)}>
+                <UsersGatewayContext value={new HttpUsersGateway(http)}>
+                  <SessionProvider>
+                    {/* Rotas por "#": funcionam em qualquer subpasta do XAMPP sem reescrita. */}
+                    <HashRouter>
+                      <App />
+                    </HashRouter>
+                  </SessionProvider>
+                </UsersGatewayContext>
+              </ManualsGatewayContext>
+            </QuestionGatewayContext>
+          </HealthGatewayContext>
+        </AuthGatewayContext>
       </StrictMode>,
     )
   } catch (error) {

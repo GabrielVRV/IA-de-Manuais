@@ -63,7 +63,35 @@ describe('HttpClient', () => {
       method: 'POST',
       body: JSON.stringify({ question: 'Pressão?' }),
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      credentials: 'include',
     })
+  })
+
+  it('sends PATCH, DELETE and multipart requests', async () => {
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ ok: true }))
+    const client = new HttpClient('http://api.local', { fetchFn })
+    const form = new FormData()
+
+    await client.patchJson('/users/1', { is_active: false })
+    await client.delete('/manuals/1')
+    await client.postForm('/manuals', form)
+
+    const inits = fetchFn.mock.calls.map(([, init]) => init)
+    expect(inits[0]).toMatchObject({ method: 'PATCH', body: '{"is_active":false}' })
+    expect(inits[1]).toMatchObject({ method: 'DELETE' })
+    expect(inits[2]).toMatchObject({ method: 'POST', body: form })
+    // Sem Content-Type: o navegador precisa definir o boundary do multipart.
+    expect(inits[2]?.headers).toEqual({ Accept: 'application/json' })
+  })
+
+  it('notifies when the session is missing or expired', async () => {
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ detail: 'x' }, 401))
+    const client = new HttpClient('http://api.local', { fetchFn })
+    const onUnauthorized = vi.fn()
+    client.setUnauthorizedHandler(onUnauthorized)
+
+    await expect(client.getJson('/x')).rejects.toBeInstanceOf(HttpError)
+    expect(onUnauthorized).toHaveBeenCalledOnce()
   })
 
   it('accepts a per-request timeout', async () => {
