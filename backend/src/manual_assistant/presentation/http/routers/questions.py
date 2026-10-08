@@ -1,13 +1,15 @@
 from typing import Any
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 
 from manual_assistant.domain.question import Question
-from manual_assistant.presentation.http.dependencies import UseCasesDep
+from manual_assistant.presentation.http.dependencies import UseCasesDep, get_current_user
 from manual_assistant.presentation.http.schemas.manuals import ErrorResponse
 from manual_assistant.presentation.http.schemas.questions import AnswerResponse, QuestionRequest
 
-router = APIRouter(prefix="/questions", tags=["questions"])
+router = APIRouter(
+    prefix="/questions", tags=["questions"], dependencies=[Depends(get_current_user)]
+)
 
 UNAVAILABLE: dict[int | str, dict[str, Any]] = {
     status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ErrorResponse}

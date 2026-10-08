@@ -3,13 +3,19 @@ from typing import Annotated, Any
 from urllib.parse import quote
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, Response, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Response, UploadFile, status
 
 from manual_assistant.domain.manual import TITLE_MAX_LENGTH, ManualId
-from manual_assistant.presentation.http.dependencies import UseCasesDep
+from manual_assistant.presentation.http.dependencies import (
+    UseCasesDep,
+    get_admin_user,
+    get_current_user,
+)
 from manual_assistant.presentation.http.schemas.manuals import ErrorResponse, ManualResponse
 
-router = APIRouter(prefix="/manuals", tags=["manuals"])
+# Consultar exige login; alterar (enviar, reprocessar, excluir) exige administrador.
+router = APIRouter(prefix="/manuals", tags=["manuals"], dependencies=[Depends(get_current_user)])
+ADMIN_ONLY = [Depends(get_admin_user)]
 
 Responses = dict[int | str, dict[str, Any]]
 
@@ -22,6 +28,7 @@ CONFLICT: Responses = {status.HTTP_409_CONFLICT: {"model": ErrorResponse}}
     "",
     status_code=status.HTTP_202_ACCEPTED,
     responses=INVALID,
+    dependencies=ADMIN_ONLY,
     summary="Envia o PDF de um manual; a indexação continua em segundo plano",
 )
 async def upload_manual(
@@ -78,6 +85,7 @@ async def get_manual_file(manual_id: UUID, use_cases: UseCasesDep) -> Response:
     "/{manual_id}/reindex",
     status_code=status.HTTP_202_ACCEPTED,
     responses={**NOT_FOUND, **CONFLICT},
+    dependencies=ADMIN_ONLY,
     summary="Reprocessa um manual (ex.: após uma falha ou troca de provedor de IA)",
 )
 async def reindex_manual(
@@ -93,6 +101,7 @@ async def reindex_manual(
     "/{manual_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     responses=NOT_FOUND,
+    dependencies=ADMIN_ONLY,
     summary="Exclui o manual, seus trechos e o arquivo original",
 )
 async def delete_manual(manual_id: UUID, use_cases: UseCasesDep) -> None:

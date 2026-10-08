@@ -19,7 +19,7 @@ def backend() -> FakeBackend:
 
 @pytest.fixture
 def client(backend: FakeBackend) -> TestClient:
-    return TestClient(backend.build_app())
+    return backend.client_logged_in_as()
 
 
 def upload(
@@ -67,7 +67,7 @@ class TestUpload:
 
     def test_rejects_files_over_the_limit(self, backend: FakeBackend) -> None:
         backend.max_upload_bytes = 1024 * 1024
-        client = TestClient(backend.build_app())
+        client = backend.client_logged_in_as()
         big = b"%PDF-" + b"0" * (1024 * 1024)
 
         response = client.post(URL, files={"file": ("m.pdf", big, "application/pdf")})

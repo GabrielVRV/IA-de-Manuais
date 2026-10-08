@@ -30,6 +30,16 @@ class Settings(BaseSettings):
     db_user: str = "manuais"
     db_password: SecretStr  # obrigatória: nunca existe senha padrão
 
+    # Autenticação
+    # Chave que assina os tokens de sessão. Gere uma aleatória (mínimo 32 caracteres):
+    #   python -c "import secrets; print(secrets.token_urlsafe(48))"
+    auth_secret_key: SecretStr
+    auth_session_hours: float = Field(default=10, gt=0)  # cobre um turno de trabalho
+    auth_max_failed_attempts: int = Field(default=5, ge=1)
+    auth_lockout_minutes: int = Field(default=15, ge=1)
+    # Só ligue com HTTPS: um cookie "secure" não é enviado em conexões HTTP.
+    auth_cookie_secure: bool = False
+
     # Arquivos dos manuais
     storage_dir: Path = Path("data/manuals")
     max_upload_mb: int = Field(default=50, gt=0)
@@ -59,6 +69,13 @@ class Settings(BaseSettings):
     def _split_comma_separated(cls, value: object) -> object:
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
+
+    @field_validator("auth_secret_key")
+    @classmethod
+    def _require_strong_secret(cls, value: SecretStr) -> SecretStr:
+        if len(value.get_secret_value()) < 32:
+            raise ValueError("APP_AUTH_SECRET_KEY precisa ter ao menos 32 caracteres")
         return value
 
     @property

@@ -6,17 +6,29 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from manual_assistant.application.errors import (
+    AccountLockedError,
     ExternalServiceError,
+    InvalidCredentialsError,
     InvalidDocumentError,
     ManualNotFoundError,
+    NotAuthenticatedError,
+    PermissionDeniedError,
     StoredFileNotFoundError,
+    UserAlreadyExistsError,
+    UserNotFoundError,
 )
 from manual_assistant.domain.errors import InvalidStateTransitionError, InvalidValueError
 
 logger = logging.getLogger(__name__)
 
 _STATUS_BY_ERROR: dict[type[Exception], int] = {
+    InvalidCredentialsError: status.HTTP_401_UNAUTHORIZED,
+    NotAuthenticatedError: status.HTTP_401_UNAUTHORIZED,
+    PermissionDeniedError: status.HTTP_403_FORBIDDEN,
+    AccountLockedError: status.HTTP_429_TOO_MANY_REQUESTS,
     ManualNotFoundError: status.HTTP_404_NOT_FOUND,
+    UserNotFoundError: status.HTTP_404_NOT_FOUND,
+    UserAlreadyExistsError: status.HTTP_409_CONFLICT,
     StoredFileNotFoundError: status.HTTP_404_NOT_FOUND,
     InvalidDocumentError: status.HTTP_422_UNPROCESSABLE_CONTENT,
     InvalidValueError: status.HTTP_422_UNPROCESSABLE_CONTENT,

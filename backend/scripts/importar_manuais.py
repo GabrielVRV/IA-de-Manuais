@@ -1,13 +1,15 @@
 """Envia para a API todos os PDFs de uma pasta e acompanha a indexação.
 
 Arquivos com o mesmo nome de um manual já cadastrado são pulados.
+Exige um usuário administrador; a senha é pedida sem aparecer na tela.
 
 Uso (na pasta backend):
-    .venv\\Scripts\\python scripts\\importar_manuais.py ..\\manuais-para-importar
-    .venv\\Scripts\\python scripts\\importar_manuais.py C:\\manuais --api http://servidor:8000
+    .venv\\Scripts\\python scripts\\importar_manuais.py ..\\manuais-para-importar --usuario gabriel
+    .venv\\Scripts\\python scripts\\importar_manuais.py C:\\manuais --usuario gabriel --api http://servidor:8000
 """
 
 import argparse
+import getpass
 import sys
 import time
 from pathlib import Path
@@ -23,6 +25,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Importa os PDFs de uma pasta para a API.")
     parser.add_argument("pasta", type=Path, help="Pasta com os PDFs")
     parser.add_argument("--api", default="http://localhost:8000", help="Endereço da API")
+    parser.add_argument("--usuario", required=True, help="Login de um administrador")
     args = parser.parse_args()
 
     folder: Path = args.pasta
@@ -35,6 +38,18 @@ def main() -> int:
         return 0
 
     with httpx.Client(base_url=args.api, timeout=120) as client:
+        # O cookie de sessão devolvido pelo login fica guardado no próprio client.
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"username": args.usuario, "password": getpass.getpass("Senha: ")},
+        )
+        if response.status_code != httpx.codes.OK:
+            print(f"Login recusado: {_detail(response)}")
+            return 1
+        if response.json()["must_change_password"]:
+            print("Troque sua senha provisória no sistema antes de importar.")
+            return 1
+
         existing = {m["file_name"] for m in _get_json(client, "/api/v1/manuals")}
         sent: dict[str, str] = {}
         for pdf in pdfs:

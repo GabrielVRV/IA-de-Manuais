@@ -1,6 +1,4 @@
-from collections.abc import Callable
-from datetime import UTC, datetime
-
+from manual_assistant.application.clock import Clock, utc_now
 from manual_assistant.application.errors import InvalidDocumentError
 from manual_assistant.application.ports.file_storage import FileStorage
 from manual_assistant.application.ports.manual_repository import ManualRepository
@@ -9,10 +7,6 @@ from manual_assistant.domain.manual import Manual
 
 PDF_SIGNATURE = b"%PDF-"
 DEFAULT_MAX_BYTES = 50 * 1024 * 1024
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
 
 
 class RegisterManualUseCase:
@@ -24,7 +18,7 @@ class RegisterManualUseCase:
         storage: FileStorage,
         *,
         max_bytes: int = DEFAULT_MAX_BYTES,
-        clock: Callable[[], datetime] = _utc_now,
+        clock: Clock = utc_now,
     ) -> None:
         self._repository = repository
         self._storage = storage

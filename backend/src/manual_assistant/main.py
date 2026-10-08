@@ -6,22 +6,33 @@ Execução: ``uvicorn --factory manual_assistant.main:create_app``
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import timedelta
 
 from fastapi import FastAPI
 
 from manual_assistant import __version__
 from manual_assistant.application.errors import ExternalServiceError
+from manual_assistant.application.ports.security import PasswordHasher
 from manual_assistant.application.use_cases.ask_question import AskQuestionUseCase
+from manual_assistant.application.use_cases.authenticate_user import AuthenticateUserUseCase
+from manual_assistant.application.use_cases.change_password import ChangePasswordUseCase
 from manual_assistant.application.use_cases.check_health import CheckHealthUseCase
 from manual_assistant.application.use_cases.delete_manual import DeleteManualUseCase
 from manual_assistant.application.use_cases.get_manual import GetManualUseCase
 from manual_assistant.application.use_cases.get_manual_file import GetManualFileUseCase
 from manual_assistant.application.use_cases.index_manual import IndexManualUseCase
 from manual_assistant.application.use_cases.list_manuals import ListManualsUseCase
+from manual_assistant.application.use_cases.manage_users import (
+    CreateUserUseCase,
+    ListUsersUseCase,
+    ResetUserPasswordUseCase,
+    UpdateUserUseCase,
+)
 from manual_assistant.application.use_cases.recover_interrupted_indexing import (
     RecoverInterruptedIndexingUseCase,
 )
 from manual_assistant.application.use_cases.register_manual import RegisterManualUseCase
+from manual_assistant.application.use_cases.resolve_session import ResolveSessionUseCase
 from manual_assistant.infrastructure.ai.factory import AiProviders, build_ai_providers
 from manual_assistant.infrastructure.documents.line_chunker import LineChunker
 from manual_assistant.infrastructure.documents.pdf_parser import PdfiumDocumentParser
@@ -34,7 +45,10 @@ from manual_assistant.infrastructure.persistence.manual_repository import (
     SqlAlchemyManualRepository,
 )
 from manual_assistant.infrastructure.persistence.models import EMBEDDING_DIMENSIONS
+from manual_assistant.infrastructure.persistence.user_repository import SqlAlchemyUserRepository
 from manual_assistant.infrastructure.persistence.vector_store import PgVectorStore
+from manual_assistant.infrastructure.security.argon2_hasher import Argon2PasswordHasher
+from manual_assistant.infrastructure.security.jwt_tokens import JwtTokenService
 from manual_assistant.infrastructure.settings import Settings
 from manual_assistant.infrastructure.storage.local_file_storage import LocalFileStorage
 from manual_assistant.presentation.http.app import create_http_app
@@ -47,8 +61,9 @@ def create_app(
     settings: Settings | None = None,
     *,
     ai_providers: AiProviders | None = None,
+    password_hasher: PasswordHasher | None = None,
 ) -> FastAPI:
-    """``ai_providers`` permite que os testes substituam a IA real por fakes."""
+    """``ai_providers`` e ``password_hasher`` permitem que os testes usem versões rápidas."""
     # Sem argumentos, o pydantic-settings lê os valores obrigatórios do ambiente.
     settings = settings or Settings()
     ai = ai_providers or build_ai_providers(settings, embedding_dimensions=EMBEDDING_DIMENSIONS)
@@ -58,6 +73,12 @@ def create_app(
     repository = SqlAlchemyManualRepository(session_factory)
     vector_store = PgVectorStore(session_factory, dimensions=EMBEDDING_DIMENSIONS)
     storage = LocalFileStorage(settings.storage_dir)
+    users = SqlAlchemyUserRepository(session_factory)
+    hasher = password_hasher or Argon2PasswordHasher()
+    tokens = JwtTokenService(
+        settings.auth_secret_key.get_secret_value(),
+        ttl=timedelta(hours=settings.auth_session_hours),
+    )
 
     use_cases = UseCases(
         check_health=CheckHealthUseCase(indicators=[DatabaseHealthIndicator(engine)]),
@@ -85,6 +106,19 @@ def create_app(
             top_k=settings.rag_top_k,
             min_score=settings.rag_min_score,
         ),
+        authenticate_user=AuthenticateUserUseCase(
+            users=users,
+            hasher=hasher,
+            tokens=tokens,
+            max_failed_attempts=settings.auth_max_failed_attempts,
+            lockout=timedelta(minutes=settings.auth_lockout_minutes),
+        ),
+        resolve_session=ResolveSessionUseCase(users=users, tokens=tokens),
+        change_password=ChangePasswordUseCase(users=users, hasher=hasher),
+        create_user=CreateUserUseCase(users=users, hasher=hasher),
+        list_users=ListUsersUseCase(users),
+        reset_user_password=ResetUserPasswordUseCase(users=users, hasher=hasher),
+        update_user=UpdateUserUseCase(users),
     )
     recover_interrupted = RecoverInterruptedIndexingUseCase(repository)
 
@@ -103,5 +137,6 @@ def create_app(
         version=__version__,
         cors_origins=settings.cors_origins,
         use_cases=use_cases,
+        cookie_secure=settings.auth_cookie_secure,
         lifespan=lifespan,
     )
