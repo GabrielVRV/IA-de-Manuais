@@ -51,7 +51,7 @@ negócio em [`docs/dominio.md`](docs/dominio.md).
 | 7  | Caso de uso "Perguntar" (RAG) com citação de manual e página                         | ✅     |
 | 8  | Chat no frontend: respostas com fontes clicáveis (abre o PDF na página citada)      | ✅     |
 | 9a | Usuários, login (cookie HttpOnly + Argon2) e proteção das rotas da API              | ✅     |
-| 9b | Telas de login, de usuários e de acompanhamento dos manuais                         | ⏳     |
+| 9b | Telas de login, de usuários e de acompanhamento dos manuais                         | ✅     |
 | 10 | Sincronização automática dos manuais com o SharePoint (Microsoft Graph)             | ⏳     |
 | 11 | Observabilidade: logs estruturados, custo de tokens, feedback 👍/👎 nas respostas    | ⏳     |
 
@@ -64,6 +64,8 @@ negócio em [`docs/dominio.md`](docs/dominio.md).
   dependência entre camadas e testes.
 
 ## Rodando o projeto
+
+> 📘 Passo a passo completo, com solução de problemas: **[docs/IMPLANTACAO.md](docs/IMPLANTACAO.md)**.
 
 **Backend + banco (Docker):**
 
