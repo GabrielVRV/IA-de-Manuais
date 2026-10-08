@@ -10,6 +10,7 @@ from manual_assistant.application.use_cases.ask_question import AskQuestionUseCa
 from manual_assistant.application.use_cases.check_health import CheckHealthUseCase
 from manual_assistant.application.use_cases.delete_manual import DeleteManualUseCase
 from manual_assistant.application.use_cases.get_manual import GetManualUseCase
+from manual_assistant.application.use_cases.get_manual_file import GetManualFileUseCase
 from manual_assistant.application.use_cases.index_manual import IndexManualUseCase
 from manual_assistant.application.use_cases.list_manuals import ListManualsUseCase
 from manual_assistant.application.use_cases.register_manual import RegisterManualUseCase
@@ -56,6 +57,7 @@ class FakeBackend:
             ),
             list_manuals=ListManualsUseCase(self.repository),
             get_manual=GetManualUseCase(self.repository),
+            get_manual_file=GetManualFileUseCase(self.repository, self.storage),
             delete_manual=DeleteManualUseCase(
                 repository=self.repository, vector_store=self.vector_store, storage=self.storage
             ),

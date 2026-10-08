@@ -22,7 +22,7 @@ export class HttpHealthGateway implements HealthGateway {
 
   async check(signal?: AbortSignal): Promise<ApiHealth> {
     try {
-      return toApiHealth(await this.#http.getJson('/api/v1/health', signal))
+      return toApiHealth(await this.#http.getJson('/api/v1/health', { signal }))
     } catch (error) {
       // 503 traz o relatório completo: a API está no ar, mas alguma dependência não.
       if (error instanceof HttpError && error.status === 503) return toApiHealth(error.body)

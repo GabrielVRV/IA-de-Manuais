@@ -23,8 +23,8 @@ describe('<ApiStatus />', () => {
   it('shows the API as online with its version', async () => {
     renderWith(gatewayResolving({ status: 'up', version: '0.1.0', components: {} }))
 
-    expect(await screen.findByText('Servidor online')).toBeInTheDocument()
-    expect(screen.getByText('Versão 0.1.0')).toBeInTheDocument()
+    expect(await screen.findByRole('status')).toHaveTextContent('Online')
+    expect(screen.getByRole('status')).toHaveTextContent('versão 0.1.0')
   })
 
   it('lists the components that are down', async () => {
@@ -36,21 +36,21 @@ describe('<ApiStatus />', () => {
       }),
     )
 
-    expect(await screen.findByText('Servidor com instabilidade')).toBeInTheDocument()
-    expect(screen.getByText('Componentes fora do ar: database')).toBeInTheDocument()
+    expect(await screen.findByText('Instável')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Componentes fora do ar: database.')
   })
 
-  it('explains when the API cannot be reached and allows a new check', async () => {
+  it('explains when the API cannot be reached and checks again on click', async () => {
     const check = vi
       .fn<HealthGateway['check']>()
       .mockRejectedValueOnce(new NetworkError())
       .mockResolvedValueOnce({ status: 'up', version: '0.1.0', components: {} })
     renderWith({ check })
 
-    expect(await screen.findByText('Servidor indisponível')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Verificar novamente' }))
+    expect(await screen.findByText('Offline')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button'))
 
-    expect(await screen.findByText('Servidor online')).toBeInTheDocument()
+    expect(await screen.findByText('Online')).toBeInTheDocument()
     expect(check).toHaveBeenCalledTimes(2)
   })
 })

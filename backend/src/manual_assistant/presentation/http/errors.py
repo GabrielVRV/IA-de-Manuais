@@ -9,6 +9,7 @@ from manual_assistant.application.errors import (
     ExternalServiceError,
     InvalidDocumentError,
     ManualNotFoundError,
+    StoredFileNotFoundError,
 )
 from manual_assistant.domain.errors import InvalidStateTransitionError, InvalidValueError
 
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 _STATUS_BY_ERROR: dict[type[Exception], int] = {
     ManualNotFoundError: status.HTTP_404_NOT_FOUND,
+    StoredFileNotFoundError: status.HTTP_404_NOT_FOUND,
     InvalidDocumentError: status.HTTP_422_UNPROCESSABLE_CONTENT,
     InvalidValueError: status.HTTP_422_UNPROCESSABLE_CONTENT,
     InvalidStateTransitionError: status.HTTP_409_CONFLICT,

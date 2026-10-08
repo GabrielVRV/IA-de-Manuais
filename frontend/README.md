@@ -9,6 +9,7 @@ src/
 ├── main.tsx                  # Raiz de composição: lê config, cria adaptadores e injeta
 ├── app/                      # Casca da aplicação (layout, telas de erro, config de runtime)
 ├── features/
+│   ├── chat/                 # Conversa com os manuais (perguntas, respostas, fontes)
 │   └── health/               # Uma pasta por funcionalidade, cada uma com suas camadas:
 │       ├── domain/           #   tipos e portas (interfaces), TypeScript puro
 │       ├── infrastructure/   #   adaptadores HTTP que implementam as portas
@@ -24,6 +25,16 @@ src/
 - `presentation` não conhece a `infrastructure`: recebe as implementações por contexto
   React, montadas em `main.tsx`;
 - `shared` não depende de nenhuma funcionalidade.
+
+## Funcionalidades
+
+- **Chat:** pergunta em linguagem natural; a resposta vem formatada (Markdown seguro) e
+  com as **fontes clicáveis**, que abrem o PDF do manual na página citada. "Não encontrei"
+  tem um visual próprio. Enter envia e Shift+Enter quebra linha.
+- **Status do servidor** no cabeçalho (clique para verificar de novo).
+
+Decisões e limitações conhecidas (sem streaming, sem memória de conversa) estão no
+[ADR 0006](../docs/adr/0006-chat-no-frontend.md).
 
 ## Desenvolvimento
 

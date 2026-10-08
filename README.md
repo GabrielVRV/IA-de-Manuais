@@ -49,7 +49,7 @@ negócio em [`docs/dominio.md`](docs/dominio.md).
 | 5  | Ingestão: casos de uso, leitura de PDF, divisão em trechos e armazenamento          | ✅     |
 | 6  | Provedores de IA (Gemini/OpenAI) e API de manuais (upload, listagem, exclusão)      | ✅     |
 | 7  | Caso de uso "Perguntar" (RAG) com citação de manual e página                         | ✅     |
-| 8  | Chat no frontend com resposta em streaming                                          | ⏳     |
+| 8  | Chat no frontend: respostas com fontes clicáveis (abre o PDF na página citada)      | ✅     |
 | 9  | Autenticação e área administrativa de manuais                                       | ⏳     |
 | 10 | Observabilidade: logs estruturados, custo de tokens, feedback 👍/👎 nas respostas    | ⏳     |
 

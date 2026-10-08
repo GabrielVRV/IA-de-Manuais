@@ -15,6 +15,7 @@ from manual_assistant.application.use_cases.ask_question import AskQuestionUseCa
 from manual_assistant.application.use_cases.check_health import CheckHealthUseCase
 from manual_assistant.application.use_cases.delete_manual import DeleteManualUseCase
 from manual_assistant.application.use_cases.get_manual import GetManualUseCase
+from manual_assistant.application.use_cases.get_manual_file import GetManualFileUseCase
 from manual_assistant.application.use_cases.index_manual import IndexManualUseCase
 from manual_assistant.application.use_cases.list_manuals import ListManualsUseCase
 from manual_assistant.application.use_cases.recover_interrupted_indexing import (
@@ -73,6 +74,7 @@ def create_app(
         ),
         list_manuals=ListManualsUseCase(repository),
         get_manual=GetManualUseCase(repository),
+        get_manual_file=GetManualFileUseCase(repository, storage),
         delete_manual=DeleteManualUseCase(
             repository=repository, vector_store=vector_store, storage=storage
         ),

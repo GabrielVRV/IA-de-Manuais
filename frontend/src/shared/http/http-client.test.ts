@@ -51,11 +51,38 @@ describe('HttpClient', () => {
     await expect(client.getJson('/x')).rejects.toBeInstanceOf(TimeoutError)
   })
 
+  it('sends JSON bodies with POST', async () => {
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ ok: true }))
+    const client = new HttpClient('http://api.local', { fetchFn })
+
+    await client.postJson('/api/v1/questions', { question: 'Pressão?' })
+
+    const [url, init] = fetchFn.mock.calls[0] ?? []
+    expect(url).toBe('http://api.local/api/v1/questions')
+    expect(init).toMatchObject({
+      method: 'POST',
+      body: JSON.stringify({ question: 'Pressão?' }),
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    })
+  })
+
+  it('accepts a per-request timeout', async () => {
+    const client = new HttpClient('http://api.local', { fetchFn: hangingFetch, timeoutMs: 60_000 })
+
+    await expect(client.getJson('/x', { timeoutMs: 10 })).rejects.toBeInstanceOf(TimeoutError)
+  })
+
+  it('builds absolute URLs for links', () => {
+    expect(new HttpClient('http://api.local/').url('/api/v1/manuals/1/file')).toBe(
+      'http://api.local/api/v1/manuals/1/file',
+    )
+  })
+
   it('propagates caller cancellation without wrapping it', async () => {
     const client = new HttpClient('http://api.local', { fetchFn: hangingFetch })
     const controller = new AbortController()
 
-    const request = client.getJson('/x', controller.signal)
+    const request = client.getJson('/x', { signal: controller.signal })
     controller.abort()
 
     await expect(request).rejects.toHaveProperty('name', 'AbortError')

@@ -5,50 +5,57 @@ type Tone = 'neutral' | 'success' | 'warning' | 'danger'
 
 interface StatusView {
   readonly tone: Tone
-  readonly title: string
+  readonly label: string
   readonly detail: string
 }
 
 function toView(state: ApiHealthState): StatusView {
   switch (state.kind) {
     case 'checking':
-      return { tone: 'neutral', title: 'Verificando o servidor…', detail: 'Aguarde um instante.' }
+      return { tone: 'neutral', label: 'Verificando…', detail: 'Verificando o servidor.' }
     case 'unreachable':
-      return { tone: 'danger', title: 'Servidor indisponível', detail: state.message }
+      return { tone: 'danger', label: 'Offline', detail: state.message }
     case 'reachable': {
       const { health } = state
       if (health.status === 'up') {
-        return { tone: 'success', title: 'Servidor online', detail: `Versão ${health.version}` }
+        return {
+          tone: 'success',
+          label: 'Online',
+          detail: `Servidor online, versão ${health.version}.`,
+        }
       }
       const failing = Object.entries(health.components)
         .filter(([, status]) => status === 'down')
         .map(([name]) => name)
       return {
         tone: 'warning',
-        title: 'Servidor com instabilidade',
-        detail: `Componentes fora do ar: ${failing.join(', ')}`,
+        label: 'Instável',
+        detail: `Componentes fora do ar: ${failing.join(', ')}.`,
       }
     }
   }
 }
 
+/** Indicador compacto para o cabeçalho; clicar verifica de novo. */
 export function ApiStatus() {
   const { state, recheck } = useApiHealth()
   const view = toView(state)
-  const isChecking = state.kind === 'checking'
 
   return (
-    <section className={styles.card} data-tone={view.tone} aria-labelledby="api-status-title">
+    <button
+      type="button"
+      className={styles.badge}
+      data-tone={view.tone}
+      onClick={recheck}
+      disabled={state.kind === 'checking'}
+      title={`${view.detail} Clique para verificar novamente.`}
+    >
       <span className={styles.indicator} aria-hidden="true" />
-      <div className={styles.text} role="status" aria-live="polite">
-        <h2 id="api-status-title" className={styles.title}>
-          {view.title}
-        </h2>
-        <p className={styles.detail}>{view.detail}</p>
-      </div>
-      <button type="button" className={styles.button} onClick={recheck} disabled={isChecking}>
-        Verificar novamente
-      </button>
-    </section>
+      <span role="status" aria-live="polite">
+        <span className={styles.visuallyHidden}>Servidor: </span>
+        {view.label}
+        <span className={styles.visuallyHidden}> — {view.detail}</span>
+      </span>
+    </button>
   )
 }

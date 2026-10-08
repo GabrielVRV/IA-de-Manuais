@@ -110,6 +110,32 @@ class TestQueries:
         assert response.json() == {"detail": "Falha no banco de dados"}
 
 
+class TestFile:
+    def test_serves_the_original_pdf_inline(self, client: TestClient) -> None:
+        manual_id = upload(client, name="Manual Prensa.pdf")["id"]
+
+        response = client.get(f"{URL}/{manual_id}/file")
+
+        assert response.status_code == 200
+        assert response.content == PDF
+        assert response.headers["content-type"] == "application/pdf"
+        assert response.headers["content-disposition"] == (
+            "inline; filename*=UTF-8''Manual%20Prensa.pdf"
+        )
+
+    def test_missing_file_returns_404(self, client: TestClient, backend: FakeBackend) -> None:
+        manual_id = upload(client)["id"]
+        backend.storage.files.clear()
+
+        response = client.get(f"{URL}/{manual_id}/file")
+
+        assert response.status_code == 404
+        assert "Arquivo não encontrado" in response.json()["detail"]
+
+    def test_unknown_manual_returns_404(self, client: TestClient) -> None:
+        assert client.get(f"{URL}/{uuid4()}/file").status_code == 404
+
+
 class TestReindexAndDelete:
     def test_reindexes_a_failed_manual(self, client: TestClient, backend: FakeBackend) -> None:
         backend.embeddings.error = ExternalServiceError("instável")

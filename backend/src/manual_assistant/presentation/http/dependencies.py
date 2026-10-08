@@ -7,6 +7,7 @@ from manual_assistant.application.use_cases.ask_question import AskQuestionUseCa
 from manual_assistant.application.use_cases.check_health import CheckHealthUseCase
 from manual_assistant.application.use_cases.delete_manual import DeleteManualUseCase
 from manual_assistant.application.use_cases.get_manual import GetManualUseCase
+from manual_assistant.application.use_cases.get_manual_file import GetManualFileUseCase
 from manual_assistant.application.use_cases.index_manual import IndexManualUseCase
 from manual_assistant.application.use_cases.list_manuals import ListManualsUseCase
 from manual_assistant.application.use_cases.register_manual import RegisterManualUseCase
@@ -21,6 +22,7 @@ class UseCases:
     index_manual: IndexManualUseCase
     list_manuals: ListManualsUseCase
     get_manual: GetManualUseCase
+    get_manual_file: GetManualFileUseCase
     delete_manual: DeleteManualUseCase
     ask_question: AskQuestionUseCase
 
