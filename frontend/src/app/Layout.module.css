@@ -14,22 +14,33 @@
 
 .inner {
   width: 100%;
-  max-width: 52rem;
+  max-width: 60rem;
   margin: 0 auto;
   padding: 0 var(--space-4);
 }
 
 .headerContent {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-2) var(--space-4);
   min-height: 3.5rem;
+  padding-block: var(--space-2);
+}
+
+.start {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-5);
 }
 
 .main {
   flex: 1;
   min-height: 0;
+  /* As telas de administração rolam aqui; o chat controla a própria rolagem. */
+  overflow-y: auto;
 }
 
 .brand {

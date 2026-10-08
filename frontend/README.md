@@ -31,7 +31,14 @@ src/
 - **Chat:** pergunta em linguagem natural; a resposta vem formatada (Markdown seguro) e
   com as **fontes clicáveis**, que abrem o PDF do manual na página citada. "Não encontrei"
   tem um visual próprio. Enter envia e Shift+Enter quebra linha.
+- **Login** com troca obrigatória da senha provisória no primeiro acesso; a sessão expirada
+  devolve à tela de login com um aviso.
+- **Manuais** (administradores): envio de vários PDFs (arrastar e soltar), status que se
+  atualiza sozinho durante a indexação, motivo de falha, reprocessar e excluir.
+- **Usuários** (administradores): criar com senha provisória gerada, redefinir senha,
+  ativar/desativar e mudar perfil.
 - **Status do servidor** no cabeçalho (clique para verificar de novo).
+- Rotas por `#` (ex.: `#/manuais`): funcionam em qualquer subpasta do XAMPP, sem reescrita.
 
 Decisões e limitações conhecidas (sem streaming, sem memória de conversa) estão no
 [ADR 0006](../docs/adr/0006-chat-no-frontend.md).
