@@ -37,7 +37,11 @@ def build_ai_providers(settings: Settings, *, embedding_dimensions: int) -> AiPr
         )
         return AiProviders(
             embeddings=GeminiEmbeddingProvider(
-                gemini, model=settings.gemini_embedding_model, dimensions=embedding_dimensions
+                gemini,
+                model=settings.gemini_embedding_model,
+                dimensions=embedding_dimensions,
+                batch_size=settings.gemini_embedding_batch_size,
+                quota_wait_seconds=settings.gemini_quota_wait_seconds,
             ),
             language_model=GeminiLanguageModel(
                 gemini,

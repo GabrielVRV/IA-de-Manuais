@@ -10,6 +10,7 @@ import pytest
 from manual_assistant.application.errors import ExternalServiceError
 from manual_assistant.application.ports.language_model import CompletionRequest
 from manual_assistant.infrastructure.ai.gemini_provider import (
+    MAX_QUOTA_WAITS_PER_BATCH,
     GeminiEmbeddingProvider,
     GeminiLanguageModel,
     create_gemini_client,
@@ -18,6 +19,7 @@ from manual_assistant.infrastructure.ai.gemini_provider import (
 pytestmark = pytest.mark.anyio
 
 DIMENSIONS = 4
+QUOTA_EXCEEDED = httpx.Response(429, json={"error": {"code": 429, "message": "quota"}})
 Handler = Callable[[httpx.Request], httpx.Response]
 
 
@@ -95,6 +97,58 @@ class TestEmbeddings:
 
         assert len(vector) == DIMENSIONS
         assert api.requests[0][1]["requests"][0]["taskType"] == "RETRIEVAL_QUERY"
+
+    async def test_uses_the_configured_batch_size(self, api: FakeGeminiApi) -> None:
+        provider = GeminiEmbeddingProvider(
+            api.client(), model="m", dimensions=DIMENSIONS, batch_size=20
+        )
+
+        await provider.embed_documents([f"trecho {i}" for i in range(45)])
+
+        assert [len(body["requests"]) for _, body in api.requests] == [20, 20, 5]
+
+    async def test_fails_on_quota_by_default(
+        self, api: FakeGeminiApi, embeddings: GeminiEmbeddingProvider
+    ) -> None:
+        api.failure = QUOTA_EXCEEDED
+
+        with pytest.raises(ExternalServiceError, match="Cota"):
+            await embeddings.embed_documents(["trecho"])
+
+        assert len(api.requests) == 1
+
+    async def test_waits_for_the_quota_and_retries_the_batch(self, api: FakeGeminiApi) -> None:
+        waits: list[float] = []
+
+        async def fake_sleep(seconds: float) -> None:
+            waits.append(seconds)
+            api.failure = None  # a cota liberou durante a espera
+
+        provider = GeminiEmbeddingProvider(
+            api.client(), model="m", dimensions=DIMENSIONS, quota_wait_seconds=60, sleep=fake_sleep
+        )
+        api.failure = QUOTA_EXCEEDED
+
+        vectors = await provider.embed_documents(["a", "b"])
+
+        assert len(vectors) == 2
+        assert waits == [60]
+
+    async def test_gives_up_when_the_quota_never_frees_up(self, api: FakeGeminiApi) -> None:
+        waits: list[float] = []
+
+        async def fake_sleep(seconds: float) -> None:
+            waits.append(seconds)
+
+        provider = GeminiEmbeddingProvider(
+            api.client(), model="m", dimensions=DIMENSIONS, quota_wait_seconds=60, sleep=fake_sleep
+        )
+        api.failure = QUOTA_EXCEEDED
+
+        with pytest.raises(ExternalServiceError, match="Cota"):
+            await provider.embed_documents(["a"])
+
+        assert len(waits) == MAX_QUOTA_WAITS_PER_BATCH
 
     async def test_rejects_vectors_with_unexpected_dimensions(self, api: FakeGeminiApi) -> None:
         provider = GeminiEmbeddingProvider(api.client(), model="m", dimensions=DIMENSIONS + 1)

@@ -57,6 +57,10 @@ class Settings(BaseSettings):
     gemini_api_key: SecretStr | None = None
     gemini_chat_model: str = "gemini-3.5-flash"
     gemini_embedding_model: str = "gemini-embedding-001"
+    # Plano gratuito: lotes menores (ex.: 20) e espera pela cota (ex.: 60 s) ao receber 429.
+    # 0 = falha na hora, o esperado no plano pago.
+    gemini_embedding_batch_size: int = Field(default=100, ge=1, le=100)
+    gemini_quota_wait_seconds: float = Field(default=0, ge=0)
     # 0 desliga o raciocínio; "none" não envia o parâmetro (obrigatório nos modelos *-lite).
     gemini_thinking_budget: int | None = Field(default=0, ge=0)
 
