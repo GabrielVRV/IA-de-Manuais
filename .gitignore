@@ -25,6 +25,7 @@ frontend/coverage/
 
 # Manuais e dados locais (nunca versionar documentos da empresa)
 data/
+manuais-para-importar/
 *.pdf
 
 # Editores / SO
