@@ -18,7 +18,6 @@ def settings(**values: Any) -> Settings:
     return Settings(
         _env_file=None,
         db_password="x",
-        auth_secret_key="segredo-de-teste-com-mais-de-32-caracteres",
         **values,
     )
 

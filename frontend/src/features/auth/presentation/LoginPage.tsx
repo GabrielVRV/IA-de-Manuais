@@ -36,7 +36,9 @@ export function LoginPage({ notice }: { readonly notice?: string | undefined }) 
         }}
       >
         <h1 className={styles.title}>Assistente de Manuais</h1>
-        <p className={ui.muted}>Entre com seu usuário para consultar os manuais.</p>
+        <p className={ui.muted}>
+          Entre com seu usuário e senha do TOTVS para consultar os manuais.
+        </p>
 
         {notice && !error && (
           <p className={ui.alert} data-tone="info" role="status">
@@ -80,7 +82,10 @@ export function LoginPage({ notice }: { readonly notice?: string | undefined }) 
         <button className={cx(ui.button, ui.primary)} type="submit" disabled={submitting}>
           {submitting ? 'Entrando…' : 'Entrar'}
         </button>
-        <p className={ui.hint}>Esqueceu a senha? Peça a um administrador para redefini-la.</p>
+        <p className={ui.hint}>
+          Esqueceu a senha? Redefina-a no TOTVS. Se o seu usuário foi criado aqui, peça a um
+          administrador.
+        </p>
       </form>
     </div>
   )

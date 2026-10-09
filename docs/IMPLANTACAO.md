@@ -59,14 +59,11 @@ Preencha **obrigatoriamente**:
 | Variável | O que colocar |
 | -------- | ------------- |
 | `APP_GEMINI_API_KEY` | A chave da API do Gemini |
-| `APP_AUTH_SECRET_KEY` | Uma chave aleatória. Gere com o comando abaixo e cole o resultado |
 | `APP_CORS_ORIGINS` | O endereço da **tela** exatamente como aparece no navegador, sem a subpasta. Ex.: `http://NOME-DO-SERVIDOR,http://localhost:5173` |
+| `APP_TOTVS_LOGIN_URL` | O endereço da rota `validarLogin` do Datasul, para os usuários entrarem com a senha do TOTVS. Ex.: `http://IP-DO-DATASUL:PORTA/api/sfc/v1/api_valida_login/validarLogin/`. Vazio = só entram usuários criados aqui |
 
-Para gerar a `APP_AUTH_SECRET_KEY` no PowerShell:
-
-```powershell
-$b = New-Object byte[] 48; [Security.Cryptography.RNGCryptoServiceProvider]::Create().GetBytes($b); [Convert]::ToBase64String($b)
-```
+> O `backend\.env` nunca vai para o GitHub (está no `.gitignore`): é nele que ficam a chave
+> do Gemini e o endereço do Datasul.
 
 > As variáveis `APP_DB_*` desse arquivo só valem quando a API roda fora do Docker. Dentro
 > do Docker, elas vêm automaticamente do `.env` da raiz.
@@ -102,8 +99,16 @@ banco são criadas sozinhas quando a API inicia.
 docker compose exec api python -m manual_assistant.cli create-admin --username seu.login --name "Seu Nome"
 ```
 
-O comando pede a senha **duas vezes**, sem mostrá-la na tela. Esse é o único usuário criado
-por comando. Os demais você cria pela tela (passo 6).
+O comando pede a senha **duas vezes**, sem mostrá-la na tela. Ele é um usuário **local**:
+entra com essa senha mesmo se o Datasul estiver fora do ar, então guarde-o como acesso de
+emergência. Os colegas entram com o usuário do TOTVS (passo 6).
+
+Se quiser que o seu próprio login passe a usar a senha do TOTVS, crie antes um segundo
+administrador local de emergência e então rode, mantendo o perfil de administrador:
+
+```powershell
+docker compose exec api python -m manual_assistant.cli use-totvs --username seu.login
+```
 
 ---
 
@@ -161,10 +166,19 @@ Nos próximos deploys, o script preserva o `config.json` que já está no servid
 2. **Manuais:** arraste os PDFs para a área tracejada, ou clique em **Escolher PDFs**. Cada
    manual aparece como *Na fila* → *Indexando…* → **Disponível**. A tela se atualiza sozinha.
 3. **Chat:** faça perguntas. As fontes no fim de cada resposta abrem o PDF na página citada.
-4. **Usuários:** crie contas para os colegas. Uma **senha provisória** é gerada e mostrada
-   **uma única vez**: entregue-a à pessoa, que vai trocá-la no primeiro acesso.
+4. **Usuários:** os colegas entram com o **usuário e a senha do TOTVS**. No primeiro
+   acesso, eles veem uma tela "Aguardando liberação" e aparecem no topo da aba
+   **Usuários**, com um aviso. Clique em **Liberar** (ou escolha o perfil):
    - **Usuário:** só usa o chat.
    - **Administrador:** também gerencia manuais e usuários.
+
+   Para recusar alguém, clique em **Desativar**. Quem não tem TOTVS pode ser criado na
+   própria tela, como **usuário local**: uma **senha provisória** é gerada e mostrada
+   **uma única vez**, e a pessoa a troca no primeiro acesso.
+
+   A sessão fica aberta: só pede login de novo depois de **7 dias sem uso**, ou **30 dias**
+   depois do último login. Senha trocada ou usuário bloqueado no TOTVS só valem no próximo
+   login. Para cortar o acesso na hora, desative o usuário aqui.
 
 ### Roteiro sugerido para a demonstração (defender a chave paga)
 
@@ -201,7 +215,9 @@ Nos próximos deploys, o script preserva o `config.json` que já está no servid
 | `docker compose up` falha baixando pacotes | Proxy corporativo | Configure o proxy no Docker Desktop (Settings → Resources → Proxies) |
 | Erro de porta `5432` em uso | Já existe um PostgreSQL na máquina | No `.env` da raiz: `DB_PUBLISHED_PORT=5433` |
 | Erro de porta `8000` em uso | Outro serviço usando a porta | No `docker-compose.yml`, troque `"8000:8000"` por `"8001:8000"` e use `:8001` no `config.json` |
-| API não fica *healthy* | Variável obrigatória faltando | `docker compose logs api`: procure por `APP_AUTH_SECRET_KEY`, `APP_GEMINI_API_KEY` ou `DB_PASSWORD` |
+| API não fica *healthy* | Variável obrigatória faltando | `docker compose logs api`: procure por `APP_GEMINI_API_KEY` ou `DB_PASSWORD` |
+| Login do TOTVS: **"temporariamente indisponível"** | Datasul fora do ar, URL errada ou o container não alcança o IP do Datasul | Confira `APP_TOTVS_LOGIN_URL`; `docker compose logs api` mostra o erro (ex.: `HTTP 404`, `não respondeu`, `Campos: ...`). Teste de dentro do container: `docker compose exec api python -c "import httpx; print(httpx.post('<url>').status_code)"` (401 = alcançou o Datasul) |
+| Usuário do TOTVS: **"Usuário ou senha inválidos"** com a senha certa | Datasul não aceita o Basic Auth de usuários comuns | Ver a seção "A confirmar no primeiro deploy" do README da API de login no Progress |
 | Tela mostra **"Offline"** no cabeçalho | API fora do ar, `config.json` errado ou CORS | Teste o passo 3; confira o `apiBaseUrl` e o `APP_CORS_ORIGINS` |
 | Entra e **é deslogado em seguida** | Nome do servidor diferente na tela e no `config.json` | Use o mesmo nome nos dois (ver o alerta em 5B.2) |
 | Manual **"Falhou: serviço externo"** | Limite ou cota do plano gratuito do Gemini | Aguarde a cota renovar (diária) ou use a chave paga, e clique em **Reprocessar** |
@@ -215,8 +231,9 @@ Nos próximos deploys, o script preserva o `config.json` que já está no servid
 
 - **Chave paga:** no plano gratuito do Gemini, o Google pode usar o conteúdo enviado para
   treinar modelos. **Não use manuais confidenciais com a chave gratuita.**
-- **HTTPS:** sem ele, as senhas trafegam abertas na rede interna. Antes da produção,
-  instale um certificado interno e defina `APP_AUTH_COOKIE_SECURE=true`. Ver o
-  [ADR 0007](adr/0007-autenticacao-e-controle-de-acesso.md).
+- **HTTPS:** sem ele, as senhas (inclusive as do TOTVS) trafegam abertas na rede interna,
+  como já acontece no acesso ao Datasul por HTTP. Quando houver um certificado interno,
+  defina `APP_AUTH_COOKIE_SECURE=true`. Ver o
+  [ADR 0008](adr/0008-login-pelo-totvs-e-sessoes-no-banco.md).
 - **Backup:** faça backup regular do volume do banco (`manual-assistant_db-data`) e do
   volume dos PDFs (`manual-assistant_manual-files`).

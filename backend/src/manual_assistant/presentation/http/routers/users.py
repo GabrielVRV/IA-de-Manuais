@@ -27,7 +27,7 @@ async def list_users(admin: AdminUser, use_cases: UseCasesDep) -> list[UserRespo
     "",
     status_code=status.HTTP_201_CREATED,
     responses={status.HTTP_409_CONFLICT: {"model": ErrorResponse}},
-    summary="Cria um usuário com senha provisória (somente administradores)",
+    summary="Cria um usuário local com senha provisória (somente administradores)",
 )
 async def create_user(
     request: CreateUserRequest, admin: AdminUser, use_cases: UseCasesDep
@@ -45,7 +45,7 @@ async def create_user(
 @router.post(
     "/{user_id}/reset-password",
     responses=NOT_FOUND,
-    summary="Define uma senha provisória (somente administradores)",
+    summary="Define uma senha provisória para um usuário local (somente administradores)",
 )
 async def reset_password(
     user_id: UUID, request: ResetPasswordRequest, admin: AdminUser, use_cases: UseCasesDep
@@ -59,7 +59,7 @@ async def reset_password(
 @router.patch(
     "/{user_id}",
     responses=NOT_FOUND,
-    summary="Ativa/desativa ou muda o perfil (somente administradores)",
+    summary="Ativa/desativa, muda o perfil ou libera o acesso (somente administradores)",
 )
 async def update_user(
     user_id: UUID, request: UpdateUserRequest, admin: AdminUser, use_cases: UseCasesDep

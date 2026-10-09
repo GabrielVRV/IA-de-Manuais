@@ -7,9 +7,16 @@ import { ADMIN, fakeUsersGateway, managedUser, renderApp } from '@/test/fakes'
 
 const me = managedUser({ id: ADMIN.id, username: 'admin', displayName: 'Ana Admin', role: 'admin' })
 const joao = managedUser()
+const pedro = managedUser({
+  id: 'u-pedro',
+  username: 'pedro',
+  displayName: 'Pedro do TOTVS',
+  role: 'pending',
+  authSource: 'totvs',
+})
 
 function setup() {
-  const users = fakeUsersGateway([me, joao])
+  const users = fakeUsersGateway([me, joao, pedro])
   renderApp({ users, path: '/usuarios' })
   return { users, user: userEvent.setup() }
 }
@@ -77,5 +84,22 @@ describe('<UsersAdmin />', () => {
 
     expect(within(row('Ana Admin')).getByRole('button', { name: 'Desativar' })).toBeDisabled()
     expect(within(row('Ana Admin')).getByLabelText('Perfil de Ana Admin')).toBeDisabled()
+  })
+
+  it('highlights TOTVS users awaiting approval and releases them', async () => {
+    const { users, user } = setup()
+    await screen.findByRole('table')
+
+    expect(screen.getByText(/1 usuário do TOTVS aguarda liberação/)).toBeInTheDocument()
+    // Quem aguarda aparece no topo da tabela.
+    expect(screen.getAllByRole('row')[1]).toHaveTextContent('Pedro do TOTVS')
+    expect(row('Pedro')).toHaveTextContent('TOTVS')
+    expect(within(row('Pedro')).queryByRole('button', { name: 'Redefinir senha' })).toBeNull()
+
+    await user.click(within(row('Pedro')).getByRole('button', { name: 'Liberar' }))
+
+    expect(users.update).toHaveBeenLastCalledWith('u-pedro', { role: 'user' })
+    expect(await within(row('Pedro')).findByText('Ativo')).toBeInTheDocument()
+    expect(screen.queryByText(/aguarda liberação/)).not.toBeInTheDocument()
   })
 })

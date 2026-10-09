@@ -20,6 +20,8 @@ export interface Session {
   readonly state: SessionState
   login: (username: string, password: string) => Promise<void>
   logout: () => Promise<void>
+  /** Busca de novo o usuário da sessão (ex.: para ver se o acesso já foi liberado). */
+  refresh: () => Promise<void>
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>
 }
 

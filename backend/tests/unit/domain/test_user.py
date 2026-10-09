@@ -1,13 +1,17 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import pytest
 
 from manual_assistant.domain.errors import InvalidValueError
-from manual_assistant.domain.user import User, UserRole, normalize_username, validate_password
+from manual_assistant.domain.user import (
+    AuthSource,
+    User,
+    UserRole,
+    normalize_username,
+    validate_password,
+)
 from tests.factories import FIXED_NOW
-from tests.security import make_user
-
-LOCKOUT = timedelta(minutes=15)
+from tests.security import make_totvs_user, make_user
 
 
 def register(username: str = "maria.silva", display_name: str = "Maria") -> User:
@@ -64,39 +68,70 @@ def test_logins_are_case_insensitive() -> None:
     assert normalize_username(" GaBriel ") == "gabriel"
 
 
-class TestLockout:
-    def test_locks_after_the_maximum_number_of_failures(self) -> None:
-        user = make_user()
-        for _ in range(4):
-            user.record_failed_login(FIXED_NOW, max_attempts=5, lockout=LOCKOUT)
-            assert not user.is_locked(FIXED_NOW)
+class TestTotvsProvisioning:
+    def test_enters_awaiting_approval_without_a_password(self) -> None:
+        user = User.provision_from_totvs(
+            username=" JOAO.Silva ", display_name="  João da Silva ", now=FIXED_NOW
+        )
 
-        user.record_failed_login(FIXED_NOW, max_attempts=5, lockout=LOCKOUT)
+        assert (user.username, user.display_name) == ("joao.silva", "João da Silva")
+        assert user.is_pending
+        assert not user.is_local
+        assert user.password_hash is None
+        assert not user.must_change_password
 
-        assert user.is_locked(FIXED_NOW)
-        assert not user.is_locked(FIXED_NOW + LOCKOUT)
+    def test_falls_back_to_the_login_when_the_totvs_has_no_name(self) -> None:
+        user = User.provision_from_totvs(username="joao", display_name="  ", now=FIXED_NOW)
 
-    def test_successful_login_clears_failures(self) -> None:
-        user = make_user()
-        user.record_failed_login(FIXED_NOW, max_attempts=5, lockout=LOCKOUT)
+        assert user.display_name == "joao"
 
-        user.record_successful_login(FIXED_NOW)
+    def test_long_totvs_names_are_cut_to_fit(self) -> None:
+        user = make_totvs_user()
 
-        assert user.failed_login_attempts == 0
-        assert user.last_login_at == FIXED_NOW
+        user.sync_display_name("x" * 150)
+
+        assert len(user.display_name) == 100
+
+    @pytest.mark.parametrize(
+        ("source", "password_hash"), [(AuthSource.LOCAL, None), (AuthSource.TOTVS, "hash")]
+    )
+    def test_only_local_users_store_a_password(
+        self, source: AuthSource, password_hash: str | None
+    ) -> None:
+        with pytest.raises(InvalidValueError, match="Só usuários locais"):
+            User(
+                id=make_user().id,
+                username="maria",
+                display_name="Maria",
+                role=UserRole.USER,
+                password_hash=password_hash,
+                created_at=FIXED_NOW,
+                auth_source=source,
+            )
+
+    def test_a_local_user_can_switch_to_the_totvs_keeping_the_role(self) -> None:
+        user = make_user(role=UserRole.ADMIN, must_change_password=True)
+
+        user.use_totvs_login()
+
+        assert (user.auth_source, user.password_hash) == (AuthSource.TOTVS, None)
+        assert user.is_admin
+        assert not user.must_change_password
 
 
 class TestPasswordLifecycle:
-    def test_reset_sets_a_temporary_password_and_unlocks(self) -> None:
+    def test_reset_sets_a_temporary_password(self) -> None:
         user = make_user()
-        for _ in range(5):
-            user.record_failed_login(FIXED_NOW, max_attempts=5, lockout=LOCKOUT)
 
         user.reset_password("novo-hash")
 
         assert user.password_hash == "novo-hash"
         assert user.must_change_password
-        assert not user.is_locked(FIXED_NOW)
+
+    @pytest.mark.parametrize("change", ["reset_password", "change_password"])
+    def test_totvs_passwords_are_not_managed_here(self, change: str) -> None:
+        with pytest.raises(InvalidValueError, match="próprio TOTVS"):
+            getattr(make_totvs_user(), change)("hash")
 
     def test_change_password_clears_the_pending_change(self) -> None:
         user = make_user(must_change_password=True)

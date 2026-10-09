@@ -36,7 +36,8 @@
   text-decoration: none;
 }
 
-.userName:hover {
+/* Só o nome de usuários locais é link (para trocar a senha). */
+.userName[href]:hover {
   color: var(--color-primary);
   text-decoration: underline;
 }

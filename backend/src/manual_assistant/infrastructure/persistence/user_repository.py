@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from manual_assistant.application.errors import UserAlreadyExistsError
-from manual_assistant.domain.user import User, UserId, UserRole
+from manual_assistant.domain.user import AuthSource, User, UserId, UserRole
 from manual_assistant.infrastructure.persistence.database import translate_database_errors
 from manual_assistant.infrastructure.persistence.models import UserRecord
 
@@ -71,11 +71,10 @@ def _to_row(user: User) -> dict[str, Any]:
         "username": user.username,
         "display_name": user.display_name,
         "role": user.role.value,
+        "auth_source": user.auth_source.value,
         "password_hash": user.password_hash,
         "is_active": user.is_active,
         "must_change_password": user.must_change_password,
-        "failed_login_attempts": user.failed_login_attempts,
-        "locked_until": user.locked_until,
         "last_login_at": user.last_login_at,
         "created_at": user.created_at,
     }
@@ -89,9 +88,8 @@ def _to_entity(record: UserRecord) -> User:
         role=UserRole(record.role),
         password_hash=record.password_hash,
         created_at=record.created_at,
+        auth_source=AuthSource(record.auth_source),
         is_active=record.is_active,
         must_change_password=record.must_change_password,
-        failed_login_attempts=record.failed_login_attempts,
-        locked_until=record.locked_until,
         last_login_at=record.last_login_at,
     )

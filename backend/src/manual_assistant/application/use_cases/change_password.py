@@ -5,13 +5,15 @@ from manual_assistant.domain.user import User, validate_password
 
 
 class ChangePasswordUseCase:
-    """O próprio usuário troca a senha (obrigatório depois de uma senha provisória)."""
+    """O próprio usuário local troca a senha (obrigatório depois de uma senha provisória)."""
 
     def __init__(self, *, users: UserRepository, hasher: PasswordHasher) -> None:
         self._users = users
         self._hasher = hasher
 
     async def execute(self, user: User, *, current_password: str, new_password: str) -> None:
+        if user.password_hash is None:
+            raise InvalidValueError("A senha de usuários do TOTVS é trocada no próprio TOTVS")
         if not self._hasher.verify(current_password, user.password_hash):
             raise InvalidValueError("A senha atual está incorreta")
         if new_password == current_password:

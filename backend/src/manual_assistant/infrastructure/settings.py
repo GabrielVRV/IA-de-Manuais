@@ -1,7 +1,7 @@
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from sqlalchemy import URL
 
@@ -31,14 +31,18 @@ class Settings(BaseSettings):
     db_password: SecretStr  # obrigatória: nunca existe senha padrão
 
     # Autenticação
-    # Chave que assina os tokens de sessão. Gere uma aleatória (mínimo 32 caracteres):
-    #   python -c "import secrets; print(secrets.token_urlsafe(48))"
-    auth_secret_key: SecretStr
-    auth_session_hours: float = Field(default=10, gt=0)  # cobre um turno de trabalho
+    # A sessão cai após esse tempo sem uso, ou no prazo máximo, mesmo com uso diário.
+    auth_session_idle_days: float = Field(default=7, gt=0)
+    auth_session_max_days: float = Field(default=30, gt=0)
     auth_max_failed_attempts: int = Field(default=5, ge=1)
     auth_lockout_minutes: int = Field(default=15, ge=1)
     # Só ligue com HTTPS: um cookie "secure" não é enviado em conexões HTTP.
     auth_cookie_secure: bool = False
+
+    # Login pelo TOTVS (ADR 0008). Vazio = só usuários locais entram.
+    # Ex.: http://ip-do-datasul:porta/api/sfc/v1/api_valida_login/validarLogin/
+    totvs_login_url: str | None = None
+    totvs_timeout_seconds: float = Field(default=10, gt=0)
 
     # Arquivos dos manuais
     storage_dir: Path = Path("data/manuals")
@@ -75,12 +79,20 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
 
-    @field_validator("auth_secret_key")
+    @field_validator("totvs_login_url", mode="before")
     @classmethod
-    def _require_strong_secret(cls, value: SecretStr) -> SecretStr:
-        if len(value.get_secret_value()) < 32:
-            raise ValueError("APP_AUTH_SECRET_KEY precisa ter ao menos 32 caracteres")
+    def _blank_as_none(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip() or None
         return value
+
+    @model_validator(mode="after")
+    def _idle_fits_in_max(self) -> Self:
+        if self.auth_session_idle_days > self.auth_session_max_days:
+            raise ValueError(
+                "APP_AUTH_SESSION_IDLE_DAYS não pode ser maior que APP_AUTH_SESSION_MAX_DAYS"
+            )
+        return self
 
     @property
     def database_url(self) -> URL:

@@ -23,7 +23,10 @@ from manual_assistant.application.use_cases.manage_users import (
     UpdateUserUseCase,
 )
 from manual_assistant.application.use_cases.register_manual import RegisterManualUseCase
-from manual_assistant.application.use_cases.resolve_session import ResolveSessionUseCase
+from manual_assistant.application.use_cases.resolve_session import (
+    LogoutUseCase,
+    ResolveSessionUseCase,
+)
 from manual_assistant.domain.user import User, UserRole
 from manual_assistant.infrastructure.documents.line_chunker import LineChunker
 from manual_assistant.infrastructure.documents.pdf_parser import PdfiumDocumentParser
@@ -32,12 +35,15 @@ from manual_assistant.presentation.http.dependencies import UseCases
 from tests.fakes import (
     FakeEmbeddingProvider,
     FakeLanguageModel,
+    FakeTotvs,
     InMemoryFileStorage,
+    InMemoryLoginAttemptRepository,
     InMemoryManualRepository,
+    InMemorySessionRepository,
     InMemoryUserRepository,
     InMemoryVectorStore,
 )
-from tests.security import DEFAULT_PASSWORD, fast_hasher, make_user, token_service
+from tests.security import DEFAULT_PASSWORD, fast_hasher, make_user, session_manager
 
 FRONTEND_ORIGIN = "http://servidor-interno"
 
@@ -52,11 +58,16 @@ class FakeBackend:
     vector_store: InMemoryVectorStore = field(default_factory=InMemoryVectorStore)
     language_model: FakeLanguageModel = field(default_factory=FakeLanguageModel)
     users: InMemoryUserRepository = field(default_factory=InMemoryUserRepository)
+    sessions: InMemorySessionRepository = field(default_factory=InMemorySessionRepository)
+    login_attempts: InMemoryLoginAttemptRepository = field(
+        default_factory=InMemoryLoginAttemptRepository
+    )
+    totvs: FakeTotvs = field(default_factory=FakeTotvs)
     health_indicators: list[HealthIndicator] = field(default_factory=list)
     max_upload_bytes: int = 1024 * 1024
 
     def build_app(self) -> FastAPI:
-        hasher, tokens = fast_hasher(), token_service()
+        hasher, sessions = fast_hasher(), session_manager(self.sessions)
         use_cases = UseCases(
             check_health=CheckHealthUseCase(self.health_indicators),
             register_manual=RegisterManualUseCase(
@@ -82,9 +93,14 @@ class FakeBackend:
                 language_model=self.language_model,
             ),
             authenticate_user=AuthenticateUserUseCase(
-                users=self.users, hasher=hasher, tokens=tokens
+                users=self.users,
+                attempts=self.login_attempts,
+                hasher=hasher,
+                sessions=sessions,
+                totvs=self.totvs,
             ),
-            resolve_session=ResolveSessionUseCase(users=self.users, tokens=tokens),
+            resolve_session=ResolveSessionUseCase(users=self.users, sessions=sessions),
+            logout=LogoutUseCase(sessions),
             change_password=ChangePasswordUseCase(users=self.users, hasher=hasher),
             create_user=CreateUserUseCase(users=self.users, hasher=hasher),
             list_users=ListUsersUseCase(self.users),

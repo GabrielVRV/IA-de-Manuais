@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from manual_assistant.domain.user import (
     DISPLAY_NAME_MAX_LENGTH,
     PASSWORD_MAX_LENGTH,
+    AuthSource,
     User,
     UserRole,
 )
@@ -17,6 +18,7 @@ class UserResponse(BaseModel):
     username: str
     display_name: str
     role: UserRole
+    auth_source: AuthSource
     is_active: bool
     must_change_password: bool
     last_login_at: datetime | None
@@ -29,6 +31,7 @@ class UserResponse(BaseModel):
             username=user.username,
             display_name=user.display_name,
             role=user.role,
+            auth_source=user.auth_source,
             is_active=user.is_active,
             must_change_password=user.must_change_password,
             last_login_at=user.last_login_at,
@@ -47,6 +50,8 @@ class ChangePasswordRequest(BaseModel):
 
 
 class CreateUserRequest(BaseModel):
+    """Usuário local. Os do TOTVS são cadastrados sozinhos no primeiro login."""
+
     username: str = Field(examples=["maria.silva"])
     display_name: str = Field(max_length=DISPLAY_NAME_MAX_LENGTH, examples=["Maria Silva"])
     role: UserRole = UserRole.USER

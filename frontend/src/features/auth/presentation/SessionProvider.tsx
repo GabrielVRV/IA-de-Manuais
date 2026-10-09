@@ -48,6 +48,11 @@ export function SessionProvider({ children }: { readonly children: ReactNode }) 
     }
   }, [gateway])
 
+  const refresh = useCallback(async () => {
+    const user = await gateway.currentUser()
+    setState(user ? { status: 'authenticated', user } : { status: 'anonymous' })
+  }, [gateway])
+
   const changePassword = useCallback(
     async (currentPassword: string, newPassword: string) => {
       await gateway.changePassword(currentPassword, newPassword)
@@ -61,8 +66,8 @@ export function SessionProvider({ children }: { readonly children: ReactNode }) 
   )
 
   const session = useMemo<Session>(
-    () => ({ state, login, logout, changePassword }),
-    [state, login, logout, changePassword],
+    () => ({ state, login, logout, refresh, changePassword }),
+    [state, login, logout, refresh, changePassword],
   )
 
   return <SessionContext value={session}>{children}</SessionContext>

@@ -4,9 +4,14 @@ O mypy garante que cada fake segue o contrato da porta que substitui.
 """
 
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from datetime import datetime
 
 from manual_assistant.application.errors import StoredFileNotFoundError
+from manual_assistant.application.ports.credential_verifier import (
+    CredentialCheck,
+    CredentialStatus,
+)
 from manual_assistant.application.ports.embedding_provider import Embedding
 from manual_assistant.application.ports.language_model import (
     Completion,
@@ -16,8 +21,10 @@ from manual_assistant.application.ports.language_model import (
 from manual_assistant.application.ports.text_chunker import TextFragment
 from manual_assistant.application.ports.vector_store import EmbeddedChunk
 from manual_assistant.domain.chunk import ScoredChunk
+from manual_assistant.domain.login_attempts import LoginAttempts
 from manual_assistant.domain.manual import Manual, ManualId
 from manual_assistant.domain.pages import Page, PageRange
+from manual_assistant.domain.session import Session
 from manual_assistant.domain.user import User, UserId
 
 
@@ -167,3 +174,72 @@ class InMemoryUserRepository:
 
     async def list_all(self) -> Sequence[User]:
         return sorted(self.users.values(), key=lambda u: u.display_name)
+
+
+@dataclass
+class InMemorySessionRepository:
+    sessions: dict[str, Session] = field(default_factory=dict)
+    touches: int = 0
+
+    async def add(self, session: Session) -> None:
+        self.sessions[session.token_hash] = replace(session)
+
+    async def get(self, token_hash: str) -> Session | None:
+        session = self.sessions.get(token_hash)
+        return replace(session) if session else None
+
+    async def touch(self, token_hash: str, last_seen_at: datetime) -> None:
+        self.touches += 1
+        if token_hash in self.sessions:
+            self.sessions[token_hash].last_seen_at = last_seen_at
+
+    async def delete(self, token_hash: str) -> None:
+        self.sessions.pop(token_hash, None)
+
+    async def delete_expired(self, *, last_seen_before: datetime, created_before: datetime) -> None:
+        self.sessions = {
+            key: s
+            for key, s in self.sessions.items()
+            if s.last_seen_at >= last_seen_before and s.created_at >= created_before
+        }
+
+
+@dataclass
+class InMemoryLoginAttemptRepository:
+    attempts: dict[str, LoginAttempts] = field(default_factory=dict)
+
+    async def get(self, username: str) -> LoginAttempts:
+        stored = self.attempts.get(username)
+        return replace(stored) if stored else LoginAttempts(username=username)
+
+    async def save(self, attempts: LoginAttempts) -> None:
+        self.attempts[attempts.username] = replace(attempts)
+
+    async def clear(self, username: str) -> None:
+        self.attempts.pop(username, None)
+
+
+@dataclass
+class FakeTotvs:
+    """TOTVS simulado: logins e senhas cadastrados em ``accounts``."""
+
+    accounts: dict[str, str] = field(default_factory=dict)
+    names: dict[str, str] = field(default_factory=dict)
+    expired: set[str] = field(default_factory=set)
+    error: Exception | None = None
+    calls: list[str] = field(default_factory=list)
+
+    def add(self, username: str, password: str, name: str | None = None) -> None:
+        self.accounts[username] = password
+        if name:
+            self.names[username] = name
+
+    async def verify(self, username: str, password: str) -> CredentialCheck:
+        self.calls.append(username)
+        if self.error is not None:
+            raise self.error
+        if self.accounts.get(username) != password:
+            return CredentialCheck(CredentialStatus.INVALID)
+        if username in self.expired:
+            return CredentialCheck(CredentialStatus.EXPIRED)
+        return CredentialCheck(CredentialStatus.VALID, display_name=self.names.get(username))

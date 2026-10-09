@@ -32,6 +32,13 @@ class AccountLockedError(ApplicationError):
         super().__init__(f"Muitas tentativas de login. Tente novamente em {minutes} minuto(s).")
 
 
+class PasswordExpiredError(ApplicationError):
+    """Senha certa, mas vencida no TOTVS."""
+
+    def __init__(self) -> None:
+        super().__init__("Sua senha do TOTVS venceu. Redefina-a no TOTVS e entre novamente.")
+
+
 class NotAuthenticatedError(ApplicationError):
     def __init__(self, message: str = "Faça login para continuar") -> None:
         super().__init__(message)
@@ -45,6 +52,18 @@ class PermissionDeniedError(ApplicationError):
 class PasswordChangeRequiredError(PermissionDeniedError):
     def __init__(self) -> None:
         super().__init__("Troque sua senha provisória para continuar")
+
+
+class AccessPendingError(PermissionDeniedError):
+    def __init__(self) -> None:
+        super().__init__("Seu acesso ainda não foi liberado. Aguarde um administrador.")
+
+
+class AccountDisabledError(PermissionDeniedError):
+    """Senha certa, mas o usuário foi desativado. Só é informado depois da senha conferir."""
+
+    def __init__(self) -> None:
+        super().__init__("Seu acesso a este sistema foi desativado. Fale com um administrador.")
 
 
 class UserNotFoundError(ApplicationError):

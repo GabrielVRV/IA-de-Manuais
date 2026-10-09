@@ -23,8 +23,13 @@ UNAUTHORIZED: dict[int | str, dict[str, Any]] = {
 
 @router.post(
     "/login",
-    responses={**UNAUTHORIZED, status.HTTP_429_TOO_MANY_REQUESTS: {"model": ErrorResponse}},
-    summary="Entra no sistema; a sessão fica num cookie HttpOnly",
+    responses={
+        **UNAUTHORIZED,
+        status.HTTP_403_FORBIDDEN: {"model": ErrorResponse},
+        status.HTTP_429_TOO_MANY_REQUESTS: {"model": ErrorResponse},
+        status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ErrorResponse},
+    },
+    summary="Entra no sistema (usuário local ou do TOTVS); a sessão fica num cookie HttpOnly",
 )
 async def login(
     credentials: LoginRequest, request: Request, response: Response, use_cases: UseCasesDep
@@ -45,7 +50,10 @@ async def login(
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT, summary="Sai do sistema")
-async def logout(response: Response) -> None:
+async def logout(request: Request, response: Response, use_cases: UseCasesDep) -> None:
+    token = request.cookies.get(SESSION_COOKIE)
+    if token:
+        await use_cases.logout.execute(token)
     response.delete_cookie(SESSION_COOKIE, path="/")
 
 
@@ -58,7 +66,7 @@ async def me(user: SessionUser) -> UserResponse:
     "/change-password",
     status_code=status.HTTP_204_NO_CONTENT,
     responses=UNAUTHORIZED,
-    summary="Troca a própria senha (obrigatório após uma senha provisória)",
+    summary="Troca a própria senha de um usuário local (obrigatório após uma senha provisória)",
 )
 async def change_password(
     request: ChangePasswordRequest, user: SessionUser, use_cases: UseCasesDep

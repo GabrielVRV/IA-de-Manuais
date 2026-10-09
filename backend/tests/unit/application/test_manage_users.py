@@ -12,12 +12,13 @@ from manual_assistant.application.use_cases.manage_users import (
     ListUsersUseCase,
     ResetUserPasswordUseCase,
     UpdateUserUseCase,
+    UseTotvsLoginUseCase,
 )
 from manual_assistant.domain.errors import InvalidValueError
-from manual_assistant.domain.user import UserId, UserRole
+from manual_assistant.domain.user import AuthSource, UserId, UserRole
 from tests.factories import FIXED_NOW
 from tests.fakes import InMemoryUserRepository
-from tests.security import fast_hasher, make_user
+from tests.security import fast_hasher, make_totvs_user, make_user
 
 pytestmark = pytest.mark.anyio
 
@@ -116,7 +117,18 @@ async def test_resets_a_password(users: InMemoryUserRepository) -> None:
     )
 
     assert user.must_change_password
+    assert user.password_hash is not None
     assert hasher.verify("provisoria-2", user.password_hash)
+
+
+async def test_totvs_passwords_cannot_be_reset_here(users: InMemoryUserRepository) -> None:
+    user = make_totvs_user("joao")
+    await users.save(user)
+
+    with pytest.raises(InvalidValueError, match="próprio TOTVS"):
+        await ResetUserPasswordUseCase(users=users, hasher=fast_hasher()).execute(
+            admin, user.id, temporary_password="provisoria-2"
+        )
 
 
 class TestUpdate:
@@ -129,7 +141,18 @@ class TestUpdate:
         assert not user.is_active
         assert user.is_admin
 
-    @pytest.mark.parametrize("change", [{"is_active": False}, {"role": UserRole.USER}])
+    async def test_approves_a_user_awaiting_access(self, users: InMemoryUserRepository) -> None:
+        pending = make_totvs_user("joao", role=UserRole.PENDING)
+        await users.save(pending)
+
+        await UpdateUserUseCase(users).execute(admin, pending.id, role=UserRole.USER)
+
+        assert not pending.is_pending
+
+    @pytest.mark.parametrize(
+        "change",
+        [{"is_active": False}, {"role": UserRole.USER}, {"role": UserRole.PENDING}],
+    )
     async def test_admins_cannot_lock_themselves_out(
         self, users: InMemoryUserRepository, change: dict[str, object]
     ) -> None:
@@ -141,3 +164,20 @@ class TestUpdate:
     async def test_unknown_user(self, users: InMemoryUserRepository) -> None:
         with pytest.raises(UserNotFoundError):
             await UpdateUserUseCase(users).execute(admin, UserId(uuid4()), is_active=True)
+
+
+class TestUseTotvsLogin:
+    async def test_switches_a_local_user_keeping_the_role(
+        self, users: InMemoryUserRepository
+    ) -> None:
+        user = make_user("ana", role=UserRole.ADMIN)
+        await users.save(user)
+
+        await UseTotvsLoginUseCase(users).execute_as_system(username=" ANA ")
+
+        assert (user.auth_source, user.password_hash) == (AuthSource.TOTVS, None)
+        assert user.is_admin
+
+    async def test_unknown_user(self, users: InMemoryUserRepository) -> None:
+        with pytest.raises(UserNotFoundError):
+            await UseTotvsLoginUseCase(users).execute_as_system(username="ninguem")

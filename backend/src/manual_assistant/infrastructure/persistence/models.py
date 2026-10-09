@@ -88,13 +88,37 @@ class UserRecord(Base):
     username: Mapped[str] = mapped_column(String(50), unique=True)
     display_name: Mapped[str] = mapped_column(String(100))
     role: Mapped[str] = mapped_column(String(20))
-    password_hash: Mapped[str] = mapped_column(String(255))
+    auth_source: Mapped[str] = mapped_column(String(20))
+    password_hash: Mapped[str | None] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean)
     must_change_password: Mapped[bool] = mapped_column(Boolean)
-    failed_login_attempts: Mapped[int]
-    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    __table_args__ = (CheckConstraint("role IN ('admin', 'user')", name="valid_role"),)
+    __table_args__ = (
+        CheckConstraint("role IN ('admin', 'user', 'pending')", name="valid_role"),
+        CheckConstraint("auth_source IN ('local', 'totvs')", name="valid_auth_source"),
+        # Só usuários locais têm senha guardada aqui; a dos usuários do TOTVS fica no Datasul.
+        CheckConstraint(
+            "(auth_source = 'local') = (password_hash IS NOT NULL)", name="password_matches_source"
+        ),
+    )
+
+
+class SessionRecord(Base):
+    __tablename__ = "sessions"
+
+    # SHA-256 do token do cookie (o token em si nunca é gravado).
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class LoginAttemptRecord(Base):
+    __tablename__ = "login_attempts"
+
+    username: Mapped[str] = mapped_column(String(50), primary_key=True)
+    failed_count: Mapped[int]
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

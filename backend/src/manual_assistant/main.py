@@ -12,7 +12,9 @@ from fastapi import FastAPI
 
 from manual_assistant import __version__
 from manual_assistant.application.errors import ExternalServiceError
+from manual_assistant.application.ports.credential_verifier import CredentialVerifier
 from manual_assistant.application.ports.security import PasswordHasher
+from manual_assistant.application.sessions import SessionManager
 from manual_assistant.application.use_cases.ask_question import AskQuestionUseCase
 from manual_assistant.application.use_cases.authenticate_user import AuthenticateUserUseCase
 from manual_assistant.application.use_cases.change_password import ChangePasswordUseCase
@@ -32,7 +34,11 @@ from manual_assistant.application.use_cases.recover_interrupted_indexing import 
     RecoverInterruptedIndexingUseCase,
 )
 from manual_assistant.application.use_cases.register_manual import RegisterManualUseCase
-from manual_assistant.application.use_cases.resolve_session import ResolveSessionUseCase
+from manual_assistant.application.use_cases.resolve_session import (
+    LogoutUseCase,
+    ResolveSessionUseCase,
+)
+from manual_assistant.domain.session import SessionPolicy
 from manual_assistant.infrastructure.ai.factory import AiProviders, build_ai_providers
 from manual_assistant.infrastructure.documents.line_chunker import LineChunker
 from manual_assistant.infrastructure.documents.pdf_parser import PdfiumDocumentParser
@@ -41,16 +47,24 @@ from manual_assistant.infrastructure.persistence.database import (
     create_session_factory,
 )
 from manual_assistant.infrastructure.persistence.health import DatabaseHealthIndicator
+from manual_assistant.infrastructure.persistence.login_attempt_repository import (
+    SqlAlchemyLoginAttemptRepository,
+)
 from manual_assistant.infrastructure.persistence.manual_repository import (
     SqlAlchemyManualRepository,
 )
 from manual_assistant.infrastructure.persistence.models import EMBEDDING_DIMENSIONS
+from manual_assistant.infrastructure.persistence.session_repository import (
+    SqlAlchemySessionRepository,
+)
 from manual_assistant.infrastructure.persistence.user_repository import SqlAlchemyUserRepository
 from manual_assistant.infrastructure.persistence.vector_store import PgVectorStore
 from manual_assistant.infrastructure.security.argon2_hasher import Argon2PasswordHasher
-from manual_assistant.infrastructure.security.jwt_tokens import JwtTokenService
 from manual_assistant.infrastructure.settings import Settings
 from manual_assistant.infrastructure.storage.local_file_storage import LocalFileStorage
+from manual_assistant.infrastructure.totvs.datasul_credential_verifier import (
+    DatasulCredentialVerifier,
+)
 from manual_assistant.presentation.http.app import create_http_app
 from manual_assistant.presentation.http.dependencies import UseCases
 
@@ -62,8 +76,10 @@ def create_app(
     *,
     ai_providers: AiProviders | None = None,
     password_hasher: PasswordHasher | None = None,
+    totvs: CredentialVerifier | None = None,
 ) -> FastAPI:
-    """``ai_providers`` e ``password_hasher`` permitem que os testes usem versões rápidas."""
+    """``ai_providers``, ``password_hasher`` e ``totvs`` permitem que os testes usem
+    versões rápidas ou simuladas."""
     # Sem argumentos, o pydantic-settings lê os valores obrigatórios do ambiente.
     settings = settings or Settings()
     ai = ai_providers or build_ai_providers(settings, embedding_dimensions=EMBEDDING_DIMENSIONS)
@@ -75,10 +91,19 @@ def create_app(
     storage = LocalFileStorage(settings.storage_dir)
     users = SqlAlchemyUserRepository(session_factory)
     hasher = password_hasher or Argon2PasswordHasher()
-    tokens = JwtTokenService(
-        settings.auth_secret_key.get_secret_value(),
-        ttl=timedelta(hours=settings.auth_session_hours),
+    sessions = SessionManager(
+        SqlAlchemySessionRepository(session_factory),
+        policy=SessionPolicy(
+            idle_timeout=timedelta(days=settings.auth_session_idle_days),
+            max_age=timedelta(days=settings.auth_session_max_days),
+        ),
     )
+    if totvs is None and settings.totvs_login_url:
+        totvs = DatasulCredentialVerifier(
+            settings.totvs_login_url, timeout_seconds=settings.totvs_timeout_seconds
+        )
+    if totvs is None:
+        logger.info("APP_TOTVS_LOGIN_URL vazia: só usuários locais conseguem entrar")
 
     use_cases = UseCases(
         check_health=CheckHealthUseCase(indicators=[DatabaseHealthIndicator(engine)]),
@@ -108,12 +133,15 @@ def create_app(
         ),
         authenticate_user=AuthenticateUserUseCase(
             users=users,
+            attempts=SqlAlchemyLoginAttemptRepository(session_factory),
             hasher=hasher,
-            tokens=tokens,
+            sessions=sessions,
+            totvs=totvs,
             max_failed_attempts=settings.auth_max_failed_attempts,
             lockout=timedelta(minutes=settings.auth_lockout_minutes),
         ),
-        resolve_session=ResolveSessionUseCase(users=users, tokens=tokens),
+        resolve_session=ResolveSessionUseCase(users=users, sessions=sessions),
+        logout=LogoutUseCase(sessions),
         change_password=ChangePasswordUseCase(users=users, hasher=hasher),
         create_user=CreateUserUseCase(users=users, hasher=hasher),
         list_users=ListUsersUseCase(users),

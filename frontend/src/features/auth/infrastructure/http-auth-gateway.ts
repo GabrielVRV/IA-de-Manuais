@@ -9,7 +9,8 @@ const userSchema = z.object({
   id: z.string(),
   username: z.string(),
   display_name: z.string(),
-  role: z.enum(['admin', 'user']),
+  role: z.enum(['admin', 'user', 'pending']),
+  auth_source: z.enum(['local', 'totvs']),
   must_change_password: z.boolean(),
 })
 
@@ -22,6 +23,7 @@ export function toSessionUser(body: unknown): SessionUser {
     username: user.username,
     displayName: user.display_name,
     role: user.role,
+    authSource: user.auth_source,
     mustChangePassword: user.must_change_password,
   }
 }

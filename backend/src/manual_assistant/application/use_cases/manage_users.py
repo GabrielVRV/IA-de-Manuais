@@ -111,6 +111,8 @@ class ResetUserPasswordUseCase:
     async def execute(self, actor: User, user_id: UserId, *, temporary_password: str) -> User:
         _require_admin(actor)
         user = await _get_or_raise(self._users, user_id)
+        if not user.is_local:
+            raise InvalidValueError("A senha de usuários do TOTVS é trocada no próprio TOTVS")
         validate_password(temporary_password, username=user.username)
         user.reset_password(self._hasher.hash(temporary_password))
         await self._users.save(user)
@@ -118,7 +120,7 @@ class ResetUserPasswordUseCase:
 
 
 class UpdateUserUseCase:
-    """Ativa/desativa e muda o perfil de um usuário."""
+    """Ativa/desativa e muda o perfil de um usuário (inclusive libera quem aguarda acesso)."""
 
     def __init__(self, users: UserRepository) -> None:
         self._users = users
@@ -132,7 +134,9 @@ class UpdateUserUseCase:
         role: UserRole | None = None,
     ) -> User:
         _require_admin(actor)
-        if user_id == actor.id and (is_active is False or role is UserRole.USER):
+        if user_id == actor.id and (
+            is_active is False or (role is not None and role is not UserRole.ADMIN)
+        ):
             # Evita que o último administrador se tranque do lado de fora por engano.
             raise InvalidValueError("Você não pode desativar nem rebaixar a si mesmo")
 
@@ -143,6 +147,29 @@ class UpdateUserUseCase:
             user.deactivate()
         if role is not None:
             user.role = role
+        await self._users.save(user)
+        return user
+
+
+class UseTotvsLoginUseCase:
+    """Passa um usuário local a entrar com a senha do TOTVS, mantendo o perfil.
+
+    Só pelo terminal do servidor: quem tem acesso a ele já é de confiança.
+    """
+
+    def __init__(self, users: UserRepository) -> None:
+        self._users = users
+
+    async def execute_as_system(self, *, username: str) -> User:
+        """
+        Raises:
+            UserNotFoundError: login inexistente.
+        """
+        normalized = normalize_username(username)
+        user = await self._users.get_by_username(normalized)
+        if user is None:
+            raise UserNotFoundError(normalized)
+        user.use_totvs_login()
         await self._users.save(user)
         return user
 

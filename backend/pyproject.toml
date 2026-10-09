@@ -21,8 +21,8 @@ dependencies = [
     "google-genai>=2.28",
     "openai>=3.26",
     "httpx2>=2.13",  # cliente HTTP usado pelo SDK da OpenAI
+    "httpx>=0.28",  # chamadas ao TOTVS (login)
     "argon2-cffi>=25.1",
-    "pyjwt>=2.15",
 ]
 
 [project.optional-dependencies]
