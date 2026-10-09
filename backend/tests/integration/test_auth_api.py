@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from manual_assistant.application.errors import ExternalServiceError
 from manual_assistant.domain.user import UserRole
 from tests.http_app import FakeBackend, login
 from tests.pdf_builder import build_pdf
@@ -64,6 +65,82 @@ class TestLogin:
         client.post(f"{AUTH}/logout")
 
         assert client.get(f"{AUTH}/me").status_code == 401
+
+    def test_logout_invalidates_a_copied_cookie(self, backend: FakeBackend) -> None:
+        """Sem HTTPS o cookie pode ser capturado na rede: o logout o invalida no servidor."""
+        client = backend.client_logged_in_as("maria", role=UserRole.USER)
+        stolen = client.cookies["ma_session"]
+
+        client.post(f"{AUTH}/logout")
+
+        intruder = TestClient(backend.build_app(), cookies={"ma_session": stolen})
+        assert intruder.get(f"{AUTH}/me").status_code == 401
+        assert backend.sessions.sessions == {}
+
+
+class TestTotvsLogin:
+    def test_first_login_waits_for_an_administrator(self, backend: FakeBackend) -> None:
+        backend.totvs.add("joao", "senha-do-totvs", name="João da Silva")
+        client = TestClient(backend.build_app())
+
+        response = client.post(
+            f"{AUTH}/login", json={"username": "joao", "password": "senha-do-totvs"}
+        )
+
+        assert response.status_code == 200
+        assert (response.json()["role"], response.json()["auth_source"]) == ("pending", "totvs")
+        assert client.get(f"{AUTH}/me").json()["display_name"] == "João da Silva"
+        blocked = client.post("/api/v1/questions", json={"question": "Pressão?"})
+        assert blocked.status_code == 403
+        assert "ainda não foi liberado" in blocked.json()["detail"]
+
+    def test_an_administrator_releases_the_access(self, backend: FakeBackend) -> None:
+        backend.totvs.add("joao", "senha-do-totvs")
+        joao = TestClient(backend.build_app())
+        login(joao, "joao", "senha-do-totvs")
+        admin = backend.client_logged_in_as("admin")
+
+        pending = next(u for u in admin.get("/api/v1/users").json() if u["username"] == "joao")
+        assert pending["role"] == "pending"
+        released = admin.patch(f"/api/v1/users/{pending['id']}", json={"role": "user"})
+
+        assert released.status_code == 200
+        assert joao.post("/api/v1/questions", json={"question": "Pressão?"}).status_code == 200
+
+    def test_totvs_passwords_are_not_reset_here(self, backend: FakeBackend) -> None:
+        backend.totvs.add("joao", "senha-do-totvs")
+        login(TestClient(backend.build_app()), "joao", "senha-do-totvs")
+        admin = backend.client_logged_in_as("admin")
+        joao = next(u for u in admin.get("/api/v1/users").json() if u["username"] == "joao")
+
+        response = admin.post(
+            f"/api/v1/users/{joao['id']}/reset-password",
+            json={"temporary_password": "provisoria-1"},
+        )
+
+        assert response.status_code == 422
+        assert "próprio TOTVS" in response.json()["detail"]
+
+    def test_expired_totvs_password(self, backend: FakeBackend) -> None:
+        backend.totvs.add("joao", "senha-do-totvs")
+        backend.totvs.expired.add("joao")
+
+        response = TestClient(backend.build_app()).post(
+            f"{AUTH}/login", json={"username": "joao", "password": "senha-do-totvs"}
+        )
+
+        assert response.status_code == 401
+        assert "Redefina-a no TOTVS" in response.json()["detail"]
+
+    def test_totvs_outage(self, backend: FakeBackend) -> None:
+        backend.totvs.error = ExternalServiceError("O TOTVS não respondeu")
+
+        response = TestClient(backend.build_app()).post(
+            f"{AUTH}/login", json={"username": "joao", "password": "qualquer"}
+        )
+
+        assert response.status_code == 503
+        assert "qualquer" not in response.text
 
 
 class TestAccessControl:

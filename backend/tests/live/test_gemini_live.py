@@ -27,7 +27,7 @@ from manual_assistant.infrastructure.settings import Settings
 from tests.factories import make_chunk, make_manual
 from tests.fakes import FakeEmbeddingProvider, InMemoryVectorStore
 
-settings = Settings(db_password="nao-usado", auth_secret_key="x" * 32)  # lê o .env, se existir
+settings = Settings(db_password="nao-usado")  # lê o .env, se existir
 api_key = settings.gemini_api_key
 
 pytestmark = [

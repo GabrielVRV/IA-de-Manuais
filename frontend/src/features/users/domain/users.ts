@@ -1,17 +1,19 @@
-import type { UserRole } from '@/features/auth/domain/auth'
+import type { AuthSource, UserRole } from '@/features/auth/domain/auth'
 
-export type { UserRole }
+export type { AuthSource, UserRole }
 
 export interface ManagedUser {
   readonly id: string
   readonly username: string
   readonly displayName: string
   readonly role: UserRole
+  readonly authSource: AuthSource
   readonly isActive: boolean
   readonly mustChangePassword: boolean
   readonly lastLoginAt: Date | null
 }
 
+/** Usuário local. Os do TOTVS são cadastrados sozinhos no primeiro login. */
 export interface NewUser {
   readonly username: string
   readonly displayName: string

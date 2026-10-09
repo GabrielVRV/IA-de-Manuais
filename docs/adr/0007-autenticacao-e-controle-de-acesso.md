@@ -1,6 +1,8 @@
 # ADR 0007 — Autenticação e controle de acesso
 
-- **Status:** aceito
+- **Status:** aceito, em parte substituído pela
+  [ADR 0008](0008-login-pelo-totvs-e-sessoes-no-banco.md) (login pelo TOTVS, sessões no
+  banco e bloqueio por login digitado)
 - **Data:** 2026-10-07
 
 ## Contexto

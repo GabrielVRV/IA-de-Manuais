@@ -4,6 +4,7 @@ from typing import Annotated, cast
 from fastapi import Depends, Request
 
 from manual_assistant.application.errors import (
+    AccessPendingError,
     NotAuthenticatedError,
     PasswordChangeRequiredError,
     PermissionDeniedError,
@@ -24,7 +25,10 @@ from manual_assistant.application.use_cases.manage_users import (
     UpdateUserUseCase,
 )
 from manual_assistant.application.use_cases.register_manual import RegisterManualUseCase
-from manual_assistant.application.use_cases.resolve_session import ResolveSessionUseCase
+from manual_assistant.application.use_cases.resolve_session import (
+    LogoutUseCase,
+    ResolveSessionUseCase,
+)
 from manual_assistant.domain.user import User
 
 SESSION_COOKIE = "ma_session"
@@ -44,6 +48,7 @@ class UseCases:
     ask_question: AskQuestionUseCase
     authenticate_user: AuthenticateUserUseCase
     resolve_session: ResolveSessionUseCase
+    logout: LogoutUseCase
     change_password: ChangePasswordUseCase
     create_user: CreateUserUseCase
     list_users: ListUsersUseCase
@@ -63,7 +68,8 @@ def get_check_health(use_cases: UseCasesDep) -> CheckHealthUseCase:
 
 
 async def get_session_user(request: Request, use_cases: UseCasesDep) -> User:
-    """Usuário da sessão, mesmo que ainda precise trocar a senha provisória."""
+    """Usuário da sessão, mesmo que ainda precise trocar a senha provisória ou aguarde
+    a liberação do acesso."""
     token = request.cookies.get(SESSION_COOKIE)
     if not token:
         raise NotAuthenticatedError()
@@ -74,7 +80,9 @@ SessionUser = Annotated[User, Depends(get_session_user)]
 
 
 def get_current_user(user: SessionUser) -> User:
-    """Usuário liberado para usar o sistema (sem troca de senha pendente)."""
+    """Usuário liberado para usar o sistema: acesso aprovado e sem troca de senha pendente."""
+    if user.is_pending:
+        raise AccessPendingError()
     if user.must_change_password:
         raise PasswordChangeRequiredError()
     return user

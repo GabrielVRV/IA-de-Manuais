@@ -13,7 +13,7 @@ import type { HealthGateway } from '@/features/health/domain/api-health'
 import { HealthGatewayContext } from '@/features/health/presentation/health-gateway-context'
 import type { ManualsGateway, ManualSummary } from '@/features/manuals/domain/manuals'
 import { ManualsGatewayContext } from '@/features/manuals/presentation/manuals-gateway-context'
-import type { ManagedUser, UsersGateway } from '@/features/users/domain/users'
+import type { ManagedUser, UserRole, UsersGateway } from '@/features/users/domain/users'
 import { UsersGatewayContext } from '@/features/users/presentation/users-gateway-context'
 import { HttpError } from '@/shared/http/errors'
 
@@ -22,6 +22,7 @@ export const ADMIN: SessionUser = {
   username: 'admin',
   displayName: 'Ana Admin',
   role: 'admin',
+  authSource: 'local',
   mustChangePassword: false,
 }
 
@@ -31,6 +32,16 @@ export const REGULAR: SessionUser = {
   username: 'joao',
   displayName: 'João',
   role: 'user',
+}
+
+/** Primeiro login pelo TOTVS: ainda aguarda um administrador liberar o acesso. */
+export const PENDING: SessionUser = {
+  ...REGULAR,
+  id: 'u-pedro',
+  username: 'pedro',
+  displayName: 'Pedro do TOTVS',
+  role: 'pending',
+  authSource: 'totvs',
 }
 
 export class FakeAuthGateway implements AuthGateway {
@@ -118,6 +129,7 @@ export function managedUser(overrides: Partial<ManagedUser> = {}): ManagedUser {
     username: 'joao',
     displayName: 'João',
     role: 'user',
+    authSource: 'local',
     isActive: true,
     mustChangePassword: false,
     lastLoginAt: null,
@@ -134,7 +146,7 @@ export function fakeUsersGateway(initial: ManagedUser[]) {
   return {
     state,
     list: vi.fn(() => Promise.resolve([...state.users])),
-    create: vi.fn((user: { username: string; displayName: string; role: 'admin' | 'user' }) => {
+    create: vi.fn((user: { username: string; displayName: string; role: UserRole }) => {
       if (state.users.some((u) => u.username === user.username)) {
         return Promise.reject(
           new HttpError(409, { detail: `Já existe um usuário com o login '${user.username}'` }),
@@ -145,8 +157,9 @@ export function fakeUsersGateway(initial: ManagedUser[]) {
       return Promise.resolve(created)
     }),
     resetPassword: vi.fn((id: string) => replace(id, { mustChangePassword: true })),
-    update: vi.fn((id: string, changes: { isActive?: boolean; role?: 'admin' | 'user' }) =>
-      replace(id, changes),
+    update: vi.fn(
+      (id: string, changes: { isActive?: boolean; role?: 'admin' | 'user' | 'pending' }) =>
+        replace(id, changes),
     ),
   } satisfies UsersGateway & { state: typeof state }
 }

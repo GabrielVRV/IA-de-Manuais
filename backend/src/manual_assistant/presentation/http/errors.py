@@ -12,6 +12,7 @@ from manual_assistant.application.errors import (
     InvalidDocumentError,
     ManualNotFoundError,
     NotAuthenticatedError,
+    PasswordExpiredError,
     PermissionDeniedError,
     StoredFileNotFoundError,
     UserAlreadyExistsError,
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 _STATUS_BY_ERROR: dict[type[Exception], int] = {
     InvalidCredentialsError: status.HTTP_401_UNAUTHORIZED,
     NotAuthenticatedError: status.HTTP_401_UNAUTHORIZED,
+    PasswordExpiredError: status.HTTP_401_UNAUTHORIZED,
     PermissionDeniedError: status.HTTP_403_FORBIDDEN,
     AccountLockedError: status.HTTP_429_TOO_MANY_REQUESTS,
     ManualNotFoundError: status.HTTP_404_NOT_FOUND,

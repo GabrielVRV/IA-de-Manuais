@@ -2,18 +2,32 @@
 export const PASSWORD_MIN_LENGTH = 8
 export const PASSWORD_MAX_LENGTH = 128
 
-export type UserRole = 'admin' | 'user'
+/** 'pending': entrou pelo TOTVS e aguarda um administrador liberar o acesso. */
+export type UserRole = 'admin' | 'user' | 'pending'
+
+/** Quem confere a senha: este sistema ('local') ou o TOTVS. */
+export type AuthSource = 'local' | 'totvs'
 
 export interface SessionUser {
   readonly id: string
   readonly username: string
   readonly displayName: string
   readonly role: UserRole
+  readonly authSource: AuthSource
   readonly mustChangePassword: boolean
 }
 
 export function isAdmin(user: SessionUser): boolean {
   return user.role === 'admin'
+}
+
+export function isPending(user: SessionUser): boolean {
+  return user.role === 'pending'
+}
+
+/** Só usuários locais trocam a senha aqui; os do TOTVS trocam no próprio TOTVS. */
+export function managesPasswordHere(user: SessionUser): boolean {
+  return user.authSource === 'local'
 }
 
 /** Porta: como a interface entra, sai e acompanha a sessão. */

@@ -2,7 +2,7 @@ import { act, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 
-import { ADMIN, FakeAuthGateway, REGULAR, renderApp } from '@/test/fakes'
+import { ADMIN, FakeAuthGateway, PENDING, REGULAR, renderApp } from '@/test/fakes'
 
 const nav = () => screen.getByRole('navigation', { name: 'Navegação principal' })
 
@@ -62,6 +62,25 @@ describe('<App />', () => {
       expect(auth.changePassword).not.toHaveBeenCalled()
     })
 
+    it('keeps TOTVS users awaiting approval out until an administrator releases them', async () => {
+      const user = userEvent.setup()
+      const auth = new FakeAuthGateway(PENDING)
+      renderApp({ auth })
+
+      expect(
+        await screen.findByRole('heading', { name: 'Aguardando liberação' }),
+      ).toBeInTheDocument()
+      expect(screen.getByText('Pedro do TOTVS')).toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: /sua pergunta/i })).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Verificar novamente' }))
+      expect(await screen.findByRole('status')).toHaveTextContent('ainda não foi liberado')
+
+      auth.user = { ...PENDING, role: 'user' }
+      await user.click(screen.getByRole('button', { name: 'Verificar novamente' }))
+      expect(await screen.findByRole('textbox', { name: /sua pergunta/i })).toBeInTheDocument()
+    })
+
     it('returns to the login screen with a notice when the session expires', async () => {
       const auth = new FakeAuthGateway(ADMIN)
       renderApp({ auth })
@@ -104,13 +123,20 @@ describe('<App />', () => {
       expect(within(nav()).queryByRole('link', { name: 'Manuais' })).not.toBeInTheDocument()
     })
 
-    it('lets anyone change their own password', async () => {
+    it('lets local users change their own password', async () => {
       const user = userEvent.setup()
       renderApp({ auth: new FakeAuthGateway(REGULAR) })
 
       await user.click(await screen.findByRole('link', { name: 'João' }))
 
       expect(screen.getByRole('heading', { name: 'Trocar minha senha' })).toBeInTheDocument()
+    })
+
+    it('does not offer a password change to TOTVS users', async () => {
+      renderApp({ auth: new FakeAuthGateway({ ...REGULAR, authSource: 'totvs' }), path: '/senha' })
+
+      expect(await screen.findByRole('textbox', { name: /sua pergunta/i })).toBeInTheDocument()
+      expect(screen.getByText('João')).not.toHaveAttribute('href')
     })
   })
 })

@@ -48,13 +48,26 @@ uvicorn --factory manual_assistant.main:create_app --reload
 
 ## Usuários e acesso
 
-Todas as rotas exigem login, exceto `/api/v1/health` e `/api/v1/auth/login`. Detalhes no
-[ADR 0007](../docs/adr/0007-autenticacao-e-controle-de-acesso.md).
+Todas as rotas exigem login, exceto `/api/v1/health` e `/api/v1/auth/login`. Detalhes nos
+ADRs [0007](../docs/adr/0007-autenticacao-e-controle-de-acesso.md) e
+[0008](../docs/adr/0008-login-pelo-totvs-e-sessoes-no-banco.md).
 
-| Perfil  | Pode                                                   |
-| ------- | ------------------------------------------------------ |
-| `user`  | Usar o chat e abrir os manuais citados                 |
-| `admin` | Tudo do `user` + enviar/reprocessar/excluir manuais e gerenciar usuários |
+Há dois tipos de usuário:
+
+- **TOTVS:** entra com o usuário e a senha do Datasul, conferidos pela rota configurada em
+  `APP_TOTVS_LOGIN_URL`. A senha não é guardada aqui. O primeiro login cadastra a pessoa
+  como `pending`, até um administrador liberar.
+- **Local:** senha guardada aqui (Argon2id), com senha provisória e troca obrigatória. Serve
+  para quem não tem TOTVS e para o administrador de emergência.
+
+| Perfil    | Pode                                                   |
+| --------- | ------------------------------------------------------ |
+| `pending` | Só ver que aguarda liberação                           |
+| `user`    | Usar o chat e abrir os manuais citados                 |
+| `admin`   | Tudo do `user` + enviar/reprocessar/excluir manuais e gerenciar usuários |
+
+A sessão fica numa tabela do banco (o cookie leva um token aleatório; o banco guarda só o
+hash). Ela cai depois de 7 dias sem uso, 30 dias depois do login ou no logout.
 
 **Primeiro administrador** (no servidor; a senha é pedida sem aparecer na tela):
 
@@ -62,15 +75,21 @@ Todas as rotas exigem login, exceto `/api/v1/health` e `/api/v1/auth/login`. Det
 docker compose exec api python -m manual_assistant.cli create-admin --username seu.login --name "Seu Nome"
 ```
 
+**Passar um usuário local a entrar pelo TOTVS**, mantendo o perfil:
+
+```powershell
+docker compose exec api python -m manual_assistant.cli use-totvs --username seu.login
+```
+
 | Método e rota                              | O que faz                                          |
 | ------------------------------------------ | -------------------------------------------------- |
-| `POST /api/v1/auth/login`                  | Entra; a sessão fica num cookie HttpOnly           |
-| `POST /api/v1/auth/logout`                 | Sai                                                |
+| `POST /api/v1/auth/login`                  | Entra (local ou TOTVS); a sessão fica num cookie HttpOnly |
+| `POST /api/v1/auth/logout`                 | Sai e invalida a sessão no servidor                |
 | `GET /api/v1/auth/me`                      | Usuário da sessão                                  |
-| `POST /api/v1/auth/change-password`        | Troca a própria senha                              |
-| `GET/POST /api/v1/users`                   | Lista / cria usuários com senha provisória (admin) |
-| `POST /api/v1/users/{id}/reset-password`   | Define uma nova senha provisória (admin)           |
-| `PATCH /api/v1/users/{id}`                 | Ativa/desativa ou muda o perfil (admin)            |
+| `POST /api/v1/auth/change-password`        | Troca a própria senha (só usuários locais)         |
+| `GET/POST /api/v1/users`                   | Lista / cria usuários locais com senha provisória (admin) |
+| `POST /api/v1/users/{id}/reset-password`   | Define uma nova senha provisória (admin, só locais) |
+| `PATCH /api/v1/users/{id}`                 | Ativa/desativa, muda o perfil ou libera o acesso (admin) |
 
 Pelo Swagger (`/api/docs`), faça o `POST /auth/login` primeiro: o navegador guarda o
 cookie e as demais chamadas passam a funcionar.

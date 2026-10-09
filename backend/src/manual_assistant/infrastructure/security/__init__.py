@@ -1,1 +1,1 @@
-"""Hash de senhas e tokens de sessão."""
+"""Hash de senhas."""

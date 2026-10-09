@@ -22,6 +22,7 @@ const apiUser = {
   username: 'maria',
   display_name: 'Maria',
   role: 'user',
+  auth_source: 'local',
   is_active: true,
   must_change_password: true,
   last_login_at: null,

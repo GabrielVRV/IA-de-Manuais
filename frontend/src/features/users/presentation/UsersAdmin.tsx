@@ -12,6 +12,11 @@ import styles from './UsersAdmin.module.css'
 
 const dateFormat = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 
+/** Quem aguarda liberação aparece primeiro; o resto mantém a ordem da API (por nome). */
+function pendingFirst(users: readonly ManagedUser[]): ManagedUser[] {
+  return [...users].sort((a, b) => Number(b.role === 'pending') - Number(a.role === 'pending'))
+}
+
 /** Senha provisória a entregar ao usuário (mostrada uma única vez). */
 interface Handover {
   readonly username: string
@@ -62,6 +67,8 @@ export function UsersAdmin() {
     }
   }
 
+  const pendingCount = users?.filter((u) => u.isActive && u.role === 'pending').length ?? 0
+
   const resetPassword = (user: ManagedUser) => {
     if (!window.confirm(`Gerar uma nova senha provisória para ${user.displayName}?`)) return
     const password = randomPassword()
@@ -81,6 +88,15 @@ export function UsersAdmin() {
       </header>
 
       <div className={ui.stack}>
+        {pendingCount > 0 && (
+          <p className={ui.alert} data-tone="warning" role="status">
+            {pendingCount === 1
+              ? '1 usuário do TOTVS aguarda liberação.'
+              : `${String(pendingCount)} usuários do TOTVS aguardam liberação.`}{' '}
+            Clique em <strong>Liberar</strong> ou escolha o perfil para dar acesso.
+          </p>
+        )}
+
         <CreateUserForm
           onCreate={async (user) =>
             run(async () => {
@@ -128,6 +144,7 @@ export function UsersAdmin() {
                 <tr>
                   <th>Nome</th>
                   <th>Login</th>
+                  <th>Origem</th>
                   <th>Perfil</th>
                   <th>Situação</th>
                   <th>Último acesso</th>
@@ -137,8 +154,9 @@ export function UsersAdmin() {
                 </tr>
               </thead>
               <tbody>
-                {users.map((user) => {
+                {pendingFirst(users).map((user) => {
                   const isMe = user.id === me.id
+                  const pending = user.role === 'pending'
                   return (
                     <tr key={user.id} className={cx(!user.isActive && styles.inactive)}>
                       <td>
@@ -146,6 +164,7 @@ export function UsersAdmin() {
                         {isMe && <span className={ui.muted}> (você)</span>}
                       </td>
                       <td>{user.username}</td>
+                      <td>{user.authSource === 'totvs' ? 'TOTVS' : 'Local'}</td>
                       <td>
                         <select
                           className={ui.select}
@@ -158,6 +177,7 @@ export function UsersAdmin() {
                             )
                           }}
                         >
+                          {pending && <option value="pending">Aguardando liberação</option>}
                           <option value="user">Usuário</option>
                           <option value="admin">Administrador</option>
                         </select>
@@ -166,6 +186,10 @@ export function UsersAdmin() {
                         {!user.isActive ? (
                           <span className={ui.badge} data-tone="danger">
                             Inativo
+                          </span>
+                        ) : pending ? (
+                          <span className={ui.badge} data-tone="warning">
+                            Aguardando liberação
                           </span>
                         ) : user.mustChangePassword ? (
                           <span className={ui.badge} data-tone="warning">
@@ -182,15 +206,28 @@ export function UsersAdmin() {
                       </td>
                       <td>
                         <div className={styles.actions}>
-                          <button
-                            type="button"
-                            className={ui.button}
-                            onClick={() => {
-                              resetPassword(user)
-                            }}
-                          >
-                            Redefinir senha
-                          </button>
+                          {pending && user.isActive && (
+                            <button
+                              type="button"
+                              className={cx(ui.button, ui.primary)}
+                              onClick={() => {
+                                void run(() => gateway.update(user.id, { role: 'user' }))
+                              }}
+                            >
+                              Liberar
+                            </button>
+                          )}
+                          {user.authSource === 'local' && (
+                            <button
+                              type="button"
+                              className={ui.button}
+                              onClick={() => {
+                                resetPassword(user)
+                              }}
+                            >
+                              Redefinir senha
+                            </button>
+                          )}
                           <button
                             type="button"
                             className={cx(ui.button, user.isActive && ui.danger)}
@@ -251,7 +288,11 @@ function CreateUserForm({
         void submit()
       }}
     >
-      <strong>Novo usuário</strong>
+      <strong>Novo usuário local</strong>
+      <span className={ui.hint}>
+        Usuários do TOTVS não precisam ser criados: eles aparecem aqui no primeiro login, aguardando
+        liberação. Crie aqui só quem não tem acesso ao TOTVS.
+      </span>
       <div className={ui.row}>
         <label className={cx(ui.field, ui.grow)}>
           <span className={ui.label}>Nome</span>

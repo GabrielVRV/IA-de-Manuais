@@ -31,11 +31,13 @@ src/
 - **Chat:** pergunta em linguagem natural; a resposta vem formatada (Markdown seguro) e
   com as **fontes clicáveis**, que abrem o PDF do manual na página citada. "Não encontrei"
   tem um visual próprio. Enter envia e Shift+Enter quebra linha.
-- **Login** com troca obrigatória da senha provisória no primeiro acesso; a sessão expirada
-  devolve à tela de login com um aviso.
+- **Login** com o usuário do TOTVS (o primeiro acesso mostra "Aguardando liberação" até um
+  administrador liberar) ou com um usuário local (troca obrigatória da senha provisória no
+  primeiro acesso). A sessão expirada devolve à tela de login com um aviso.
 - **Manuais** (administradores): envio de vários PDFs (arrastar e soltar), status que se
   atualiza sozinho durante a indexação, motivo de falha, reprocessar e excluir.
-- **Usuários** (administradores): criar com senha provisória gerada, redefinir senha,
+- **Usuários** (administradores): liberar quem entrou pelo TOTVS (destacados no topo),
+  criar usuários locais com senha provisória gerada, redefinir senha (só locais),
   ativar/desativar e mudar perfil.
 - **Status do servidor** no cabeçalho (clique para verificar de novo).
 - Rotas por `#` (ex.: `#/manuais`): funcionam em qualquer subpasta do XAMPP, sem reescrita.
