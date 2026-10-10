@@ -18,6 +18,7 @@ from manual_assistant.application.ports.language_model import (
     CompletionRequest,
     TokenUsage,
 )
+from manual_assistant.application.ports.manual_source import SourceDocument
 from manual_assistant.application.ports.text_chunker import TextFragment
 from manual_assistant.application.ports.vector_store import EmbeddedChunk
 from manual_assistant.domain.chunk import ScoredChunk
@@ -243,3 +244,31 @@ class FakeTotvs:
         if username in self.expired:
             return CredentialCheck(CredentialStatus.EXPIRED)
         return CredentialCheck(CredentialStatus.VALID, display_name=self.names.get(username))
+
+
+@dataclass
+class FakeManualSource:
+    """Pasta da Engenharia simulada: caminho -> (conteúdo, título na planilha)."""
+
+    files: dict[str, tuple[bytes, str | None]] = field(default_factory=dict)
+    versions: dict[str, int] = field(default_factory=dict)  # muda a "data" do arquivo
+    reads: list[str] = field(default_factory=list)
+
+    def put(self, path: str, content: bytes = b"%PDF-1.4 v1", title: str | None = None) -> None:
+        self.files[path] = (content, title)
+        self.versions[path] = self.versions.get(path, 0) + 1
+
+    async def list_documents(self) -> Sequence[SourceDocument]:
+        return [
+            SourceDocument(
+                path=path,
+                file_name=path.rsplit("/", 1)[-1],
+                fingerprint=f"{len(content)}-{self.versions[path]}",
+                title=title,
+            )
+            for path, (content, title) in self.files.items()
+        ]
+
+    async def read(self, path: str) -> bytes:
+        self.reads.append(path)
+        return self.files[path][0]

@@ -46,12 +46,22 @@ class ManualRecord(Base):
     page_count: Mapped[int | None]
     chunk_count: Mapped[int | None]
     failure_reason: Mapped[str | None] = mapped_column(Text)
+    # Origem na pasta da Engenharia (ADR 0009); nulas nos manuais enviados pela tela.
+    source_key: Mapped[str | None] = mapped_column(String(50), unique=True)
+    source_fingerprint: Mapped[str | None] = mapped_column(String(100))
+    source_content_hash: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
         CheckConstraint(
             "status IN ('pending', 'processing', 'indexed', 'failed')", name="valid_status"
+        ),
+        # Os três campos de origem andam juntos: ou todos preenchidos, ou nenhum.
+        CheckConstraint(
+            "(source_key IS NULL) = (source_fingerprint IS NULL)"
+            " AND (source_key IS NULL) = (source_content_hash IS NULL)",
+            name="source_complete",
         ),
         Index("ix_manuals_created_at", "created_at"),
     )

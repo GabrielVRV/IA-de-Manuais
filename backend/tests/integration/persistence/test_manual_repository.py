@@ -6,7 +6,7 @@ from sqlalchemy import URL
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from manual_assistant.application.errors import ExternalServiceError
-from manual_assistant.domain.manual import Manual, ManualId, ManualStatus
+from manual_assistant.domain.manual import Manual, ManualId, ManualStatus, SourceFile
 from manual_assistant.infrastructure.persistence.database import (
     create_database_engine,
     create_session_factory,
@@ -75,6 +75,22 @@ async def test_lists_newest_first(repository: SqlAlchemyManualRepository) -> Non
     await repository.save(newer)
 
     assert [m.title for m in await repository.list_all()] == ["Novo", "Antigo"]
+
+
+async def test_saves_and_restores_the_source_file(repository: SqlAlchemyManualRepository) -> None:
+    source = SourceFile(key="95007003P", fingerprint="1024-1700000000", content_hash="a" * 64)
+    manual = Manual.register(title="Incubadora", file_name="95007003-01P.pdf", now=FIXED_NOW)
+    manual.update_from_source(title="Incubadora", file_name="95007003-01P.pdf", source=source)
+    uploaded = make_manual()
+
+    await repository.save(manual)
+    await repository.save(uploaded)
+
+    restored, restored_uploaded = await repository.get(manual.id), await repository.get(uploaded.id)
+    assert restored is not None
+    assert restored_uploaded is not None
+    assert restored.source == source
+    assert restored_uploaded.source is None
 
 
 async def test_deletes_the_manual(repository: SqlAlchemyManualRepository) -> None:

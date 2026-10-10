@@ -5,7 +5,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from manual_assistant.domain.manual import Manual, ManualId, ManualStatus
+from manual_assistant.domain.manual import Manual, ManualId, ManualStatus, SourceFile
 from manual_assistant.infrastructure.persistence.database import translate_database_errors
 from manual_assistant.infrastructure.persistence.models import ManualRecord
 
@@ -69,6 +69,9 @@ def _to_row(manual: Manual) -> dict[str, Any]:
         "page_count": manual.page_count,
         "chunk_count": manual.chunk_count,
         "failure_reason": manual.failure_reason,
+        "source_key": manual.source.key if manual.source else None,
+        "source_fingerprint": manual.source.fingerprint if manual.source else None,
+        "source_content_hash": manual.source.content_hash if manual.source else None,
         "created_at": manual.created_at,
     }
 
@@ -83,4 +86,18 @@ def _to_entity(record: ManualRecord) -> Manual:
         page_count=record.page_count,
         chunk_count=record.chunk_count,
         failure_reason=record.failure_reason,
+        source=_source_of(record),
+    )
+
+
+def _source_of(record: ManualRecord) -> SourceFile | None:
+    # A regra source_complete do banco garante que os três vêm juntos.
+    if record.source_key is None or record.source_fingerprint is None:
+        return None
+    if record.source_content_hash is None:
+        return None
+    return SourceFile(
+        key=record.source_key,
+        fingerprint=record.source_fingerprint,
+        content_hash=record.source_content_hash,
     )

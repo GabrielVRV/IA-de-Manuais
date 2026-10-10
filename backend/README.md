@@ -112,6 +112,26 @@ motivo aparece em `failure_reason`. Se a API reiniciar no meio de uma indexaçã
 O jeito mais fácil de testar é pelo Swagger (`/api/docs`): abra `POST /manuals`, clique
 em *Try it out* e escolha um PDF.
 
+## Sincronização com a pasta da Engenharia
+
+Importa os manuais vigentes direto da pasta de rede da Engenharia (detalhes e regras na
+[ADR 0009](../docs/adr/0009-sincronizacao-com-a-pasta-da-engenharia.md)). **A pasta só é
+lida, nunca alterada.** Novos manuais são importados, novas revisões substituem as
+anteriores e o que sair da pasta é removido do sistema.
+
+```powershell
+# 1. Só mostra o que seria feito: não altera nada nem gasta API
+.venv\Scripts\python -m manual_assistant.cli sync-manuals --folder "J:\engpub_consulta\Manuais" --dry-run --verbose
+
+# 2. Importa e indexa no máximo 3 manuais (pede confirmação)
+.venv\Scripts\python -m manual_assistant.cli sync-manuals --folder "J:\engpub_consulta\Manuais" --limit 3
+
+# 3. Sem --limit, sincroniza tudo. Pode rodar de novo: só o que mudou é processado.
+```
+
+Com `APP_SYNC_SOURCE_DIR` no `.env`, o `--folder` pode ser omitido. `--yes` dispensa a
+confirmação (para agendar).
+
 ## Provedores de IA
 
 Configurados no `.env` (ver `.env.example` e o [ADR 0005](../docs/adr/0005-provedores-de-ia.md)):
