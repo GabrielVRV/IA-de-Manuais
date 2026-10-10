@@ -22,6 +22,12 @@ from manual_assistant.application.ports.manual_source import SourceDocument
 from manual_assistant.application.ports.text_chunker import TextFragment
 from manual_assistant.application.ports.vector_store import EmbeddedChunk
 from manual_assistant.domain.chunk import ScoredChunk
+from manual_assistant.domain.conversation import (
+    Conversation,
+    ConversationId,
+    ConversationSummary,
+    Exchange,
+)
 from manual_assistant.domain.login_attempts import LoginAttempts
 from manual_assistant.domain.manual import Manual, ManualId
 from manual_assistant.domain.pages import Page, PageRange
@@ -272,3 +278,50 @@ class FakeManualSource:
     async def read(self, path: str) -> bytes:
         self.reads.append(path)
         return self.files[path][0]
+
+
+@dataclass
+class InMemoryConversationRepository:
+    conversations: dict[ConversationId, Conversation] = field(default_factory=dict)
+
+    async def add(self, conversation: Conversation) -> None:
+        self.conversations[conversation.id] = _copy(conversation)
+
+    async def get(self, conversation_id: ConversationId) -> Conversation | None:
+        stored = self.conversations.get(conversation_id)
+        return _copy(stored) if stored else None
+
+    async def list_by_owner(self, owner_id: UserId) -> Sequence[ConversationSummary]:
+        owned = [c for c in self.conversations.values() if c.owner_id == owner_id]
+        return [
+            ConversationSummary(
+                id=c.id,
+                title=c.title,
+                created_at=c.created_at,
+                updated_at=c.updated_at,
+                exchange_count=len(c.exchanges),
+            )
+            for c in sorted(owned, key=lambda c: c.updated_at, reverse=True)
+        ]
+
+    async def append(self, conversation: Conversation, exchange: Exchange) -> None:
+        stored = self.conversations[conversation.id]
+        stored.exchanges.append(exchange)
+        stored.updated_at = conversation.updated_at
+
+    async def rename(self, conversation_id: ConversationId, title: str) -> None:
+        self.conversations[conversation_id].title = title
+
+    async def delete(self, conversation_id: ConversationId) -> None:
+        self.conversations.pop(conversation_id, None)
+
+    async def delete_idle(self, *, updated_before: datetime) -> int:
+        idle = [c.id for c in self.conversations.values() if c.updated_at < updated_before]
+        for conversation_id in idle:
+            del self.conversations[conversation_id]
+        return len(idle)
+
+
+def _copy(conversation: Conversation) -> Conversation:
+    """Cópia independente, como se viesse do banco: o teste não altera o "armazenado"."""
+    return replace(conversation, exchanges=list(conversation.exchanges))

@@ -9,7 +9,7 @@ import { useSession } from '../session-context'
 import styles from './LoginPage.module.css'
 import { NeuralBackdrop } from './NeuralBackdrop'
 import { TypingDemo } from './TypingDemo'
-import { type BotMood, type Gaze, VisorBot } from './VisorBot'
+import { type BotMood, type Gaze, VisorBot } from '@/shared/mascot/VisorBot'
 
 type Focus = 'username' | 'password' | null
 

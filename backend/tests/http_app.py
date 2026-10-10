@@ -11,6 +11,13 @@ from manual_assistant.application.use_cases.ask_question import AskQuestionUseCa
 from manual_assistant.application.use_cases.authenticate_user import AuthenticateUserUseCase
 from manual_assistant.application.use_cases.change_password import ChangePasswordUseCase
 from manual_assistant.application.use_cases.check_health import CheckHealthUseCase
+from manual_assistant.application.use_cases.conversations import (
+    ChatUseCase,
+    DeleteConversationUseCase,
+    GetConversationUseCase,
+    ListConversationsUseCase,
+    RenameConversationUseCase,
+)
 from manual_assistant.application.use_cases.delete_manual import DeleteManualUseCase
 from manual_assistant.application.use_cases.get_manual import GetManualUseCase
 from manual_assistant.application.use_cases.get_manual_file import GetManualFileUseCase
@@ -36,6 +43,7 @@ from tests.fakes import (
     FakeEmbeddingProvider,
     FakeLanguageModel,
     FakeTotvs,
+    InMemoryConversationRepository,
     InMemoryFileStorage,
     InMemoryLoginAttemptRepository,
     InMemoryManualRepository,
@@ -63,6 +71,9 @@ class FakeBackend:
         default_factory=InMemoryLoginAttemptRepository
     )
     totvs: FakeTotvs = field(default_factory=FakeTotvs)
+    conversations: InMemoryConversationRepository = field(
+        default_factory=InMemoryConversationRepository
+    )
     health_indicators: list[HealthIndicator] = field(default_factory=list)
     max_upload_bytes: int = 1024 * 1024
 
@@ -87,11 +98,18 @@ class FakeBackend:
             delete_manual=DeleteManualUseCase(
                 repository=self.repository, vector_store=self.vector_store, storage=self.storage
             ),
-            ask_question=AskQuestionUseCase(
-                embeddings=self.embeddings,
-                vector_store=self.vector_store,
-                language_model=self.language_model,
+            chat=ChatUseCase(
+                conversations=self.conversations,
+                ask_question=AskQuestionUseCase(
+                    embeddings=self.embeddings,
+                    vector_store=self.vector_store,
+                    language_model=self.language_model,
+                ),
             ),
+            list_conversations=ListConversationsUseCase(self.conversations),
+            get_conversation=GetConversationUseCase(self.conversations),
+            rename_conversation=RenameConversationUseCase(self.conversations),
+            delete_conversation=DeleteConversationUseCase(self.conversations),
             authenticate_user=AuthenticateUserUseCase(
                 users=self.users,
                 attempts=self.login_attempts,

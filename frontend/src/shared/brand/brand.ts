@@ -10,6 +10,8 @@ export interface Brand {
   readonly tagline: string
   /** Caminho da logo relativo ao index.html (ex.: "./brand/logo.webp"). */
   readonly logoUrl: string | null
+  /** Versão pequena para o cabeçalho; sem ela, vale a logo (ou o robô, sem logo). */
+  readonly iconUrl: string | null
   readonly colors: {
     readonly primary: string
     readonly accent: string
@@ -23,6 +25,7 @@ export const DEFAULT_BRAND: Brand = {
   tagline:
     'Pergunte em linguagem natural e receba a resposta direto dos manuais técnicos, com a página de origem.',
   logoUrl: null,
+  iconUrl: null,
   colors: { primary: '#0046b4', accent: '#1ec8ff' },
   examples: [
     'Qual o torque de aperto dos parafusos da base?',
@@ -38,6 +41,7 @@ const brandSchema = z.object({
   name: z.string().trim().min(1).max(60).optional(),
   tagline: z.string().trim().min(1).max(200).optional(),
   logoUrl: z.string().trim().min(1).optional(),
+  iconUrl: z.string().trim().min(1).optional(),
   colors: z.object({ primary: hexColor.optional(), accent: hexColor.optional() }).optional(),
   examples: z.array(z.string().trim().min(1).max(120)).min(1).optional(),
 })
@@ -58,6 +62,7 @@ export function parseBrand(raw: unknown): Brand {
     name: data.name ?? DEFAULT_BRAND.name,
     tagline: data.tagline ?? DEFAULT_BRAND.tagline,
     logoUrl: data.logoUrl ?? DEFAULT_BRAND.logoUrl,
+    iconUrl: data.iconUrl ?? data.logoUrl ?? DEFAULT_BRAND.iconUrl,
     colors: { ...DEFAULT_BRAND.colors, ...data.colors },
     examples: data.examples ?? DEFAULT_BRAND.examples,
   }

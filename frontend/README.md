@@ -84,12 +84,14 @@ Nome, logo e cores **não** ficam no repositório. Para personalizar, crie a pas
   "name": "ACME IA",
   "tagline": "Frase exibida na tela de login.",
   "logoUrl": "./brand/logo.png",
+  "iconUrl": "./brand/icone.png",
   "colors": { "primary": "#0046b4", "accent": "#1ec8ff" },
   "examples": ["Pergunta de exemplo exibida na tela de login"]
 }
 ```
 
-Todos os campos são opcionais. Sem a pasta (ou com um `brand.json` inválido), a aplicação usa
+Todos os campos são opcionais. A `logoUrl` aparece grande na tela de login; o `iconUrl`
+(uma versão pequena e quadrada) aparece no cabeçalho e, sem ele, vale a própria logo. Sem a pasta (ou com um `brand.json` inválido), a aplicação usa
 a marca neutra "Assistente de Manuais". O `deploy:xampp` publica a pasta junto com o build; no
 servidor, ela também pode ser editada diretamente.
 

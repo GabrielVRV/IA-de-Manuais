@@ -2,6 +2,7 @@
 de propósito, para que o domínio não dependa do SQLAlchemy."""
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pgvector.sqlalchemy import Vector
@@ -17,6 +18,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 # Precisa ser igual ao tamanho dos vetores do provedor de embeddings.
@@ -132,3 +134,36 @@ class LoginAttemptRecord(Base):
     username: Mapped[str] = mapped_column(String(50), primary_key=True)
     failed_count: Mapped[int]
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ConversationRecord(Base):
+    __tablename__ = "conversations"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    owner_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    title: Mapped[str] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        # A lista do histórico: conversas de um usuário, das mais recentes para as antigas.
+        Index("ix_conversations_owner_id_updated_at", "owner_id", "updated_at"),
+        # A limpeza por retenção busca pelas paradas há mais tempo.
+        Index("ix_conversations_updated_at", "updated_at"),
+    )
+
+
+class ExchangeRecord(Base):
+    __tablename__ = "conversation_exchanges"
+
+    conversation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), primary_key=True
+    )
+    position: Mapped[int] = mapped_column(primary_key=True)
+    question: Mapped[str] = mapped_column(Text)
+    answer: Mapped[str] = mapped_column(Text)
+    # [{"manual_id", "manual_title", "pages"}]: a fonte como era no momento da resposta.
+    citations: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    asked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (CheckConstraint("position >= 0", name="valid_position"),)
