@@ -1,0 +1,147 @@
+.bot {
+  --eye: var(--brand-accent);
+  display: block;
+  overflow: visible;
+  animation: float 6s ease-in-out infinite;
+}
+
+.ears rect {
+  fill: var(--brand-primary);
+}
+
+.ears .earLight {
+  fill: var(--eye);
+  opacity: 0.85;
+}
+
+.gloss {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 3;
+  stroke-linecap: round;
+  opacity: 0.12;
+}
+
+.eyes rect {
+  fill: var(--eye);
+}
+
+.eyes path {
+  fill: none;
+  stroke: var(--eye);
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Cada expressão é um grupo; o humor (data-mood) decide qual aparece. */
+.open,
+.peekEye,
+.closed,
+.happy,
+.error {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition:
+    opacity 180ms ease,
+    transform 220ms ease;
+}
+
+.look {
+  transform: translate(calc(var(--gx, 0) * 9px), calc(var(--gy, 0) * 6px));
+  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.blink {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: blink 5.5s infinite;
+}
+
+.bot[data-mood='watching'] .open,
+.bot[data-mood='thinking'] .open {
+  opacity: 1;
+}
+
+.bot[data-mood='thinking'] .look {
+  animation: scan 1.4s ease-in-out infinite;
+}
+
+.bot[data-mood='shy'] .closed,
+.bot[data-mood='peek'] .closed,
+.bot[data-mood='peek'] .peekEye {
+  opacity: 1;
+}
+
+.bot[data-mood='peek'] .peekHide {
+  opacity: 0;
+}
+
+.bot[data-mood='happy'] .happy {
+  opacity: 1;
+}
+
+.bot[data-mood='happy'] {
+  animation: hop 0.6s ease;
+}
+
+.bot[data-mood='error'] {
+  --eye: #ff6b8b;
+}
+
+.bot[data-mood='error'] .error {
+  opacity: 1;
+}
+
+.ears .earLight,
+.eyes rect,
+.eyes path {
+  transition:
+    fill 200ms ease,
+    stroke 200ms ease;
+}
+
+@keyframes blink {
+  0%,
+  46%,
+  50%,
+  100% {
+    transform: scaleY(1);
+  }
+  48% {
+    transform: scaleY(0.1);
+  }
+}
+
+@keyframes scan {
+  0%,
+  100% {
+    transform: translate(-7px, -5px);
+  }
+  50% {
+    transform: translate(7px, -5px);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -5px;
+  }
+}
+
+@keyframes hop {
+  40% {
+    translate: 0 -9px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bot[data-mood='happy'] {
+    animation: none;
+  }
+}

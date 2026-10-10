@@ -7,7 +7,7 @@ import ui from '@/styles/ui.module.css'
 import { isPending, type SessionUser } from '../domain/auth'
 import styles from './Auth.module.css'
 import { ChangePasswordForm } from './ChangePasswordForm'
-import { LoginPage } from './LoginPage'
+import { LoginPage } from './login/LoginPage'
 import { useSession } from './session-context'
 
 /** Só deixa passar quem está logado, teve o acesso liberado e já trocou a senha provisória. */

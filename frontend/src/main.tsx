@@ -22,6 +22,8 @@ import { HttpManualsGateway } from '@/features/manuals/infrastructure/http-manua
 import { ManualsGatewayContext } from '@/features/manuals/presentation/manuals-gateway-context'
 import { HttpUsersGateway } from '@/features/users/infrastructure/http-users-gateway'
 import { UsersGatewayContext } from '@/features/users/presentation/users-gateway-context'
+import { applyBrand, loadBrand } from '@/shared/brand/brand'
+import { BrandContext } from '@/shared/brand/brand-context'
 import { HttpClient } from '@/shared/http/http-client'
 
 async function bootstrap(): Promise<void> {
@@ -30,27 +32,31 @@ async function bootstrap(): Promise<void> {
   const root = createRoot(container)
 
   try {
-    const config = await loadRuntimeConfig()
+    // A marca é opcional: loadBrand nunca falha, então não impede a aplicação de abrir.
+    const [config, brand] = await Promise.all([loadRuntimeConfig(), loadBrand()])
+    applyBrand(brand)
     const http = new HttpClient(config.apiBaseUrl)
 
     root.render(
       <StrictMode>
-        <AuthGatewayContext value={new HttpAuthGateway(http)}>
-          <HealthGatewayContext value={new HttpHealthGateway(http)}>
-            <QuestionGatewayContext value={new HttpQuestionGateway(http)}>
-              <ManualsGatewayContext value={new HttpManualsGateway(http)}>
-                <UsersGatewayContext value={new HttpUsersGateway(http)}>
-                  <SessionProvider>
-                    {/* Rotas por "#": funcionam em qualquer subpasta do XAMPP sem reescrita. */}
-                    <HashRouter>
-                      <App />
-                    </HashRouter>
-                  </SessionProvider>
-                </UsersGatewayContext>
-              </ManualsGatewayContext>
-            </QuestionGatewayContext>
-          </HealthGatewayContext>
-        </AuthGatewayContext>
+        <BrandContext value={brand}>
+          <AuthGatewayContext value={new HttpAuthGateway(http)}>
+            <HealthGatewayContext value={new HttpHealthGateway(http)}>
+              <QuestionGatewayContext value={new HttpQuestionGateway(http)}>
+                <ManualsGatewayContext value={new HttpManualsGateway(http)}>
+                  <UsersGatewayContext value={new HttpUsersGateway(http)}>
+                    <SessionProvider>
+                      {/* Rotas por "#": funcionam em qualquer subpasta do XAMPP sem reescrita. */}
+                      <HashRouter>
+                        <App />
+                      </HashRouter>
+                    </SessionProvider>
+                  </UsersGatewayContext>
+                </ManualsGatewayContext>
+              </QuestionGatewayContext>
+            </HealthGatewayContext>
+          </AuthGatewayContext>
+        </BrandContext>
       </StrictMode>,
     )
   } catch (error) {

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 
+import { useBrand } from '@/shared/brand/brand-context'
 import { cx } from '@/shared/cx'
 
 import styles from './Layout.module.css'
@@ -13,12 +14,13 @@ interface LayoutProps {
 }
 
 export function Layout({ children, nav, actions }: LayoutProps) {
+  const brand = useBrand()
   return (
     <div className={styles.shell}>
       <header className={styles.header}>
         <div className={cx(styles.inner, styles.headerContent)}>
           <div className={styles.start}>
-            <h1 className={styles.brand}>Assistente de Manuais</h1>
+            <h1 className={styles.brand}>{brand.name}</h1>
             {nav}
           </div>
           {actions}
