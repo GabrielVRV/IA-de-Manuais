@@ -2,7 +2,7 @@
 <IfModule mod_headers.c>
   # Sempre revalidar: garante que um novo deploy ou uma edicao do config.json
   # cheguem ao usuario sem precisar limpar o cache do navegador.
-  <FilesMatch "^(index\.html|config\.json)$">
+  <FilesMatch "^(index\.html|config\.json|brand\.json)$">
     Header set Cache-Control "no-cache"
   </FilesMatch>
 

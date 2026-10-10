@@ -22,6 +22,9 @@ htmlcov/
 node_modules/
 frontend/dist/
 frontend/coverage/
+# Marca da instalação (nome, logo e cores da empresa): cada um tem a sua.
+# Modelo em frontend/brand.example/.
+frontend/public/brand/
 
 # Manuais e dados locais (nunca versionar documentos da empresa)
 data/

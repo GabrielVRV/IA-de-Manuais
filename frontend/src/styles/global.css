@@ -1,12 +1,19 @@
 :root {
   color-scheme: light dark;
 
-  --color-bg: #f5f7fa;
+  /* Cores da marca: sobrescritas em tempo de execução por brand/brand.json. */
+  --brand-primary: #0046b4;
+  --brand-accent: #1ec8ff;
+  /* Azul-marinho profundo derivado da marca: fundos de destaque (ex.: login). */
+  --brand-deep: color-mix(in oklab, var(--brand-primary) 38%, #000716);
+
+  --color-bg: #f3f6fc;
   --color-surface: #ffffff;
-  --color-border: #dde3ea;
-  --color-text: #1b2430;
-  --color-text-muted: #5b6878;
-  --color-primary: #1f5fbf;
+  --color-border: #d8e1f0;
+  --color-text: #0d1b33;
+  --color-text-muted: #55657e;
+  --color-primary: var(--brand-primary);
+  --color-accent: var(--brand-accent);
   --color-on-primary: #ffffff;
   --color-neutral: #8a96a5;
   --color-success: #1e8e4e;
@@ -38,13 +45,13 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-bg: #0f141a;
-    --color-surface: #171e27;
-    --color-border: #2a3441;
-    --color-text: #e6ebf1;
-    --color-text-muted: #9aa7b6;
-    --color-primary: #6aa3ff;
-    --color-on-primary: #0f141a;
+    --color-bg: #070f22;
+    --color-surface: #0d1a36;
+    --color-border: #1e3058;
+    --color-text: #e6eeff;
+    --color-text-muted: #93a3c2;
+    --color-primary: color-mix(in oklab, var(--brand-primary) 50%, #ffffff);
+    --color-on-primary: #06122a;
     --color-neutral: #6c7887;
     --color-success: #3ccf7f;
     --color-warning: #f0b041;

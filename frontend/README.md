@@ -74,6 +74,25 @@ O endereço da API **não** é embutido no build. Ele é lido de `config.json`, 
 Assim o mesmo build serve para qualquer ambiente: no servidor, basta editar esse arquivo.
 O endereço do frontend também precisa estar em `APP_CORS_ORIGINS` no `.env` do backend.
 
+## Marca da empresa (opcional)
+
+Nome, logo e cores **não** ficam no repositório. Para personalizar, crie a pasta
+`public/brand/` (ignorada pelo Git) a partir do modelo em `brand.example/`:
+
+```json
+{
+  "name": "ACME IA",
+  "tagline": "Frase exibida na tela de login.",
+  "logoUrl": "./brand/logo.png",
+  "colors": { "primary": "#0046b4", "accent": "#1ec8ff" },
+  "examples": ["Pergunta de exemplo exibida na tela de login"]
+}
+```
+
+Todos os campos são opcionais. Sem a pasta (ou com um `brand.json` inválido), a aplicação usa
+a marca neutra "Assistente de Manuais". O `deploy:xampp` publica a pasta junto com o build; no
+servidor, ela também pode ser editada diretamente.
+
 ## Deploy no XAMPP
 
 ```powershell
