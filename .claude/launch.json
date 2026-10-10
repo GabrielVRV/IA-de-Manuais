@@ -3,7 +3,8 @@
   "configurations": [
     {
       "name": "api",
-      "runtimeExecutable": "backend/.venv/Scripts/python.exe",
+      "cwd": "backend",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
       "runtimeArgs": ["-m", "uvicorn", "--factory", "manual_assistant.main:create_app", "--port", "8000"],
       "port": 8000
     },
