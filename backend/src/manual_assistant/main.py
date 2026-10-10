@@ -3,9 +3,10 @@
 Execução: ``uvicorn --factory manual_assistant.main:create_app``
 """
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from datetime import timedelta
 
 from fastapi import FastAPI
@@ -19,6 +20,14 @@ from manual_assistant.application.use_cases.ask_question import AskQuestionUseCa
 from manual_assistant.application.use_cases.authenticate_user import AuthenticateUserUseCase
 from manual_assistant.application.use_cases.change_password import ChangePasswordUseCase
 from manual_assistant.application.use_cases.check_health import CheckHealthUseCase
+from manual_assistant.application.use_cases.conversations import (
+    ChatUseCase,
+    DeleteConversationUseCase,
+    GetConversationUseCase,
+    ListConversationsUseCase,
+    PurgeIdleConversationsUseCase,
+    RenameConversationUseCase,
+)
 from manual_assistant.application.use_cases.delete_manual import DeleteManualUseCase
 from manual_assistant.application.use_cases.get_manual import GetManualUseCase
 from manual_assistant.application.use_cases.get_manual_file import GetManualFileUseCase
@@ -38,10 +47,14 @@ from manual_assistant.application.use_cases.resolve_session import (
     LogoutUseCase,
     ResolveSessionUseCase,
 )
+from manual_assistant.domain.conversation import RetentionPolicy
 from manual_assistant.domain.session import SessionPolicy
 from manual_assistant.infrastructure.ai.factory import AiProviders, build_ai_providers
 from manual_assistant.infrastructure.documents.line_chunker import LineChunker
 from manual_assistant.infrastructure.documents.pdf_parser import PdfiumDocumentParser
+from manual_assistant.infrastructure.persistence.conversation_repository import (
+    SqlAlchemyConversationRepository,
+)
 from manual_assistant.infrastructure.persistence.database import (
     create_database_engine,
     create_session_factory,
@@ -70,6 +83,9 @@ from manual_assistant.presentation.http.dependencies import UseCases
 
 logger = logging.getLogger(__name__)
 
+# De quanto em quanto tempo as conversas paradas além do prazo de retenção são apagadas.
+CONVERSATION_PURGE_INTERVAL = timedelta(hours=6)
+
 
 def create_app(
     settings: Settings | None = None,
@@ -90,6 +106,7 @@ def create_app(
     vector_store = PgVectorStore(session_factory, dimensions=EMBEDDING_DIMENSIONS)
     storage = LocalFileStorage(settings.storage_dir)
     users = SqlAlchemyUserRepository(session_factory)
+    conversations = SqlAlchemyConversationRepository(session_factory)
     hasher = password_hasher or Argon2PasswordHasher()
     sessions = SessionManager(
         SqlAlchemySessionRepository(session_factory),
@@ -124,13 +141,20 @@ def create_app(
         delete_manual=DeleteManualUseCase(
             repository=repository, vector_store=vector_store, storage=storage
         ),
-        ask_question=AskQuestionUseCase(
-            embeddings=ai.embeddings,
-            vector_store=vector_store,
-            language_model=ai.language_model,
-            top_k=settings.rag_top_k,
-            min_score=settings.rag_min_score,
+        chat=ChatUseCase(
+            conversations=conversations,
+            ask_question=AskQuestionUseCase(
+                embeddings=ai.embeddings,
+                vector_store=vector_store,
+                language_model=ai.language_model,
+                top_k=settings.rag_top_k,
+                min_score=settings.rag_min_score,
+            ),
         ),
+        list_conversations=ListConversationsUseCase(conversations),
+        get_conversation=GetConversationUseCase(conversations),
+        rename_conversation=RenameConversationUseCase(conversations),
+        delete_conversation=DeleteConversationUseCase(conversations),
         authenticate_user=AuthenticateUserUseCase(
             users=users,
             attempts=SqlAlchemyLoginAttemptRepository(session_factory),
@@ -149,6 +173,11 @@ def create_app(
         update_user=UpdateUserUseCase(users),
     )
     recover_interrupted = RecoverInterruptedIndexingUseCase(repository)
+    retention_days = settings.conversation_retention_days
+    purge_conversations = PurgeIdleConversationsUseCase(
+        conversations,
+        RetentionPolicy(timedelta(days=retention_days) if retention_days else None),
+    )
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -157,7 +186,11 @@ def create_app(
         except ExternalServiceError:
             # Banco fora do ar na partida: a API sobe mesmo assim e o health check acusa.
             logger.warning("Não foi possível verificar indexações interrompidas", exc_info=True)
+        purge_task = asyncio.create_task(_purge_periodically(purge_conversations))
         yield
+        purge_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await purge_task
         await engine.dispose()
 
     return create_http_app(
@@ -168,3 +201,13 @@ def create_app(
         cookie_secure=settings.auth_cookie_secure,
         lifespan=lifespan,
     )
+
+
+async def _purge_periodically(purge: PurgeIdleConversationsUseCase) -> None:
+    """Aplica a retenção do histórico na partida e depois a cada intervalo."""
+    while True:
+        try:
+            await purge.execute()
+        except ExternalServiceError:
+            logger.warning("Não foi possível apagar as conversas antigas", exc_info=True)
+        await asyncio.sleep(CONVERSATION_PURGE_INTERVAL.total_seconds())

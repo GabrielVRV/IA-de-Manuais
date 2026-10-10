@@ -7,7 +7,12 @@ import { App } from '@/app/App'
 import type { AuthGateway, SessionUser } from '@/features/auth/domain/auth'
 import { AuthGatewayContext } from '@/features/auth/presentation/session-context'
 import { SessionProvider } from '@/features/auth/presentation/SessionProvider'
-import type { QuestionGateway } from '@/features/chat/domain/chat'
+import type {
+  Answer,
+  Conversation,
+  ConversationSummary,
+  QuestionGateway,
+} from '@/features/chat/domain/chat'
 import { QuestionGatewayContext } from '@/features/chat/presentation/question-gateway-context'
 import type { HealthGateway } from '@/features/health/domain/api-health'
 import { HealthGatewayContext } from '@/features/health/presentation/health-gateway-context'
@@ -164,10 +169,94 @@ export function fakeUsersGateway(initial: ManagedUser[]) {
   } satisfies UsersGateway & { state: typeof state }
 }
 
+export const ANSWER: Answer = {
+  text: 'A pressão máxima é **10 bar**.',
+  found: true,
+  citations: [
+    { manualId: 'cx500', manualTitle: 'Compressor CX-500', pages: [3, 4], pagesLabel: 'p. 3-4' },
+  ],
+}
+
+export function conversation(overrides: Partial<Conversation> = {}): Conversation {
+  return {
+    id: 'c1',
+    title: 'Pressão do compressor',
+    createdAt: new Date('2026-10-07T10:00:00Z'),
+    updatedAt: new Date('2026-10-07T10:05:00Z'),
+    exchanges: [
+      {
+        question: 'Qual a pressão do compressor?',
+        answer: ANSWER,
+        askedAt: new Date('2026-10-07T10:00:00Z'),
+      },
+    ],
+    ...overrides,
+  }
+}
+
+/** Servidor de conversas em memória: cada pergunta respondida vai para o histórico. */
+export function fakeQuestionGateway(initial: Conversation[] = []) {
+  const state = { conversations: [...initial], answer: ANSWER, created: 0 }
+  const summary = (c: Conversation): ConversationSummary => ({
+    id: c.id,
+    title: c.title,
+    createdAt: c.createdAt,
+    updatedAt: c.updatedAt,
+    exchangeCount: c.exchanges.length,
+  })
+  const find = (id: string) => {
+    const found = state.conversations.find((c) => c.id === id)
+    if (!found) throw new HttpError(404, { detail: 'Conversa não encontrada' })
+    return found
+  }
+  const gateway = {
+    state,
+    ask: vi.fn((question: string, conversationId: string | null) => {
+      const now = new Date()
+      const exchange = { question, answer: state.answer, askedAt: now }
+      let current: Conversation
+      if (conversationId) {
+        const existing = find(conversationId)
+        current = { ...existing, updatedAt: now, exchanges: [...existing.exchanges, exchange] }
+        state.conversations = state.conversations.map((c) => (c.id === current.id ? current : c))
+      } else {
+        state.created += 1
+        current = {
+          id: `nova-${String(state.created)}`,
+          title: question,
+          createdAt: now,
+          updatedAt: now,
+          exchanges: [exchange],
+        }
+        state.conversations = [current, ...state.conversations]
+      }
+      return Promise.resolve({
+        answer: state.answer,
+        conversation: { id: current.id, title: current.title },
+      })
+    }),
+    listConversations: vi.fn(() => Promise.resolve(state.conversations.map(summary))),
+    // Dentro do then: o 404 de find() vira uma promessa rejeitada, como na API.
+    getConversation: vi.fn((id: string) => Promise.resolve().then(() => find(id))),
+    renameConversation: vi.fn((id: string, title: string) => {
+      state.conversations = state.conversations.map((c) => (c.id === id ? { ...c, title } : c))
+      return Promise.resolve({ id, title })
+    }),
+    deleteConversation: vi.fn((id: string) => {
+      state.conversations = state.conversations.filter((c) => c.id !== id)
+      return Promise.resolve()
+    }),
+    sourceUrl: (citation: { manualId: string; pages: readonly number[] }) =>
+      `http://api/manuals/${citation.manualId}/file#page=${String(citation.pages[0])}`,
+  } satisfies QuestionGateway & { state: typeof state }
+  return gateway
+}
+
 interface RenderAppOptions {
   readonly auth?: FakeAuthGateway
   readonly manuals?: ManualsGateway
   readonly users?: UsersGateway
+  readonly questions?: QuestionGateway
   readonly path?: string
 }
 
@@ -176,10 +265,7 @@ export function renderApp(options: RenderAppOptions = {}) {
   const health: HealthGateway = {
     check: () => Promise.resolve({ status: 'up', version: '0.1.0', components: {} }),
   }
-  const questions: QuestionGateway = {
-    ask: () => Promise.resolve({ text: 'ok', found: true, citations: [] }),
-    sourceUrl: () => '#',
-  }
+  const questions = options.questions ?? fakeQuestionGateway()
   const view = render(
     <AuthGatewayContext value={auth}>
       <HealthGatewayContext value={health}>

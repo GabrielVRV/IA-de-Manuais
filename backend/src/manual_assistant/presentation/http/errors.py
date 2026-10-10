@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from manual_assistant.application.errors import (
     AccountLockedError,
+    ConversationNotFoundError,
     ExternalServiceError,
     InvalidCredentialsError,
     InvalidDocumentError,
@@ -29,6 +30,7 @@ _STATUS_BY_ERROR: dict[type[Exception], int] = {
     PermissionDeniedError: status.HTTP_403_FORBIDDEN,
     AccountLockedError: status.HTTP_429_TOO_MANY_REQUESTS,
     ManualNotFoundError: status.HTTP_404_NOT_FOUND,
+    ConversationNotFoundError: status.HTTP_404_NOT_FOUND,
     UserNotFoundError: status.HTTP_404_NOT_FOUND,
     UserAlreadyExistsError: status.HTTP_409_CONFLICT,
     StoredFileNotFoundError: status.HTTP_404_NOT_FOUND,

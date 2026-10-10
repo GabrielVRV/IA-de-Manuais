@@ -13,6 +13,9 @@ class QuestionRequest(BaseModel):
         max_length=QUESTION_MAX_LENGTH,
         examples=["Qual a pressão máxima de trabalho da prensa P-200?"],
     )
+    conversation_id: UUID | None = Field(
+        default=None, description="Conversa em andamento; vazio começa uma nova"
+    )
 
 
 class CitationResponse(BaseModel):

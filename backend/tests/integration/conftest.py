@@ -41,7 +41,10 @@ async def engine(postgres_settings: Settings) -> AsyncIterator[AsyncEngine]:
     # Isola os testes: cada um começa com o banco vazio.
     async with engine.begin() as connection:
         await connection.execute(
-            text("TRUNCATE manuals, chunks, users, sessions, login_attempts CASCADE")
+            text(
+                "TRUNCATE manuals, chunks, users, sessions, login_attempts,"
+                " conversations, conversation_exchanges CASCADE"
+            )
         )
     await engine.dispose()
 

@@ -66,6 +66,13 @@ class AccountDisabledError(PermissionDeniedError):
         super().__init__("Seu acesso a este sistema foi desativado. Fale com um administrador.")
 
 
+class ConversationNotFoundError(ApplicationError):
+    """Também para a conversa de outro usuário: não revela que ela existe."""
+
+    def __init__(self) -> None:
+        super().__init__("Conversa não encontrada")
+
+
 class UserNotFoundError(ApplicationError):
     def __init__(self, user_id: object) -> None:
         super().__init__(f"Usuário não encontrado: {user_id}")

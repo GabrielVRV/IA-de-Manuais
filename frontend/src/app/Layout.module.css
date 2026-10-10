@@ -7,9 +7,19 @@
 }
 
 .header {
+  position: relative;
+  z-index: 5;
   flex: none;
   border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
+}
+
+/* Filete com as cores da marca no topo. */
+.header::before {
+  display: block;
+  height: 3px;
+  background: linear-gradient(90deg, var(--brand-primary), var(--brand-accent));
+  content: '';
 }
 
 .inner {
@@ -17,6 +27,11 @@
   max-width: 60rem;
   margin: 0 auto;
   padding: 0 var(--space-4);
+}
+
+.full {
+  max-width: none;
+  padding-inline: var(--space-5);
 }
 
 .headerContent {
@@ -38,14 +53,40 @@
 
 .main {
   flex: 1;
+  width: 100%;
   min-height: 0;
   /* As telas de administração rolam aqui; o chat controla a própria rolagem. */
   overflow-y: auto;
 }
 
 .brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   margin: 0;
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: var(--color-primary);
+  font-size: 1.0625rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+
+.brandIcon {
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+}
+
+.brandIcon img,
+.brandIcon svg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  animation: none;
+}
+
+@media (max-width: 600px) {
+  .full {
+    padding-inline: var(--space-3);
+  }
 }

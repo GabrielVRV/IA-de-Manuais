@@ -11,6 +11,13 @@ describe('parseBrand', () => {
     })
   })
 
+  it('uses the logo as the header icon unless a separate icon is given', () => {
+    expect(parseBrand({ logoUrl: './brand/logo.png' }).iconUrl).toBe('./brand/logo.png')
+    expect(parseBrand({ logoUrl: './brand/logo.png', iconUrl: './brand/icone.png' }).iconUrl).toBe(
+      './brand/icone.png',
+    )
+  })
+
   it.each([
     ['empty name', { name: '  ' }],
     ['color without #', { colors: { primary: '0046b4' } }],

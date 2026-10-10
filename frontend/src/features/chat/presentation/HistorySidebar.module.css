@@ -1,0 +1,386 @@
+.sidebar {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 17.5rem;
+  min-height: 0;
+  padding: var(--space-4) var(--space-3);
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.head {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.newChat {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0.65rem var(--space-4);
+  border-radius: 12px;
+  background: linear-gradient(
+    110deg,
+    var(--brand-primary),
+    color-mix(in oklab, var(--brand-primary) 55%, var(--brand-accent))
+  );
+  box-shadow: 0 6px 18px color-mix(in oklab, var(--brand-primary) 35%, transparent);
+  color: #ffffff;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.2s ease;
+}
+
+.newChat:hover {
+  box-shadow: 0 8px 24px color-mix(in oklab, var(--brand-accent) 35%, transparent);
+  transform: translateY(-1px);
+}
+
+.newChat svg {
+  stroke-width: 2;
+}
+
+.close {
+  display: none;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  transition: border-color 0.2s ease;
+}
+
+.search:focus-within {
+  border-color: var(--color-primary);
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.55rem 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.list {
+  flex: 1;
+  min-height: 0;
+  margin: 0 calc(var(--space-3) * -1);
+  padding: 0 var(--space-3);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.group + .group {
+  margin-top: var(--space-4);
+}
+
+.groupLabel {
+  margin: 0 0 var(--space-1);
+  padding: 0 var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.group ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  position: relative;
+  border-radius: 10px;
+  animation: slide-in 0.25s ease both;
+}
+
+.item:hover,
+.item:focus-within {
+  background: color-mix(in oklab, var(--color-text) 6%, transparent);
+}
+
+.active,
+.active:hover {
+  background: color-mix(in oklab, var(--color-primary) 14%, transparent);
+}
+
+.active::before {
+  position: absolute;
+  top: 0.5rem;
+  bottom: 0.5rem;
+  left: 0;
+  width: 3px;
+  border-radius: 999px;
+  background: linear-gradient(var(--brand-primary), var(--brand-accent));
+  content: '';
+}
+
+.link {
+  display: block;
+  padding: 0.5rem var(--space-3);
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: 0.875rem;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.active .link {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* Ações aparecem ao passar o mouse (ou ao focar pelo teclado). */
+.actions {
+  position: absolute;
+  top: 50%;
+  right: 0.25rem;
+  display: flex;
+  gap: 2px;
+  padding-left: var(--space-4);
+  border-radius: 8px;
+  background: linear-gradient(90deg, transparent, var(--color-surface) 30%);
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 0.15s ease;
+}
+
+.item:hover .actions,
+.item:focus-within .actions {
+  opacity: 1;
+}
+
+.item:hover .link,
+.item:focus-within .link {
+  padding-right: 4.25rem;
+}
+
+.miniButton {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.miniButton:hover {
+  background: color-mix(in oklab, var(--color-text) 10%, transparent);
+  color: var(--color-text);
+}
+
+.miniButton.danger:hover {
+  color: var(--color-danger);
+}
+
+.renameForm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.25rem;
+}
+
+.renameForm input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.3rem var(--space-2);
+  border: 1px solid var(--color-primary);
+  border-radius: 7px;
+  outline: none;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) var(--space-2);
+  font-size: 0.8125rem;
+}
+
+.confirm span {
+  flex-basis: 100%;
+  color: var(--color-text-muted);
+}
+
+.confirmButton {
+  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.confirmButton.danger {
+  border-color: var(--color-danger);
+  background: var(--color-danger);
+  color: #ffffff;
+}
+
+.itemError {
+  margin: 0;
+  padding: 0 var(--space-3) var(--space-2);
+  color: var(--color-danger);
+  font-size: 0.75rem;
+}
+
+.message {
+  margin: var(--space-4) var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-2);
+}
+
+.skeleton span {
+  height: 0.75rem;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--color-text) 6%, transparent),
+    color-mix(in oklab, var(--color-text) 14%, transparent),
+    color-mix(in oklab, var(--color-text) 6%, transparent)
+  );
+  background-size: 200% 100%;
+  animation: sheen 1.6s linear infinite;
+}
+
+.miniButton:focus-visible,
+.newChat:focus-visible,
+.close:focus-visible,
+.link:focus-visible,
+.confirmButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.miniButton svg,
+.close svg,
+.search svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.scrim {
+  display: none;
+}
+
+/* Telas pequenas: o histórico vira uma gaveta por cima da conversa. */
+@media (max-width: 860px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 20;
+    width: min(20rem, 86vw);
+    box-shadow: 0 0 40px rgb(0 0 0 / 0.3);
+    transform: translateX(-105%);
+    transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .open {
+    transform: none;
+  }
+
+  .close {
+    display: grid;
+    place-items: center;
+    width: 2.6rem;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+  }
+
+  .scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 19;
+    display: block;
+    background: rgb(4 10 30 / 0.45);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+
+  .scrimVisible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Sem mouse não há "passar por cima": as ações ficam sempre à mostra. */
+  .actions {
+    opacity: 1;
+  }
+
+  .link {
+    padding-right: 4.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item {
+    animation: none;
+  }
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+}
+
+@keyframes sheen {
+  to {
+    background-position: -200% 0;
+  }
+}

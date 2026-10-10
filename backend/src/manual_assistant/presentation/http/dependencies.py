@@ -9,10 +9,16 @@ from manual_assistant.application.errors import (
     PasswordChangeRequiredError,
     PermissionDeniedError,
 )
-from manual_assistant.application.use_cases.ask_question import AskQuestionUseCase
 from manual_assistant.application.use_cases.authenticate_user import AuthenticateUserUseCase
 from manual_assistant.application.use_cases.change_password import ChangePasswordUseCase
 from manual_assistant.application.use_cases.check_health import CheckHealthUseCase
+from manual_assistant.application.use_cases.conversations import (
+    ChatUseCase,
+    DeleteConversationUseCase,
+    GetConversationUseCase,
+    ListConversationsUseCase,
+    RenameConversationUseCase,
+)
 from manual_assistant.application.use_cases.delete_manual import DeleteManualUseCase
 from manual_assistant.application.use_cases.get_manual import GetManualUseCase
 from manual_assistant.application.use_cases.get_manual_file import GetManualFileUseCase
@@ -45,7 +51,11 @@ class UseCases:
     get_manual: GetManualUseCase
     get_manual_file: GetManualFileUseCase
     delete_manual: DeleteManualUseCase
-    ask_question: AskQuestionUseCase
+    chat: ChatUseCase
+    list_conversations: ListConversationsUseCase
+    get_conversation: GetConversationUseCase
+    rename_conversation: RenameConversationUseCase
+    delete_conversation: DeleteConversationUseCase
     authenticate_user: AuthenticateUserUseCase
     resolve_session: ResolveSessionUseCase
     logout: LogoutUseCase

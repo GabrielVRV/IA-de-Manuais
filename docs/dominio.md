@@ -3,18 +3,20 @@
 O código está em inglês e o negócio fala português. Esta tabela é o "dicionário" entre os
 dois. Use sempre estes termos em conversas, issues e commits.
 
-| Termo do negócio | No código        | Significado                                                                                                     |
-| ---------------- | ---------------- | --------------------------------------------------------------------------------------------------------------- |
-| Manual           | `Manual`         | Documento de um equipamento cadastrado no sistema. Tem um ciclo de vida de indexação.                           |
-| Página           | `Page`           | Texto extraído de uma página do PDF original.                                                                   |
-| Intervalo        | `PageRange`      | Páginas consecutivas de onde um trecho foi tirado (ex.: 12 a 13).                                               |
-| Trecho           | `Chunk`          | Pedaço do manual com tamanho ideal para busca. É o que é indexado, encontrado e citado.                         |
-| Relevância       | `ScoredChunk`    | Trecho encontrado numa busca, com nota de 0 (nada a ver) a 1 (idêntico) em relação à pergunta.                  |
-| Pergunta         | `Question`       | Dúvida do usuário, de 3 a 2000 caracteres.                                                                      |
-| Resposta         | `Answer`         | Texto gerado pela IA mais as citações que o embasam.                                                            |
+| Termo do negócio | No código        | Significado                                                                                                      |
+| ---------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Manual           | `Manual`         | Documento de um equipamento cadastrado no sistema. Tem um ciclo de vida de indexação.                            |
+| Página           | `Page`           | Texto extraído de uma página do PDF original.                                                                    |
+| Intervalo        | `PageRange`      | Páginas consecutivas de onde um trecho foi tirado (ex.: 12 a 13).                                                |
+| Trecho           | `Chunk`          | Pedaço do manual com tamanho ideal para busca. É o que é indexado, encontrado e citado.                          |
+| Relevância       | `ScoredChunk`    | Trecho encontrado numa busca, com nota de 0 (nada a ver) a 1 (idêntico) em relação à pergunta.                   |
+| Pergunta         | `Question`       | Dúvida do usuário, de 3 a 2000 caracteres.                                                                       |
+| Resposta         | `Answer`         | Texto gerado pela IA mais as citações que o embasam.                                                             |
 | Citação          | `Citation`       | Manual e páginas usados na resposta. Vários trechos do mesmo manual viram uma única citação, com páginas unidas. |
-| Embedding        | `Embedding`      | Vetor numérico que representa o significado de um texto; é o que permite buscar por significado.                |
-| Indexar          | `mark_indexed()` | Processar o manual (ler, dividir em trechos, gerar embeddings) para que ele possa ser consultado.               |
+| Conversa         | `Conversation`   | Sequência de perguntas e respostas de um usuário. Só o dono a vê (ADR 0010).                                     |
+| Troca            | `Exchange`       | Uma pergunta e a resposta que ela recebeu, guardadas na conversa.                                                |
+| Embedding        | `Embedding`      | Vetor numérico que representa o significado de um texto; é o que permite buscar por significado.                 |
+| Indexar          | `mark_indexed()` | Processar o manual (ler, dividir em trechos, gerar embeddings) para que ele possa ser consultado.                |
 
 ## Ciclo de vida do manual
 
@@ -32,26 +34,30 @@ PENDENTE ──▶ PROCESSANDO ──▶ INDEXADO
 
 ## Portas (o que o núcleo exige do mundo externo)
 
-| Porta               | Responsabilidade                                  | Implementação                           |
-| ------------------- | ------------------------------------------------- | --------------------------------------- |
-| `ManualRepository`  | Guardar os manuais e seus status                  | `SqlAlchemyManualRepository` (Postgres) |
-| `FileStorage`       | Guardar o PDF original de cada manual             | `LocalFileStorage` (pasta/volume)       |
-| `DocumentParser`    | Extrair o texto do PDF, página a página           | `PdfiumDocumentParser` (pypdfium2)      |
-| `TextChunker`       | Dividir as páginas em trechos                     | `LineChunker` (por linhas, sobreposto)  |
-| `EmbeddingProvider` | Gerar embeddings de trechos e perguntas           | Gemini / OpenAI (degrau 6)              |
-| `VectorStore`       | Indexar trechos e buscar por similaridade         | `PgVectorStore` (pgvector)              |
-| `LanguageModel`     | Gerar a resposta a partir dos trechos encontrados | Gemini / OpenAI (degrau 6)              |
+| Porta                    | Responsabilidade                                  | Implementação                                 |
+| ------------------------ | ------------------------------------------------- | --------------------------------------------- |
+| `ManualRepository`       | Guardar os manuais e seus status                  | `SqlAlchemyManualRepository` (Postgres)       |
+| `FileStorage`            | Guardar o PDF original de cada manual             | `LocalFileStorage` (pasta/volume)             |
+| `DocumentParser`         | Extrair o texto do PDF, página a página           | `PdfiumDocumentParser` (pypdfium2)            |
+| `TextChunker`            | Dividir as páginas em trechos                     | `LineChunker` (por linhas, sobreposto)        |
+| `EmbeddingProvider`      | Gerar embeddings de trechos e perguntas           | Gemini / OpenAI (degrau 6)                    |
+| `VectorStore`            | Indexar trechos e buscar por similaridade         | `PgVectorStore` (pgvector)                    |
+| `LanguageModel`          | Gerar a resposta a partir dos trechos encontrados | Gemini / OpenAI (degrau 6)                    |
+| `ConversationRepository` | Guardar as conversas e as trocas de cada usuário  | `SqlAlchemyConversationRepository` (Postgres) |
 
 ## Casos de uso
 
-| Caso de uso             | O que faz                                                                   |
-| ----------------------- | --------------------------------------------------------------------------- |
-| `CheckHealthUseCase`    | Consolida a saúde da API e de suas dependências                              |
-| `RegisterManualUseCase` | Valida o PDF (conteúdo e tamanho), guarda o arquivo e cadastra como pendente |
-| `IndexManualUseCase`    | Lê, divide, gera embeddings e indexa; registra falhas no próprio manual      |
-| `ListManualsUseCase`    | Lista os manuais, do mais recente para o mais antigo                         |
-| `DeleteManualUseCase`   | Remove trechos, cadastro e arquivo original                                  |
-| `AskQuestionUseCase`    | Busca os trechos relevantes, pede a resposta ao modelo e cita as fontes      |
+| Caso de uso                                 | O que faz                                                                    |
+| ------------------------------------------- | ---------------------------------------------------------------------------- |
+| `CheckHealthUseCase`                        | Consolida a saúde da API e de suas dependências                              |
+| `RegisterManualUseCase`                     | Valida o PDF (conteúdo e tamanho), guarda o arquivo e cadastra como pendente |
+| `IndexManualUseCase`                        | Lê, divide, gera embeddings e indexa; registra falhas no próprio manual      |
+| `ListManualsUseCase`                        | Lista os manuais, do mais recente para o mais antigo                         |
+| `DeleteManualUseCase`                       | Remove trechos, cadastro e arquivo original                                  |
+| `AskQuestionUseCase`                        | Busca os trechos relevantes, pede a resposta ao modelo e cita as fontes      |
+| `ChatUseCase`                               | Responde dentro de uma conversa (com o contexto dela) e guarda a troca       |
+| `List/Get/Rename/DeleteConversationUseCase` | Histórico do usuário; a conversa de outra pessoa não existe para ele         |
+| `PurgeIdleConversationsUseCase`             | Apaga as conversas paradas além do prazo de retenção                         |
 
 ## Como uma pergunta é respondida
 
@@ -63,6 +69,9 @@ PENDENTE ──▶ PROCESSANDO ──▶ INDEXADO
 3. As citações exibidas saem dos números que o modelo **realmente citou**. Vários trechos do
    mesmo manual viram uma citação só, com as páginas unidas.
 4. Se a busca não encontrar nenhum trecho, o modelo nem é chamado (custo zero).
+5. Numa conversa em andamento, as 3 últimas trocas vão no prompt (`<conversa>`) só para o
+   modelo entender continuações como "e no modelo maior?", e a busca usa também a pergunta
+   anterior. A resposta continua vindo apenas dos trechos (ADR 0010).
 
 O texto dos manuais é tratado como **dado, não instrução**: um PDF com algo como "ignore
 as regras" não altera o comportamento do assistente.

@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useRef } from 'react'
+import { type CSSProperties, useEffect, useId, useRef } from 'react'
 
 import { cx } from '@/shared/cx'
 
@@ -30,6 +30,11 @@ const clamp = (value: number) => Math.max(-1, Math.min(1, value))
 
 export function VisorBot({ mood, gaze, className }: VisorBotProps) {
   const ref = useRef<SVGSVGElement>(null)
+  // Vários robôs na mesma tela (ex.: avatares do chat): cada um com os próprios ids.
+  const uid = useId().replace(/:/g, '')
+  const shellId = `bot-shell-${uid}`
+  const visorId = `bot-visor-${uid}`
+  const glowId = `bot-glow-${uid}`
   const followPointer = gaze === undefined
 
   useEffect(() => {
@@ -66,15 +71,15 @@ export function VisorBot({ mood, gaze, className }: VisorBotProps) {
       focusable="false"
     >
       <defs>
-        <linearGradient id="bot-shell" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={shellId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#ffffff" />
           <stop offset="1" stopColor="#cfdcf2" />
         </linearGradient>
-        <linearGradient id="bot-visor" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={visorId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#0b1d4a" />
           <stop offset="1" stopColor="#020a24" />
         </linearGradient>
-        <filter id="bot-glow" x="-50%" y="-50%" width="200%" height="200%">
+        <filter id={glowId} x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation="2.4" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
@@ -92,11 +97,11 @@ export function VisorBot({ mood, gaze, className }: VisorBotProps) {
       </g>
 
       {/* Cabeça e visor */}
-      <rect x="20" y="10" width="120" height="108" rx="44" fill="url(#bot-shell)" />
-      <rect x="32" y="24" width="96" height="78" rx="32" fill="url(#bot-visor)" />
+      <rect x="20" y="10" width="120" height="108" rx="44" fill={`url(#${shellId})`} />
+      <rect x="32" y="24" width="96" height="78" rx="32" fill={`url(#${visorId})`} />
       <path className={styles.gloss} d="M46 34 Q80 26 114 34" />
 
-      <g className={styles.eyes} filter="url(#bot-glow)">
+      <g className={styles.eyes} filter={`url(#${glowId})`}>
         {/* Olhos abertos: acompanham o olhar e piscam de vez em quando */}
         <g className={styles.look}>
           <g className={styles.open}>

@@ -110,7 +110,9 @@ describe('<App />', () => {
       renderApp({ auth: new FakeAuthGateway(ADMIN) })
 
       expect(
-        await within(await screen.findByRole('navigation')).findByRole('link', { name: 'Manuais' }),
+        await within(
+          await screen.findByRole('navigation', { name: 'Navegação principal' }),
+        ).findByRole('link', { name: 'Manuais' }),
       ).toBeInTheDocument()
       expect(within(nav()).getByRole('link', { name: 'Usuários' })).toBeInTheDocument()
       expect(screen.getByText('Ana Admin')).toBeInTheDocument()

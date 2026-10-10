@@ -26,7 +26,10 @@ def test_answers_with_formatted_citations(backend: FakeBackend) -> None:
     response = backend.client_logged_in_as().post(URL, json={"question": "Pressão máxima?"})
 
     assert response.status_code == 200
-    assert response.json() == {
+    body = response.json()
+    conversation = body.pop("conversation")
+    assert conversation["title"] == "Pressão máxima?"
+    assert body == {
         "answer": "A pressão máxima é 180 bar.",
         "found": True,
         "citations": [
@@ -64,6 +67,32 @@ def test_returns_503_when_the_ai_provider_fails(backend: FakeBackend) -> None:
 
     assert response.status_code == 503
     assert "Gemini" in response.json()["detail"]
+
+
+def test_follow_up_continues_the_conversation(backend: FakeBackend) -> None:
+    client = backend.client_logged_in_as()
+    first = client.post(URL, json={"question": "Pressão máxima da P-200?"}).json()
+    conversation_id = first["conversation"]["id"]
+
+    second = client.post(URL, json={"question": "E a mínima?", "conversation_id": conversation_id})
+
+    assert second.status_code == 200
+    assert second.json()["conversation"]["id"] == conversation_id
+    assert "<pergunta>Pressão máxima da P-200?</pergunta>" in (
+        backend.language_model.requests[-1].prompt
+    )
+
+
+def test_cannot_continue_someone_elses_conversation(backend: FakeBackend) -> None:
+    maria = backend.client_logged_in_as("maria")
+    conversation_id = maria.post(URL, json={"question": "Pressão máxima?"}).json()["conversation"][
+        "id"
+    ]
+
+    joao = backend.client_logged_in_as("joao")
+    response = joao.post(URL, json={"question": "E a mínima?", "conversation_id": conversation_id})
+
+    assert response.status_code == 404
 
 
 @pytest.mark.parametrize(

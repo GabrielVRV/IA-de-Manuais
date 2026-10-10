@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Sequence
 
 from manual_assistant.application.ports.embedding_provider import EmbeddingProvider
 from manual_assistant.application.ports.language_model import CompletionRequest, LanguageModel
@@ -8,8 +9,10 @@ from manual_assistant.application.rag_prompt import (
     SYSTEM_INSTRUCTION,
     build_prompt,
     parse_completion,
+    retrieval_query,
 )
 from manual_assistant.domain.answer import Answer
+from manual_assistant.domain.conversation import Exchange
 from manual_assistant.domain.question import Question
 
 logger = logging.getLogger(__name__)
@@ -38,8 +41,9 @@ class AskQuestionUseCase:
         # "relevante" de "irrelevante". Quem decide "não encontrei" é o modelo.
         self._min_score = min_score
 
-    async def execute(self, question: Question) -> Answer:
-        query = await self._embeddings.embed_query(question.text)
+    async def execute(self, question: Question, history: Sequence[Exchange] = ()) -> Answer:
+        """``history``: últimas trocas da conversa, para entender perguntas de continuação."""
+        query = await self._embeddings.embed_query(retrieval_query(question, history))
         results = await self._vector_store.search(
             query, limit=self._top_k, min_score=self._min_score
         )
@@ -51,7 +55,7 @@ class AskQuestionUseCase:
         completion = await self._language_model.complete(
             CompletionRequest(
                 system_instruction=SYSTEM_INSTRUCTION,
-                prompt=build_prompt(question, chunks),
+                prompt=build_prompt(question, chunks, history),
                 max_output_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
             )
         )
@@ -59,11 +63,12 @@ class AskQuestionUseCase:
 
         logger.info(
             "Pergunta respondida: modelo=%s tokens_entrada=%d tokens_saida=%d "
-            "trechos=%d citacoes=%d",
+            "trechos=%d citacoes=%d historico=%d",
             completion.model,
             completion.usage.input_tokens,
             completion.usage.output_tokens,
             len(chunks),
             len(answer.citations),
+            len(history),
         )
         return answer

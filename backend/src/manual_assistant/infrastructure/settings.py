@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     # Idiomas importados, pela letra no fim do nome (P = português, E = inglês...).
     sync_languages: Annotated[list[str], NoDecode] = Field(default_factory=lambda: ["P"])
 
+    # Histórico de conversas (ADR 0010): apagadas após esse tempo sem uso. 0 = guardar sempre.
+    conversation_retention_days: int = Field(default=90, ge=0)
+
     # Busca e resposta (RAG)
     rag_top_k: int = Field(default=6, ge=1, le=20)
     # 0 = sem corte: com o Gemini, trechos sem relação ainda pontuam ~0,6.
