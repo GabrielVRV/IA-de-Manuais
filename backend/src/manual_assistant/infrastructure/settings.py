@@ -48,6 +48,14 @@ class Settings(BaseSettings):
     storage_dir: Path = Path("data/manuals")
     max_upload_mb: int = Field(default=50, gt=0)
 
+    # Sincronização com a pasta de manuais da Engenharia (ADR 0009). Só leitura.
+    # Vazio = desligada. No Docker, a pasta de rede montada com :ro.
+    sync_source_dir: Path | None = None
+    # Planilha (dentro da pasta) com a descrição de cada código; vazio = sem planilha.
+    sync_catalog_file: str | None = "MANUAIS PRODUTO.xlsm"
+    # Idiomas importados, pela letra no fim do nome (P = português, E = inglês...).
+    sync_languages: Annotated[list[str], NoDecode] = Field(default_factory=lambda: ["P"])
+
     # Busca e resposta (RAG)
     rag_top_k: int = Field(default=6, ge=1, le=20)
     # 0 = sem corte: com o Gemini, trechos sem relação ainda pontuam ~0,6.
@@ -79,7 +87,14 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
 
-    @field_validator("totvs_login_url", mode="before")
+    @field_validator("sync_languages", mode="before")
+    @classmethod
+    def _split_languages(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [code.strip().upper() for code in value.split(",") if code.strip()]
+        return value
+
+    @field_validator("totvs_login_url", "sync_source_dir", "sync_catalog_file", mode="before")
     @classmethod
     def _blank_as_none(cls, value: object) -> object:
         if isinstance(value, str):

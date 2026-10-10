@@ -12,6 +12,8 @@ def isolated_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "APP_DB_HOST",
         "APP_DB_PASSWORD",
         "APP_TOTVS_LOGIN_URL",
+        "APP_SYNC_SOURCE_DIR",
+        "APP_SYNC_LANGUAGES",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -31,6 +33,19 @@ def test_uses_development_defaults() -> None:
     assert settings.cors_origins == ["http://localhost:5173"]
     assert (settings.auth_session_idle_days, settings.auth_session_max_days) == (7, 30)
     assert settings.totvs_login_url is None
+
+
+def test_sync_is_off_by_default_and_imports_only_portuguese() -> None:
+    settings = Settings(_env_file=None, db_password="x")
+
+    assert settings.sync_source_dir is None
+    assert settings.sync_languages == ["P"]
+
+
+def test_reads_sync_languages_as_comma_separated_list(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_SYNC_LANGUAGES", "p, E ,")
+
+    assert Settings(_env_file=None, db_password="x").sync_languages == ["P", "E"]
 
 
 def test_a_blank_totvs_url_turns_the_totvs_login_off(monkeypatch: pytest.MonkeyPatch) -> None:

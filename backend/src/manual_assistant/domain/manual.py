@@ -11,6 +11,24 @@ ManualId = NewType("ManualId", UUID)
 TITLE_MAX_LENGTH = 200
 
 
+@dataclass(frozen=True, slots=True)
+class SourceFile:
+    """Arquivo da pasta de manuais da Engenharia de onde o manual foi importado.
+
+    ``key`` identifica o manual entre revisões (código + idioma, ex.: "95007003P");
+    ``fingerprint`` (tamanho e data do arquivo) evita reler a pasta a cada sincronização
+    e ``content_hash`` (SHA-256) evita reindexar um arquivo que só foi copiado de novo.
+    """
+
+    key: str
+    fingerprint: str
+    content_hash: str
+
+    def __post_init__(self) -> None:
+        if not self.key.strip():
+            raise InvalidValueError("A chave do arquivo de origem é obrigatória")
+
+
 class ManualStatus(StrEnum):
     PENDING = "pending"
     PROCESSING = "processing"
@@ -36,25 +54,32 @@ class Manual:
     page_count: int | None = None
     chunk_count: int | None = None
     failure_reason: str | None = None
+    # Preenchido só nos manuais vindos da pasta da Engenharia (None = enviado pela tela).
+    source: SourceFile | None = None
 
     def __post_init__(self) -> None:
-        if not self.title.strip():
-            raise InvalidValueError("O título do manual é obrigatório")
-        if len(self.title) > TITLE_MAX_LENGTH:
-            raise InvalidValueError(f"O título do manual excede {TITLE_MAX_LENGTH} caracteres")
-        if not self.file_name.strip():
-            raise InvalidValueError("O nome do arquivo do manual é obrigatório")
+        _validate_names(self.title, self.file_name)
         if self.created_at.tzinfo is None:
             raise InvalidValueError("A data de cadastro precisa ter fuso horário")
 
     @classmethod
-    def register(cls, *, title: str, file_name: str, now: datetime) -> Self:
+    def register(
+        cls, *, title: str, file_name: str, now: datetime, source: SourceFile | None = None
+    ) -> Self:
         return cls(
             id=ManualId(uuid4()),
             title=title.strip(),
             file_name=file_name.strip(),
             created_at=now,
+            source=source,
         )
+
+    def update_from_source(self, *, title: str, file_name: str, source: SourceFile) -> None:
+        """Acompanha o arquivo da pasta: nova revisão, novo título na planilha etc."""
+        _validate_names(title, file_name)
+        self.title = title.strip()
+        self.file_name = file_name.strip()
+        self.source = source
 
     @property
     def is_searchable(self) -> bool:
@@ -97,3 +122,12 @@ class Manual:
 
     def __hash__(self) -> int:
         return hash(self.id)
+
+
+def _validate_names(title: str, file_name: str) -> None:
+    if not title.strip():
+        raise InvalidValueError("O título do manual é obrigatório")
+    if len(title.strip()) > TITLE_MAX_LENGTH:
+        raise InvalidValueError(f"O título do manual excede {TITLE_MAX_LENGTH} caracteres")
+    if not file_name.strip():
+        raise InvalidValueError("O nome do arquivo do manual é obrigatório")

@@ -23,6 +23,7 @@ dependencies = [
     "httpx2>=2.13",  # cliente HTTP usado pelo SDK da OpenAI
     "httpx>=0.28",  # chamadas ao TOTVS (login)
     "argon2-cffi>=25.1",
+    "openpyxl>=3.1",  # planilha de manuais da Engenharia (sincronização)
 ]
 
 [project.optional-dependencies]
@@ -84,7 +85,7 @@ files = ["src", "tests"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["pypdfium2", "pypdfium2.*"]  # biblioteca sem anotações de tipo publicadas
+module = ["pypdfium2", "pypdfium2.*", "openpyxl", "openpyxl.*"]  # sem anotações de tipo
 ignore_missing_imports = true
 
 # --------------------------------------------------------------------------- #

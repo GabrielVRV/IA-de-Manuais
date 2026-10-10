@@ -53,7 +53,8 @@ negócio em [`docs/dominio.md`](docs/dominio.md).
 | 9a | Usuários, login (cookie HttpOnly + Argon2) e proteção das rotas da API              | ✅     |
 | 9b | Telas de login, de usuários e de acompanhamento dos manuais                         | ✅     |
 | 9c | Login com o usuário do TOTVS, liberação pelo administrador e sessões no banco       | ✅     |
-| 10 | Sincronização automática dos manuais com o SharePoint (Microsoft Graph)             | ⏳     |
+| 10a| Sincronização com a pasta de manuais da Engenharia (comando `sync-manuals`)         | ✅     |
+| 10b| Sincronização periódica na API e acompanhamento na tela de administração           | ⏳     |
 | 11 | Observabilidade: logs estruturados, custo de tokens, feedback 👍/👎 nas respostas    | ⏳     |
 
 ## Convenções

@@ -4,7 +4,7 @@ from datetime import datetime
 import pytest
 
 from manual_assistant.domain.errors import InvalidStateTransitionError, InvalidValueError
-from manual_assistant.domain.manual import TITLE_MAX_LENGTH, Manual, ManualStatus
+from manual_assistant.domain.manual import TITLE_MAX_LENGTH, Manual, ManualStatus, SourceFile
 from tests.factories import FIXED_NOW, make_manual
 
 
@@ -36,6 +36,38 @@ class TestRegistration:
     def test_rejects_dates_without_timezone(self) -> None:
         with pytest.raises(InvalidValueError, match="fuso"):
             Manual.register(title="Manual", file_name="p.pdf", now=datetime(2026, 1, 1))  # noqa: DTZ001
+
+
+class TestSourceFile:
+    SOURCE = SourceFile(key="95007003P", fingerprint="10-1", content_hash="abc")
+
+    def test_uploaded_manuals_have_no_source(self) -> None:
+        assert make_manual().source is None
+
+    def test_follows_a_new_revision_of_the_file(self) -> None:
+        manual = Manual.register(
+            title="Antigo", file_name="95007003-01P.pdf", now=FIXED_NOW, source=self.SOURCE
+        )
+        new_source = replace(self.SOURCE, fingerprint="20-2", content_hash="def")
+
+        manual.update_from_source(title=" Novo ", file_name="95007003-02P.pdf", source=new_source)
+
+        assert (manual.title, manual.file_name, manual.source) == (
+            "Novo",
+            "95007003-02P.pdf",
+            new_source,
+        )
+
+    def test_update_keeps_the_title_rules(self) -> None:
+        manual = make_manual()
+
+        with pytest.raises(InvalidValueError):
+            manual.update_from_source(title=" ", file_name="a.pdf", source=self.SOURCE)
+        assert manual.title == "Manual da Prensa P-200"
+
+    def test_requires_a_key(self) -> None:
+        with pytest.raises(InvalidValueError):
+            SourceFile(key=" ", fingerprint="1-1", content_hash="abc")
 
 
 class TestLifecycle:
