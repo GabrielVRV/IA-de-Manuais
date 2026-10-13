@@ -111,6 +111,24 @@ class TestParseCompletion:
         }
 
     @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            (
+                r"Altura (A) $16,5 \text{ m}$, Largura (B) $6,5 \text{ m}$ [1].",
+                "Altura (A) 16,5 m, Largura (B) 6,5 m.",
+            ),
+            (r"Opere a $25^\circ\text{C}$ [1].", "Opere a 25°C."),
+            (r"Área de $2 \times 3\,\text{m}^2$ [1].", "Área de 2 × 3 m²."),  # noqa: RUF001
+            ("Custa R$ 100 e R$ 200 [1].", "Custa R$ 100 e R$ 200."),
+        ],
+    )
+    def test_turns_latex_math_into_plain_text(self, raw: str, expected: str) -> None:
+        assert parse_completion(raw, CHUNKS).text == expected
+
+    def test_system_instruction_forbids_latex(self) -> None:
+        assert "LaTeX" in SYSTEM_INSTRUCTION
+
+    @pytest.mark.parametrize(
         "text", [NOT_FOUND_MARKER, f"  {NOT_FOUND_MARKER}\n", "Hmm. NAO_ENCONTRADO"]
     )
     def test_translates_the_not_found_marker(self, text: str) -> None:
