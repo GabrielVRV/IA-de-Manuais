@@ -31,6 +31,7 @@ citando o manual e a página de origem de cada informação.**
 - [Roadmap](#roadmap)
 - [Convenções](#convenções)
 - [Documentação](#documentação)
+- [Licença](#licença)
 
 ## Visão geral
 
@@ -227,6 +228,10 @@ Todo push e pull request passa por pipelines no GitHub Actions:
 | [docs/adr/](docs/adr/)                         | Decisões de arquitetura (ADRs)            |
 | [backend/README.md](backend/README.md)         | Detalhes da API e execução local          |
 | [frontend/README.md](frontend/README.md)       | Detalhes da SPA, configuração e deploy    |
+
+## Licença
+
+Distribuído sob a licença MIT. Veja [LICENSE](LICENSE).
 
 ---
 
