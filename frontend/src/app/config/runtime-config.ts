@@ -5,11 +5,12 @@ import { z } from 'zod'
  * Assim o mesmo build serve para qualquer ambiente: basta editar o arquivo no XAMPP.
  */
 export interface RuntimeConfig {
+  /** Vazio = a API responde no mesmo endereço da tela (container `web`, que repassa `/api/`). */
   readonly apiBaseUrl: string
 }
 
 const runtimeConfigSchema = z.object({
-  apiBaseUrl: z.url({ protocol: /^https?$/ }),
+  apiBaseUrl: z.union([z.literal(''), z.url({ protocol: /^https?$/ })]),
 })
 
 export class RuntimeConfigError extends Error {
@@ -20,7 +21,7 @@ export function parseRuntimeConfig(raw: unknown): RuntimeConfig {
   const result = runtimeConfigSchema.safeParse(raw)
   if (!result.success) {
     throw new RuntimeConfigError(
-      'config.json inválido: "apiBaseUrl" deve ser uma URL http(s), ex.: "http://servidor:8000".',
+      'config.json inválido: "apiBaseUrl" deve ser uma URL http(s), ex.: "http://servidor:8000", ou vazio para usar o mesmo endereço da tela.',
       { cause: result.error },
     )
   }

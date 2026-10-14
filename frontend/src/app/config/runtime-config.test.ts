@@ -9,6 +9,10 @@ describe('parseRuntimeConfig', () => {
     })
   })
 
+  it('accepts an empty URL: the API is served from the same origin', () => {
+    expect(parseRuntimeConfig({ apiBaseUrl: '' })).toEqual({ apiBaseUrl: '' })
+  })
+
   it.each([
     ['missing field', {}],
     ['not a URL', { apiBaseUrl: 'servidor:8000' }],

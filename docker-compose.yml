@@ -44,6 +44,17 @@ services:
       - "8000:8000"
     restart: unless-stopped
 
+  web:
+    # Tela + proxy da API no mesmo endereço: o cookie de login funciona sem CORS.
+    build: ./frontend
+    image: manual-assistant-web:latest
+    container_name: manual-assistant-web
+    depends_on:
+      - api
+    ports:
+      - "${WEB_PUBLISHED_PORT:-8084}:80"
+    restart: unless-stopped
+
 volumes:
   db-data:
   manual-files:

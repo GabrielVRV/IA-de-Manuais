@@ -145,23 +145,23 @@ direção errada quebra o CI. As decisões de arquitetura estão registradas com
 ### Pré-requisitos
 
 - [Docker](https://www.docker.com/) e Docker Compose
-- [Node.js](https://nodejs.org/) 22+
+- [Node.js](https://nodejs.org/) 22+ (só para desenvolver a tela)
 - Chave de API do **Gemini** ou da **OpenAI**
 
-### 1. Backend + banco (Docker)
+### 1. Tudo no Docker (tela + API + banco)
 
 ```bash
 cp .env.example .env                  # defina DB_PASSWORD
-cp backend/.env.example backend/.env  # configurações da API (CORS, chaves de IA...)
+cp backend/.env.example backend/.env  # configurações da API (chaves de IA, TOTVS...)
 docker compose up -d --build
-curl http://localhost:8000/api/v1/health
+curl http://localhost:8084/api/v1/health
 ```
 
-As migrações do banco são aplicadas automaticamente quando a API inicia.
+A tela fica em <http://localhost:8084>. O nginx do container `web` repassa `/api/` para a
+API, então tela e API ficam no mesmo endereço, o que o cookie de login exige. As migrações
+do banco são aplicadas automaticamente quando a API inicia.
 
-### 2. Frontend
-
-Em desenvolvimento:
+### 2. Desenvolvimento da tela
 
 ```bash
 cd frontend
@@ -169,17 +169,7 @@ npm install
 npm run dev
 ```
 
-Para publicar em um servidor Apache/XAMPP (Windows):
-
-```powershell
-cd frontend
-npm install
-npm run deploy:xampp -- -Destino "C:\xampp\htdocs\ia-manuais"
-```
-
-Depois, ajuste o `config.json` publicado com o endereço da API e inclua o endereço do
-frontend em `APP_CORS_ORIGINS`, no `backend/.env`. Detalhes em
-[frontend/README.md](frontend/README.md).
+Detalhes em [frontend/README.md](frontend/README.md).
 
 ## Qualidade e CI
 

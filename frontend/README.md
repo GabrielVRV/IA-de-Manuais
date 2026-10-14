@@ -1,6 +1,11 @@
 # Frontend — Assistente de Manuais
 
-SPA em **React + TypeScript + Vite**, publicada como arquivos estáticos no XAMPP.
+SPA em **React + TypeScript + Vite**, servida pelo container `web` do `docker-compose.yml`
+(nginx), que também repassa `/api/` para a API.
+
+> O cookie de login é `SameSite=Lax`: o navegador só o envia se a tela e a API estiverem no
+> **mesmo servidor** (a porta pode mudar; o IP ou o nome, não). Por isso o deploy no XAMPP
+> só funciona com o XAMPP na mesma máquina da API.
 
 ## Estrutura
 
@@ -72,6 +77,8 @@ O endereço da API **não** é embutido no build. Ele é lido de `config.json`, 
 ```
 
 Assim o mesmo build serve para qualquer ambiente: no servidor, basta editar esse arquivo.
+Vazio (`{ "apiBaseUrl": "" }`) = a API está no mesmo endereço da tela. É o que o container
+`web` usa.
 O endereço do frontend também precisa estar em `APP_CORS_ORIGINS` no `.env` do backend.
 
 ## Marca da empresa (opcional)
