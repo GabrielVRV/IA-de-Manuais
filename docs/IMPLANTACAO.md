@@ -177,6 +177,44 @@ Para trocar a porta, defina `WEB_PUBLISHED_PORT` no `.env` da raiz e rode
 5. Comparar o custo: no plano pago, cada pergunta custa uma fração de centavo, enquanto o
    Copilot exige uma licença por usuário.
 
+### Sincronizar com a pasta de manuais da Engenharia
+
+Em vez de enviar os PDFs pela tela, o sistema pode importar direto da pasta de rede da
+Engenharia. A pasta **só é lida**, nunca alterada.
+
+1. A pasta precisa estar **montada no servidor do Docker** (no `/etc/fstab`, com `ro` e uma
+   conta de serviço somente leitura). O padrão é `/mnt/Manual`; se for outro caminho,
+   defina `MANUAIS_HOST_DIR` no `.env` da raiz e rode `docker compose up -d`.
+2. Confira se o container enxerga os manuais:
+
+   ```bash
+   docker compose exec api ls /mnt/manuais
+   ```
+
+3. Na tela **Manuais** (administrador), no quadro **Pasta de manuais da Engenharia**:
+   - **Verificar** mostra o que seria feito (novos, revisões novas, a remover, ignorados),
+     **sem alterar nada nem gastar API**.
+   - **Sincronizar** aparece depois da verificação e pede confirmação, informando quantos
+     manuais serão indexados. Ela roda **em segundo plano**: dá para sair da tela, e o
+     andamento e o resultado (inclusive as falhas) aparecem no quadro.
+
+   Uma sincronização por vez. O resumo da última some se a API reiniciar (os manuais ficam).
+
+O mesmo também pode ser feito pelo comando, útil para testar com poucos manuais:
+
+```bash
+docker compose exec api python -m manual_assistant.cli sync-manuals --dry-run --verbose
+```
+
+```bash
+docker compose exec -it api python -m manual_assistant.cli sync-manuals --limit 3
+```
+
+Só entram os PDFs que estão **direto** dentro de cada subpasta (`ARMAZENAGEM/`,
+`PROTEÍNA/`...). As subpastas de dentro delas (`Versões Anteriores`, `Versões Obsoletas`)
+não são lidas. Sincronize de novo sempre que quiser atualizar: só o que mudou é
+reindexado, e o manual que saiu da pasta é removido do sistema.
+
 ---
 
 ## 7. Atualizar, parar e religar

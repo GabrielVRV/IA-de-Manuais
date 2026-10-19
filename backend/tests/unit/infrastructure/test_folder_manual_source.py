@@ -25,6 +25,7 @@ def _write_catalog(path: Path) -> None:
     sheet.append(["Código", "Descrição", "Segmento", "Situação"])
     sheet.append(["95006001-00P", "MANUAL DE MONTAGEM INCUBADORAS", "INCUBAÇÃO", "Ativo"])
     sheet.append(["95006002-00p", "  NASCEDOURO G 21  ", "INCUBAÇÃO", "Ativo"])
+    sheet.append(["95021401-02P", "SECADOR CAVALETE CA 10", "SECADOR", "Ativo"])
     workbook.save(path)
 
 
@@ -37,6 +38,7 @@ def root(tmp_path: Path) -> Path:
     _write(root / "PROTEÍNA" / "~$temporario.pdf")
     _write(root / "PROTEÍNA" / "leia-me.txt")
     _write(root / "ARMAZENAGEM" / "95021036-02P.pdf")
+    _write(root / "ARMAZENAGEM" / "95021401-v2-ca10.pdf")
     _write(root / "ARMAZENAGEM" / "Versões Obsoletas" / "95021036-01P.pdf")
     _write(root / "solto-na-raiz.pdf")
     _write_catalog(root / CATALOG)
@@ -55,6 +57,7 @@ async def test_lists_only_pdfs_directly_inside_each_subfolder(root: Path) -> Non
 
     assert [d.path for d in documents] == [
         "ARMAZENAGEM/95021036-02P.pdf",
+        "ARMAZENAGEM/95021401-v2-ca10.pdf",
         "PROTEÍNA/95006001-00P.pdf",
         "PROTEÍNA/95006002-00P.pdf",
     ]
@@ -65,6 +68,7 @@ async def test_takes_titles_from_the_spreadsheet(root: Path) -> None:
 
     assert {d.file_name: d.title for d in documents} == {
         "95021036-02P.pdf": None,  # não está na planilha
+        "95021401-v2-ca10.pdf": "SECADOR CAVALETE CA 10",  # na planilha como 95021401-02P
         "95006001-00P.pdf": "MANUAL DE MONTAGEM INCUBADORAS",
         "95006002-00P.pdf": "NASCEDOURO G 21",
     }
@@ -75,7 +79,7 @@ async def test_works_without_the_spreadsheet(root: Path) -> None:
 
     documents = await FolderManualSource(root, catalog_file=CATALOG).list_documents()
 
-    assert len(documents) == 3
+    assert len(documents) == 4
     assert all(d.title is None for d in documents)
 
 
@@ -84,7 +88,7 @@ async def test_a_broken_spreadsheet_does_not_stop_the_listing(root: Path) -> Non
 
     documents = await FolderManualSource(root, catalog_file=CATALOG).list_documents()
 
-    assert len(documents) == 3
+    assert len(documents) == 4
 
 
 async def test_fingerprint_changes_when_the_file_changes(root: Path) -> None:
@@ -142,7 +146,7 @@ async def test_retries_a_momentary_network_failure(
 
     monkeypatch.setattr(Path, "iterdir", flaky_iterdir)
 
-    assert len(await source.list_documents()) == 3
+    assert len(await source.list_documents()) == 4
 
 
 async def test_gives_up_after_repeated_network_failures(
