@@ -47,6 +47,11 @@ from manual_assistant.application.use_cases.resolve_session import (
     LogoutUseCase,
     ResolveSessionUseCase,
 )
+from manual_assistant.application.use_cases.sync_manuals import (
+    ApplyManualSyncUseCase,
+    ManualSyncService,
+    PlanManualSyncUseCase,
+)
 from manual_assistant.domain.conversation import RetentionPolicy
 from manual_assistant.domain.session import SessionPolicy
 from manual_assistant.infrastructure.ai.factory import AiProviders, build_ai_providers
@@ -74,6 +79,7 @@ from manual_assistant.infrastructure.persistence.user_repository import SqlAlche
 from manual_assistant.infrastructure.persistence.vector_store import PgVectorStore
 from manual_assistant.infrastructure.security.argon2_hasher import Argon2PasswordHasher
 from manual_assistant.infrastructure.settings import Settings
+from manual_assistant.infrastructure.source.folder_manual_source import FolderManualSource
 from manual_assistant.infrastructure.storage.local_file_storage import LocalFileStorage
 from manual_assistant.infrastructure.totvs.datasul_credential_verifier import (
     DatasulCredentialVerifier,
@@ -122,25 +128,48 @@ def create_app(
     if totvs is None:
         logger.info("APP_TOTVS_LOGIN_URL vazia: só usuários locais conseguem entrar")
 
+    register_manual = RegisterManualUseCase(
+        repository, storage, max_bytes=settings.max_upload_bytes
+    )
+    index_manual = IndexManualUseCase(
+        repository=repository,
+        storage=storage,
+        parser=PdfiumDocumentParser(),
+        chunker=LineChunker(),
+        embeddings=ai.embeddings,
+        vector_store=vector_store,
+    )
+    delete_manual = DeleteManualUseCase(
+        repository=repository, vector_store=vector_store, storage=storage
+    )
+    manual_sync = ManualSyncService(plan=None, apply=None)
+    if settings.sync_source_dir:
+        source = FolderManualSource(
+            settings.sync_source_dir, catalog_file=settings.sync_catalog_file
+        )
+        manual_sync = ManualSyncService(
+            plan=PlanManualSyncUseCase(
+                source=source, repository=repository, languages=settings.sync_languages
+            ),
+            apply=ApplyManualSyncUseCase(
+                source=source,
+                repository=repository,
+                storage=storage,
+                register_manual=register_manual,
+                index_manual=index_manual,
+                delete_manual=delete_manual,
+            ),
+        )
+
     use_cases = UseCases(
         check_health=CheckHealthUseCase(indicators=[DatabaseHealthIndicator(engine)]),
-        register_manual=RegisterManualUseCase(
-            repository, storage, max_bytes=settings.max_upload_bytes
-        ),
-        index_manual=IndexManualUseCase(
-            repository=repository,
-            storage=storage,
-            parser=PdfiumDocumentParser(),
-            chunker=LineChunker(),
-            embeddings=ai.embeddings,
-            vector_store=vector_store,
-        ),
+        register_manual=register_manual,
+        index_manual=index_manual,
         list_manuals=ListManualsUseCase(repository),
         get_manual=GetManualUseCase(repository),
         get_manual_file=GetManualFileUseCase(repository, storage),
-        delete_manual=DeleteManualUseCase(
-            repository=repository, vector_store=vector_store, storage=storage
-        ),
+        delete_manual=delete_manual,
+        manual_sync=manual_sync,
         chat=ChatUseCase(
             conversations=conversations,
             ask_question=AskQuestionUseCase(
@@ -188,6 +217,7 @@ def create_app(
             logger.warning("Não foi possível verificar indexações interrompidas", exc_info=True)
         purge_task = asyncio.create_task(_purge_periodically(purge_conversations))
         yield
+        await manual_sync.stop()
         purge_task.cancel()
         with suppress(asyncio.CancelledError):
             await purge_task

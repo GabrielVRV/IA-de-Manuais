@@ -93,6 +93,7 @@ export function useManuals() {
     error,
     uploads,
     upload,
+    refresh,
     reindex: (id: string) => act(() => gateway.reindex(id)),
     remove: (id: string) => act(() => gateway.remove(id)),
     fileUrl: (id: string) => gateway.fileUrl(id),

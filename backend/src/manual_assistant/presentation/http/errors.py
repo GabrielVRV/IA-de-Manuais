@@ -19,6 +19,11 @@ from manual_assistant.application.errors import (
     UserAlreadyExistsError,
     UserNotFoundError,
 )
+from manual_assistant.application.use_cases.sync_manuals import (
+    EmptyManualSourceError,
+    SyncAlreadyRunningError,
+    SyncNotConfiguredError,
+)
 from manual_assistant.domain.errors import InvalidStateTransitionError, InvalidValueError
 
 logger = logging.getLogger(__name__)
@@ -37,6 +42,9 @@ _STATUS_BY_ERROR: dict[type[Exception], int] = {
     InvalidDocumentError: status.HTTP_422_UNPROCESSABLE_CONTENT,
     InvalidValueError: status.HTTP_422_UNPROCESSABLE_CONTENT,
     InvalidStateTransitionError: status.HTTP_409_CONFLICT,
+    SyncNotConfiguredError: status.HTTP_409_CONFLICT,
+    SyncAlreadyRunningError: status.HTTP_409_CONFLICT,
+    EmptyManualSourceError: status.HTTP_503_SERVICE_UNAVAILABLE,
     ExternalServiceError: status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 

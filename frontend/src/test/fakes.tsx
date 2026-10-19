@@ -16,7 +16,13 @@ import type {
 import { QuestionGatewayContext } from '@/features/chat/presentation/question-gateway-context'
 import type { HealthGateway } from '@/features/health/domain/api-health'
 import { HealthGatewayContext } from '@/features/health/presentation/health-gateway-context'
-import type { ManualsGateway, ManualSummary } from '@/features/manuals/domain/manuals'
+import type {
+  ManualsGateway,
+  ManualSummary,
+  SyncCheck,
+  SyncRun,
+  SyncStatus,
+} from '@/features/manuals/domain/manuals'
 import { ManualsGatewayContext } from '@/features/manuals/presentation/manuals-gateway-context'
 import type { ManagedUser, UserRole, UsersGateway } from '@/features/users/domain/users'
 import { UsersGatewayContext } from '@/features/users/presentation/users-gateway-context'
@@ -103,8 +109,43 @@ export function manual(overrides: Partial<ManualSummary> = {}): ManualSummary {
   }
 }
 
-export function fakeManualsGateway(initial: ManualSummary[] = [manual()]) {
-  const state = { manuals: [...initial] }
+export function syncCheck(overrides: Partial<SyncCheck> = {}): SyncCheck {
+  return {
+    counts: { add: 1, update: 0, retitle: 0, remove: 0, unchanged: 5, ignore: 1 },
+    toIndex: 1,
+    items: [
+      { action: 'add', fileName: '95000001-00P.pdf', title: 'SILO 500 T', reason: null },
+      {
+        action: 'ignore',
+        fileName: '95000001-00E.pdf',
+        title: '',
+        reason: "ARMAZENAGEM/95000001-00E.pdf: idioma 'E' não sincronizado",
+      },
+    ],
+    ...overrides,
+  }
+}
+
+export function syncRun(overrides: Partial<SyncRun> = {}): SyncRun {
+  return {
+    startedAt: new Date('2026-10-16T10:00:00Z'),
+    startedBy: 'Ana Admin',
+    finishedAt: null,
+    running: true,
+    total: 1,
+    done: 0,
+    succeeded: 0,
+    failures: [],
+    error: null,
+    ...overrides,
+  }
+}
+
+export function fakeManualsGateway(
+  initial: ManualSummary[] = [manual()],
+  sync: SyncStatus = { enabled: true, running: false, lastRun: null },
+) {
+  const state = { manuals: [...initial], sync }
   const gateway = {
     state,
     list: vi.fn(() => Promise.resolve([...state.manuals])),
@@ -124,6 +165,13 @@ export function fakeManualsGateway(initial: ManualSummary[] = [manual()]) {
       return Promise.resolve()
     }),
     fileUrl: (id: string) => `http://api/manuals/${id}/file`,
+    syncStatus: vi.fn(() => Promise.resolve(state.sync)),
+    checkSync: vi.fn(() => Promise.resolve(syncCheck())),
+    startSync: vi.fn(() => {
+      const run = syncRun()
+      state.sync = { ...state.sync, running: true, lastRun: run }
+      return Promise.resolve(run)
+    }),
   } satisfies ManualsGateway & { state: typeof state }
   return gateway
 }

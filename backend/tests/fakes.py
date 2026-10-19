@@ -3,6 +3,7 @@
 O mypy garante que cada fake segue o contrato da porta que substitui.
 """
 
+import asyncio
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from datetime import datetime
@@ -259,6 +260,8 @@ class FakeManualSource:
     files: dict[str, tuple[bytes, str | None]] = field(default_factory=dict)
     versions: dict[str, int] = field(default_factory=dict)  # muda a "data" do arquivo
     reads: list[str] = field(default_factory=list)
+    read_error: Exception | None = None  # lançado ao ler qualquer arquivo
+    read_gate: asyncio.Event | None = None  # se definido, a leitura espera por ele
 
     def put(self, path: str, content: bytes = b"%PDF-1.4 v1", title: str | None = None) -> None:
         self.files[path] = (content, title)
@@ -277,6 +280,10 @@ class FakeManualSource:
 
     async def read(self, path: str) -> bytes:
         self.reads.append(path)
+        if self.read_gate is not None:
+            await self.read_gate.wait()
+        if self.read_error is not None:
+            raise self.read_error
         return self.files[path][0]
 
 

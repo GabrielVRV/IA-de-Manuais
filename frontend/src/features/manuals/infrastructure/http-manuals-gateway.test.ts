@@ -84,6 +84,59 @@ describe('HttpManualsGateway', () => {
   })
 })
 
+describe('HttpManualsGateway sync', () => {
+  const apiRun = {
+    started_at: '2026-10-16T10:00:00Z',
+    started_by: 'Ana',
+    finished_at: null,
+    running: true,
+    total: 3,
+    done: 1,
+    succeeded: 1,
+    failures: [{ action: 'add', file_name: 'ruim.pdf', detail: 'não é um PDF' }],
+    error: null,
+  }
+
+  it('maps the status, the check and the start', async () => {
+    const fetchFn = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json({ enabled: true, running: true, last_run: apiRun }))
+      .mockResolvedValueOnce(
+        Response.json({
+          counts: { add: 1, update: 0, retitle: 0, remove: 0, unchanged: 2, ignore: 0 },
+          to_index: 1,
+          items: [{ action: 'add', file_name: 'a.pdf', title: 'A', reason: null }],
+        }),
+      )
+      .mockResolvedValueOnce(Response.json(apiRun))
+    const gateway = new HttpManualsGateway(new HttpClient('http://api', { fetchFn }))
+
+    const status = await gateway.syncStatus()
+    const check = await gateway.checkSync()
+    const run = await gateway.startSync()
+
+    expect(status.lastRun).toMatchObject({
+      startedAt: new Date('2026-10-16T10:00:00Z'),
+      finishedAt: null,
+      failures: [{ action: 'add', fileName: 'ruim.pdf', detail: 'não é um PDF' }],
+    })
+    expect(check).toMatchObject({ toIndex: 1, items: [{ fileName: 'a.pdf' }] })
+    expect(run.done).toBe(1)
+    const calls = fetchFn.mock.calls.map(([url, init]) => [init?.method, url])
+    expect(calls).toEqual([
+      ['GET', 'http://api/api/v1/sync'],
+      ['POST', 'http://api/api/v1/sync/check'],
+      ['POST', 'http://api/api/v1/sync/run'],
+    ])
+  })
+
+  it('rejects unexpected payloads', async () => {
+    await expect(new HttpManualsGateway(client({}).http).syncStatus()).rejects.toBeInstanceOf(
+      InvalidResponseError,
+    )
+  })
+})
+
 describe('HttpUsersGateway', () => {
   it('maps users and sends changes in the API format', async () => {
     const { http, fetchFn } = client(apiUser)

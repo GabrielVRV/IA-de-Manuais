@@ -2,17 +2,22 @@
 
 Duas etapas: ``PlanManualSyncUseCase`` compara a pasta com o que já está cadastrado
 sem alterar nada (é o modo simulação); ``ApplyManualSyncUseCase`` executa o plano.
+``ManualSyncService`` dispara as duas pela tela, com a sincronização em segundo plano.
 A pasta de origem só é lida, nunca alterada.
 """
 
+import asyncio
 import hashlib
 import logging
 from collections.abc import Callable, Collection, Sequence
-from dataclasses import dataclass
+from contextlib import suppress
+from dataclasses import dataclass, field
+from datetime import datetime
 from enum import StrEnum
 from pathlib import PurePosixPath
 from typing import TypeVar
 
+from manual_assistant.application.clock import Clock, utc_now
 from manual_assistant.application.errors import ApplicationError
 from manual_assistant.application.ports.file_storage import FileStorage
 from manual_assistant.application.ports.manual_repository import ManualRepository
@@ -37,6 +42,16 @@ class EmptyManualSourceError(ApplicationError):
     def __init__(self) -> None:
         # Sem esta trava, uma pasta de rede fora do ar faria todos os manuais serem removidos.
         super().__init__("A pasta de manuais está vazia ou não pôde ser lida. Nada foi alterado.")
+
+
+class SyncNotConfiguredError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("A pasta de manuais não está configurada (APP_SYNC_SOURCE_DIR).")
+
+
+class SyncAlreadyRunningError(ApplicationError):
+    def __init__(self) -> None:
+        super().__init__("Já existe uma sincronização em andamento.")
 
 
 class SyncAction(StrEnum):
@@ -285,3 +300,120 @@ def _required(value: T | None) -> T:
 
 class SyncIndexingError(ApplicationError):
     """O manual foi cadastrado/atualizado, mas a indexação falhou (detalhe no manual)."""
+
+
+@dataclass(slots=True)
+class SyncRun:
+    """Andamento (e, ao terminar, resultado) de uma sincronização disparada pela tela."""
+
+    started_at: datetime
+    started_by: str
+    total: int  # itens do plano que serão aplicados
+    outcomes: list[SyncOutcome] = field(default_factory=list)
+    finished_at: datetime | None = None
+    error: str | None = None  # falha que interrompeu a sincronização inteira
+
+    @property
+    def running(self) -> bool:
+        return self.finished_at is None
+
+
+class ManualSyncService:
+    """Verificar e sincronizar a partir da tela de administração.
+
+    Uma sincronização por vez, em segundo plano: a primeira com a pasta inteira leva
+    muito mais que uma requisição HTTP. O andamento e o resultado da última ficam em
+    memória (a API roda num processo só); reiniciar a API apaga esse resumo, não os
+    manuais. Sem a pasta configurada, o serviço existe mas fica desligado.
+    """
+
+    def __init__(
+        self,
+        *,
+        plan: PlanManualSyncUseCase | None,
+        apply: ApplyManualSyncUseCase | None,
+        clock: Clock = utc_now,
+    ) -> None:
+        self._plan = plan
+        self._apply = apply
+        self._clock = clock
+        self._starting = False
+        self._task: asyncio.Task[None] | None = None
+        self.last_run: SyncRun | None = None
+
+    @property
+    def enabled(self) -> bool:
+        return self._plan is not None and self._apply is not None
+
+    @property
+    def running(self) -> bool:
+        return self._starting or (self.last_run is not None and self.last_run.running)
+
+    async def check(self) -> SyncPlan:
+        """O mesmo que ``--dry-run``: compara a pasta com o sistema sem alterar nada.
+
+        Raises:
+            SyncNotConfiguredError, EmptyManualSourceError, ExternalServiceError.
+        """
+        if self._plan is None:
+            raise SyncNotConfiguredError()
+        return await self._plan.execute()
+
+    async def start(self, *, started_by: str) -> SyncRun:
+        """Refaz o plano (a pasta pode ter mudado desde a verificação) e o aplica em
+        segundo plano. Devolve logo depois de iniciar.
+
+        Raises:
+            SyncNotConfiguredError, SyncAlreadyRunningError, EmptyManualSourceError,
+            ExternalServiceError.
+        """
+        if self._plan is None or self._apply is None:
+            raise SyncNotConfiguredError()
+        # Marcado antes do primeiro await: dois cliques seguidos não iniciam duas.
+        if self.running:
+            raise SyncAlreadyRunningError()
+        self._starting = True
+        try:
+            plan = await self._plan.execute()
+        finally:
+            self._starting = False
+
+        pending = [
+            i for i in plan.items if i.action not in (SyncAction.UNCHANGED, SyncAction.IGNORE)
+        ]
+        run = SyncRun(started_at=self._clock(), started_by=started_by, total=len(pending))
+        self.last_run = run
+        self._task = asyncio.create_task(self._execute(self._apply, plan, run))
+        return run
+
+    async def wait(self) -> None:
+        """Espera a sincronização em andamento terminar (usado nos testes)."""
+        if self._task is not None:
+            await self._task
+
+    async def stop(self) -> None:
+        """Interrompe a sincronização em andamento (desligamento da API). Um manual
+        interrompido no meio fica com falha na próxima partida e pode ser reprocessado."""
+        if self._task is None or self._task.done():
+            return
+        self._task.cancel()
+        with suppress(asyncio.CancelledError):
+            await self._task
+
+    async def _execute(self, apply: ApplyManualSyncUseCase, plan: SyncPlan, run: SyncRun) -> None:
+        logger.info("Sincronização iniciada por %s: %d item(ns)", run.started_by, run.total)
+        try:
+            await apply.execute(plan, on_progress=run.outcomes.append)
+        except asyncio.CancelledError:
+            run.error = "a API foi desligada no meio da sincronização"
+            raise
+        except Exception as error:
+            # As falhas de cada manual já são tratadas no apply; isto é o imprevisto.
+            logger.exception("Sincronização interrompida")
+            run.error = str(error) or type(error).__name__
+        finally:
+            run.finished_at = self._clock()
+        failures = sum(not outcome.ok for outcome in run.outcomes)
+        logger.info(
+            "Sincronização concluída: %d ok, %d com falha", len(run.outcomes) - failures, failures
+        )

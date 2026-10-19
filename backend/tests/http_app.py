@@ -34,6 +34,11 @@ from manual_assistant.application.use_cases.resolve_session import (
     LogoutUseCase,
     ResolveSessionUseCase,
 )
+from manual_assistant.application.use_cases.sync_manuals import (
+    ApplyManualSyncUseCase,
+    ManualSyncService,
+    PlanManualSyncUseCase,
+)
 from manual_assistant.domain.user import User, UserRole
 from manual_assistant.infrastructure.documents.line_chunker import LineChunker
 from manual_assistant.infrastructure.documents.pdf_parser import PdfiumDocumentParser
@@ -42,6 +47,7 @@ from manual_assistant.presentation.http.dependencies import UseCases
 from tests.fakes import (
     FakeEmbeddingProvider,
     FakeLanguageModel,
+    FakeManualSource,
     FakeTotvs,
     InMemoryConversationRepository,
     InMemoryFileStorage,
@@ -76,28 +82,50 @@ class FakeBackend:
     )
     health_indicators: list[HealthIndicator] = field(default_factory=list)
     max_upload_bytes: int = 1024 * 1024
+    # None = pasta de manuais não configurada (sincronização desligada).
+    manual_source: FakeManualSource | None = field(default_factory=FakeManualSource)
+    manual_sync: ManualSyncService | None = None  # montado em build_app
 
     def build_app(self) -> FastAPI:
         hasher, sessions = fast_hasher(), session_manager(self.sessions)
+        register_manual = RegisterManualUseCase(
+            self.repository, self.storage, max_bytes=self.max_upload_bytes
+        )
+        index_manual = IndexManualUseCase(
+            repository=self.repository,
+            storage=self.storage,
+            parser=PdfiumDocumentParser(),  # real: os PDFs dos testes são gerados
+            chunker=LineChunker(),
+            embeddings=self.embeddings,
+            vector_store=self.vector_store,
+        )
+        delete_manual = DeleteManualUseCase(
+            repository=self.repository, vector_store=self.vector_store, storage=self.storage
+        )
+        self.manual_sync = ManualSyncService(plan=None, apply=None)
+        if self.manual_source is not None:
+            self.manual_sync = ManualSyncService(
+                plan=PlanManualSyncUseCase(
+                    source=self.manual_source, repository=self.repository, languages=["P"]
+                ),
+                apply=ApplyManualSyncUseCase(
+                    source=self.manual_source,
+                    repository=self.repository,
+                    storage=self.storage,
+                    register_manual=register_manual,
+                    index_manual=index_manual,
+                    delete_manual=delete_manual,
+                ),
+            )
         use_cases = UseCases(
             check_health=CheckHealthUseCase(self.health_indicators),
-            register_manual=RegisterManualUseCase(
-                self.repository, self.storage, max_bytes=self.max_upload_bytes
-            ),
-            index_manual=IndexManualUseCase(
-                repository=self.repository,
-                storage=self.storage,
-                parser=PdfiumDocumentParser(),  # real: os PDFs dos testes são gerados
-                chunker=LineChunker(),
-                embeddings=self.embeddings,
-                vector_store=self.vector_store,
-            ),
+            register_manual=register_manual,
+            index_manual=index_manual,
             list_manuals=ListManualsUseCase(self.repository),
             get_manual=GetManualUseCase(self.repository),
             get_manual_file=GetManualFileUseCase(self.repository, self.storage),
-            delete_manual=DeleteManualUseCase(
-                repository=self.repository, vector_store=self.vector_store, storage=self.storage
-            ),
+            delete_manual=delete_manual,
+            manual_sync=self.manual_sync,
             chat=ChatUseCase(
                 conversations=self.conversations,
                 ask_question=AskQuestionUseCase(

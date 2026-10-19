@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from manual_assistant.application.errors import ExternalServiceError
@@ -8,8 +10,11 @@ from manual_assistant.application.use_cases.register_manual import RegisterManua
 from manual_assistant.application.use_cases.sync_manuals import (
     ApplyManualSyncUseCase,
     EmptyManualSourceError,
+    ManualSyncService,
     PlanManualSyncUseCase,
     SyncAction,
+    SyncAlreadyRunningError,
+    SyncNotConfiguredError,
     SyncOutcome,
     SyncPlan,
 )
@@ -59,6 +64,10 @@ class Context:
             delete_manual=DeleteManualUseCase(
                 repository=self.repository, vector_store=self.vector_store, storage=self.storage
             ),
+        )
+
+        self.service = ManualSyncService(
+            plan=self.plan_use_case, apply=self.apply_use_case, clock=lambda: FIXED_NOW
         )
 
     async def plan(self) -> SyncPlan:
@@ -264,3 +273,81 @@ async def test_indexing_failure_is_reported(ctx: Context) -> None:
     assert not outcome.ok
     assert "serviço externo" in outcome.detail
     assert ctx.only_manual().status is ManualStatus.FAILED
+
+
+class TestManualSyncService:
+    """Verificar e sincronizar pela tela (a sincronização roda em segundo plano)."""
+
+    async def test_check_changes_nothing(self, ctx: Context) -> None:
+        ctx.source.put("PROTEÍNA/95007003-01P.pdf")
+
+        plan = await ctx.service.check()
+
+        assert _actions(plan) == {"95007003-01P.pdf": SyncAction.ADD}
+        assert ctx.repository.manuals == {}
+        assert ctx.service.last_run is None
+
+    async def test_runs_in_background_and_keeps_the_result(self, ctx: Context) -> None:
+        ctx.source.put("ARMAZENAGEM/95000001-00P.pdf", b"isto nao e um pdf")
+        ctx.source.put("ARMAZENAGEM/95000002-00P.pdf")
+
+        run = await ctx.service.start(started_by="Maria")
+        assert (run.total, run.outcomes, run.running) == (2, [], True)
+        assert ctx.service.running
+        await ctx.service.wait()
+
+        assert ctx.service.last_run is run
+        assert not ctx.service.running
+        assert (run.started_by, run.started_at, run.finished_at) == ("Maria", FIXED_NOW, FIXED_NOW)
+        assert [o.ok for o in run.outcomes] == [False, True]
+        assert run.error is None
+        assert len(ctx.repository.manuals) == 1
+
+    async def test_only_one_sync_at_a_time(self, ctx: Context) -> None:
+        ctx.source.put("ARMAZENAGEM/95000001-00P.pdf")
+
+        await ctx.service.start(started_by="Maria")
+        with pytest.raises(SyncAlreadyRunningError):
+            await ctx.service.start(started_by="João")
+        await ctx.service.wait()
+
+        await ctx.service.start(started_by="João")  # terminada a anterior, pode de novo
+        await ctx.service.wait()
+
+    async def test_empty_folder_starts_nothing(self, ctx: Context) -> None:
+        with pytest.raises(EmptyManualSourceError):
+            await ctx.service.start(started_by="Maria")
+
+        assert ctx.service.last_run is None
+        assert not ctx.service.running
+
+    async def test_unexpected_error_is_recorded(self, ctx: Context) -> None:
+        ctx.source.put("ARMAZENAGEM/95000001-00P.pdf")
+        ctx.source.read_error = RuntimeError("disco cheio")
+
+        run = await ctx.service.start(started_by="Maria")
+        await ctx.service.wait()
+
+        assert run.error == "disco cheio"
+        assert not run.running
+
+    async def test_stop_interrupts_the_sync(self, ctx: Context) -> None:
+        ctx.source.put("ARMAZENAGEM/95000001-00P.pdf")
+        ctx.source.read_gate = asyncio.Event()  # a leitura nunca termina
+        run = await ctx.service.start(started_by="Maria")
+        await asyncio.sleep(0)  # deixa a sincronização começar
+
+        await ctx.service.stop()
+
+        assert not run.running
+        assert run.error is not None
+        assert "desligada" in run.error
+
+    async def test_disabled_without_a_folder(self) -> None:
+        service = ManualSyncService(plan=None, apply=None)
+
+        assert not service.enabled
+        with pytest.raises(SyncNotConfiguredError):
+            await service.check()
+        with pytest.raises(SyncNotConfiguredError):
+            await service.start(started_by="Maria")

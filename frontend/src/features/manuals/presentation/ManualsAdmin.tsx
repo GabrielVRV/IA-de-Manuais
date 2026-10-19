@@ -5,6 +5,7 @@ import ui from '@/styles/ui.module.css'
 
 import type { ManualStatus, ManualSummary } from '../domain/manuals'
 import styles from './ManualsAdmin.module.css'
+import { SyncPanel } from './SyncPanel'
 import { useManuals } from './use-manuals'
 
 const STATUS: Record<ManualStatus, { label: string; tone: string }> = {
@@ -20,7 +21,8 @@ const plural = (count: number | null, one: string, many: string) =>
   `${String(count)} ${count === 1 ? one : many}`
 
 export function ManualsAdmin() {
-  const { manuals, error, uploads, upload, reindex, remove, fileUrl, clearUploads } = useManuals()
+  const { manuals, error, uploads, upload, reindex, remove, fileUrl, clearUploads, refresh } =
+    useManuals()
   const sending = uploads.some((u) => u.status === 'sending')
 
   return (
@@ -31,6 +33,8 @@ export function ManualsAdmin() {
       </header>
 
       <div className={ui.stack}>
+        <SyncPanel onProgress={() => void refresh()} />
+
         <DropZone
           disabled={sending}
           onFiles={(files) => {

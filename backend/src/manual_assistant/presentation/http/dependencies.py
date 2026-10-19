@@ -35,6 +35,7 @@ from manual_assistant.application.use_cases.resolve_session import (
     LogoutUseCase,
     ResolveSessionUseCase,
 )
+from manual_assistant.application.use_cases.sync_manuals import ManualSyncService
 from manual_assistant.domain.user import User
 
 SESSION_COOKIE = "ma_session"
@@ -51,6 +52,7 @@ class UseCases:
     get_manual: GetManualUseCase
     get_manual_file: GetManualFileUseCase
     delete_manual: DeleteManualUseCase
+    manual_sync: ManualSyncService
     chat: ChatUseCase
     list_conversations: ListConversationsUseCase
     get_conversation: GetConversationUseCase
