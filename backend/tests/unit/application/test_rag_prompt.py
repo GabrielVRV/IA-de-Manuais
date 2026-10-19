@@ -3,6 +3,7 @@ import pytest
 from manual_assistant.application.rag_prompt import (
     NOT_FOUND_MARKER,
     NOT_FOUND_MESSAGE,
+    SMALL_TALK_MARKER,
     SYSTEM_INSTRUCTION,
     build_prompt,
     parse_completion,
@@ -135,4 +136,22 @@ class TestParseCompletion:
         answer = parse_completion(text, CHUNKS)
 
         assert answer.text == NOT_FOUND_MESSAGE
+        assert not answer.has_sources
+
+
+class TestSmallTalk:
+    def test_system_instruction_explains_the_small_talk_marker(self) -> None:
+        assert SMALL_TALK_MARKER in SYSTEM_INSTRUCTION
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            f"{SMALL_TALK_MARKER} Bom dia! Como posso ajudar?",
+            f"\n{SMALL_TALK_MARKER}Bom dia! Como posso ajudar? [1]",
+        ],
+    )
+    def test_small_talk_has_no_citations(self, text: str) -> None:
+        answer = parse_completion(text, CHUNKS)
+
+        assert answer == Answer("Bom dia! Como posso ajudar?")
         assert not answer.has_sources

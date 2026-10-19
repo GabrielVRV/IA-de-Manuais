@@ -16,6 +16,8 @@ from manual_assistant.domain.conversation import Exchange
 from manual_assistant.domain.question import Question
 
 NOT_FOUND_MARKER = "NAO_ENCONTRADO"
+# Cumprimentos e agradecimentos não usam os manuais: a resposta sai sem fontes.
+SMALL_TALK_MARKER = "CONVERSA:"
 
 # Respostas antigas entram resumidas: o contexto serve para entender a pergunta, e
 # respostas inteiras só encareceriam cada chamada.
@@ -44,7 +46,10 @@ ex.: [1] ou [2][3].
 qual equipamento ela se refere). Não use as respostas anteriores como fonte: toda \
 informação da resposta precisa estar nos trechos.
 9. Escreva números e unidades como texto simples (ex.: 16,5 m; 180 bar; 25 °C). Não use \
-LaTeX nem fórmulas entre cifrões: a tela não interpreta essa notação."""
+LaTeX nem fórmulas entre cifrões: a tela não interpreta essa notação.
+10. Se a mensagem for apenas cumprimento, agradecimento, despedida ou conversa sem \
+pergunta técnica (ex.: "bom dia", "obrigado"), responda de forma breve e cordial, sem \
+citar trechos, começando exatamente com {SMALL_TALK_MARKER}"""
 
 # [1], [1][2], [1, 3], [ 2 ]
 _CITATION = re.compile(r"\[\s*(\d+(?:\s*,\s*\d+)*)\s*\]")
@@ -82,6 +87,9 @@ def parse_completion(text: str, chunks: Sequence[Chunk]) -> Answer:
     """Converte a resposta do modelo em ``Answer``, com as citações dos trechos usados."""
     if NOT_FOUND_MARKER in text:
         return Answer(NOT_FOUND_MESSAGE)
+    if text.lstrip().startswith(SMALL_TALK_MARKER):
+        reply = text.lstrip().removeprefix(SMALL_TALK_MARKER)
+        return Answer(_plain_math(_CITATION_WITH_SPACE.sub("", reply)).strip() or "Olá!")
 
     cited = _cited_numbers(text, limit=len(chunks))
     # Sem nenhuma marcação, é melhor citar tudo o que foi fornecido do que nada.
