@@ -15,6 +15,7 @@ from openpyxl import load_workbook
 
 from manual_assistant.application.errors import ExternalServiceError
 from manual_assistant.application.ports.manual_source import SourceDocument
+from manual_assistant.domain.manual_code import ManualCode
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ class FolderManualSource:
                 path=relative,
                 file_name=name,
                 fingerprint=fingerprint,
-                title=titles.get(PurePosixPath(name).stem.upper()),
+                title=_title_of(name, titles),
             )
             for relative, name, fingerprint in files
         ]
@@ -119,6 +120,15 @@ class FolderManualSource:
         if not file.is_relative_to(root) or file.suffix.lower() != ".pdf":
             raise ValueError(f"Caminho fora da pasta de manuais: {path!r}")
         return file
+
+
+def _title_of(file_name: str, titles: Mapping[str, str]) -> str | None:
+    """Pelo nome do arquivo; se não achar (ex.: "95021401-v2-ca10.pdf"), pelo código
+    como a planilha o escreve ("95021401-02P")."""
+    if title := titles.get(PurePosixPath(file_name).stem.upper()):
+        return title
+    code = ManualCode.from_file_name(file_name)
+    return titles.get(code.catalog_code) if code else None
 
 
 def _parse_catalog(content: bytes) -> dict[str, str]:
