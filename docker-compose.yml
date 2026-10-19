@@ -38,8 +38,11 @@ services:
       APP_DB_USER: ${DB_USER:-manuais}
       APP_DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no arquivo .env da raiz}
       APP_STORAGE_DIR: /home/app/data/manuals
+      APP_SYNC_SOURCE_DIR: /mnt/manuais
     volumes:
       - manual-files:/home/app/data  # PDFs originais (necessários para reprocessar)
+      # Pasta de manuais da Engenharia, montada no servidor. SOMENTE LEITURA (ADR 0009).
+      - ${MANUAIS_HOST_DIR:-/mnt/Manual}:/mnt/manuais:ro
     ports:
       - "8000:8000"
     restart: unless-stopped
