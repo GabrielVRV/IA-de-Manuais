@@ -64,4 +64,30 @@ describe('applyBrand', () => {
     expect(root.style.getPropertyValue('--brand-accent')).toBe(DEFAULT_BRAND.colors.accent)
     expect(document.title).toBe('ACME IA')
   })
+
+  it('uses the brand icon as the tab icon', () => {
+    const favicon = document.createElement('link')
+    favicon.rel = 'icon'
+    favicon.type = 'image/svg+xml'
+    favicon.href = './favicon.svg'
+    document.head.append(favicon)
+
+    applyBrand({ ...DEFAULT_BRAND, iconUrl: './brand/icone.png' }, document.createElement('div'))
+
+    expect(favicon.getAttribute('href')).toBe('./brand/icone.png')
+    expect(favicon.hasAttribute('type')).toBe(false)
+    favicon.remove()
+  })
+
+  it('keeps the neutral tab icon without a brand icon', () => {
+    const favicon = document.createElement('link')
+    favicon.rel = 'icon'
+    favicon.href = './favicon.svg'
+    document.head.append(favicon)
+
+    applyBrand(DEFAULT_BRAND, document.createElement('div'))
+
+    expect(favicon.getAttribute('href')).toBe('./favicon.svg')
+    favicon.remove()
+  })
 })

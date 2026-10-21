@@ -8,9 +8,9 @@
 
 .screen {
   /* Os componentes compartilhados (ex.: alertas) herdam estas cores. */
-  --color-surface: #0b1940;
-  --color-text: #eaf2ff;
-  --color-text-muted: #a9bbdc;
+  --color-surface: color-mix(in oklch, var(--brand-primary) 49%, oklch(0 0 none));
+  --color-text: color-mix(in oklch, var(--brand-primary) 9%, oklch(1 0 none));
+  --color-text-muted: color-mix(in oklch, var(--brand-primary) 36%, oklch(0.966 0 none));
   --color-border: rgb(255 255 255 / 0.14);
   --color-primary: var(--brand-accent);
   --color-danger: #ff7a90;
@@ -66,7 +66,8 @@
   min-height: 100vh;
   min-height: 100dvh;
   margin: 0 auto;
-  padding: clamp(1.5rem, 4vw, 3rem) clamp(1rem, 4vw, 3rem);
+  /* Medidas verticais em vh: no notebook a tela cabe inteira, sem rolagem. */
+  padding: clamp(1rem, 4vh, 3rem) clamp(1rem, 4vw, 3rem);
 }
 
 /* ------------------------------------------------------------------ */
@@ -85,7 +86,7 @@
 
 .logo {
   display: block;
-  width: clamp(9rem, 20vw, 14rem);
+  width: min(clamp(9rem, 20vw, 14rem), 26vh);
   height: auto;
   filter: drop-shadow(0 18px 36px rgb(0 0 0 / 0.45))
     drop-shadow(0 0 28px color-mix(in oklab, var(--brand-accent) 35%, transparent));
@@ -112,7 +113,7 @@
 }
 
 .headline {
-  margin: 1.5rem 0 0.75rem;
+  margin: clamp(0.75rem, 2.5vh, 1.5rem) 0 0.75rem;
   font-size: clamp(1.75rem, 3.6vw, 2.75rem);
   font-weight: 800;
   line-height: 1.12;
@@ -137,7 +138,7 @@
   flex-direction: column;
   gap: 0.75rem;
   max-width: 32rem;
-  margin-top: 1.75rem;
+  margin-top: clamp(1rem, 2.5vh, 1.75rem);
   padding: 1rem;
   border: 1px solid var(--glass-border);
   border-radius: 20px;
@@ -257,9 +258,16 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
-  margin: 1.5rem 0 0;
+  margin: clamp(1rem, 2.5vh, 1.5rem) 0 0;
   padding: 0;
   list-style: none;
+}
+
+/* Notebook com pouca altura: os destaques saem para a tela caber sem rolagem. */
+@media (min-width: 961px) and (max-height: 820px) {
+  .features {
+    display: none;
+  }
 }
 
 .features li {
@@ -306,7 +314,8 @@
   padding: 0 1.75rem 1.75rem;
   border-radius: 26px;
   background:
-    linear-gradient(160deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.02)), rgb(6 18 52 / 0.6);
+    linear-gradient(160deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.02)),
+    color-mix(in oklab, var(--color-surface) 60%, transparent);
   box-shadow:
     0 30px 80px rgb(0 0 0 / 0.45),
     inset 0 0 0 1px var(--glass-border),
@@ -359,7 +368,7 @@
   border: 1px solid color-mix(in oklab, var(--brand-accent) 40%, transparent);
   border-radius: 999px;
   background: color-mix(in oklab, var(--brand-accent) 13%, transparent);
-  color: #dff6ff;
+  color: color-mix(in oklch, var(--brand-accent) 18%, oklch(1 0 none));
   font-size: 0.875rem;
   text-align: center;
   animation: pop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1) both;

@@ -30,7 +30,7 @@ export function NeuralBackdrop() {
     if (!ctx) return
 
     const speed = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0.3 : 1
-    const accent = getComputedStyle(canvas).getPropertyValue('--brand-accent').trim() || '#1ec8ff'
+    const accent = getComputedStyle(canvas).getPropertyValue('--brand-accent').trim() || '#06c7fc'
     const pointer = { x: -9999, y: -9999 }
     let nodes: Node[] = []
     let width = 0

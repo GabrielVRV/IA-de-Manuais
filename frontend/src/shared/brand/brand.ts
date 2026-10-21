@@ -26,7 +26,7 @@ export const DEFAULT_BRAND: Brand = {
     'Pergunte em linguagem natural e receba a resposta direto dos manuais técnicos, com a página de origem.',
   logoUrl: null,
   iconUrl: null,
-  colors: { primary: '#025ba8', accent: '#1ec8ff' },
+  colors: { primary: '#025ba8', accent: '#06c7fc' },
   examples: [
     'Qual o torque de aperto dos parafusos da base?',
     'Como faço a manutenção preventiva do motorredutor?',
@@ -86,9 +86,19 @@ export async function loadBrand(
   }
 }
 
-/** Publica as cores da marca como variáveis CSS, das quais a paleta é derivada. */
+/**
+ * Publica as cores da marca como variáveis CSS, das quais a paleta é derivada,
+ * e usa o ícone da marca na aba do navegador (sem ele, fica o favicon neutro).
+ */
 export function applyBrand(brand: Brand, root: HTMLElement = document.documentElement): void {
   root.style.setProperty('--brand-primary', brand.colors.primary)
   root.style.setProperty('--brand-accent', brand.colors.accent)
   document.title = brand.name
+  if (brand.iconUrl) {
+    const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+    if (favicon) {
+      favicon.removeAttribute('type')
+      favicon.href = brand.iconUrl
+    }
+  }
 }

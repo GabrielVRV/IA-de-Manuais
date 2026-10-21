@@ -5,7 +5,7 @@
   "iconUrl": "./brand/icone.png",
   "colors": {
     "primary": "#025ba8",
-    "accent": "#1ec8ff"
+    "accent": "#06c7fc"
   },
   "examples": [
     "Qual o torque de aperto dos parafusos da base?",

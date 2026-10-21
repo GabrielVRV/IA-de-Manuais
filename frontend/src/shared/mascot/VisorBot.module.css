@@ -5,6 +5,19 @@
   animation: float 6s ease-in-out infinite;
 }
 
+/* Tons da carcaça e do visor, derivados da cor da marca. */
+.shellShade {
+  stop-color: color-mix(in oklch, var(--brand-primary) 20%, oklch(1 0 none));
+}
+
+.visorTop {
+  stop-color: color-mix(in oklch, var(--brand-primary) 53%, oklch(0 0 none));
+}
+
+.visorBottom {
+  stop-color: color-mix(in oklch, var(--brand-primary) 33%, oklch(0 0 none));
+}
+
 .ears rect {
   fill: var(--brand-primary);
 }

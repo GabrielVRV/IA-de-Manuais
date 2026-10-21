@@ -73,11 +73,11 @@ export function VisorBot({ mood, gaze, className }: VisorBotProps) {
       <defs>
         <linearGradient id={shellId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#ffffff" />
-          <stop offset="1" stopColor="#cfdcf2" />
+          <stop offset="1" className={styles.shellShade} />
         </linearGradient>
         <linearGradient id={visorId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#0b1d4a" />
-          <stop offset="1" stopColor="#020a24" />
+          <stop offset="0" className={styles.visorTop} />
+          <stop offset="1" className={styles.visorBottom} />
         </linearGradient>
         <filter id={glowId} x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation="2.4" result="blur" />
