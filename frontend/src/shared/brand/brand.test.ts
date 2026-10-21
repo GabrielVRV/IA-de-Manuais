@@ -20,7 +20,7 @@ describe('parseBrand', () => {
 
   it.each([
     ['empty name', { name: '  ' }],
-    ['color without #', { colors: { primary: '0046b4' } }],
+    ['color without #', { colors: { primary: '025ba8' } }],
     ['no examples', { examples: [] }],
     ['not an object', 'ACME'],
   ])('rejects %s', (_case, raw) => {

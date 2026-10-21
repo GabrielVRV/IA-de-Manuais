@@ -92,7 +92,7 @@ Nome, logo e cores **não** ficam no repositório. Para personalizar, crie a pas
   "tagline": "Frase exibida na tela de login.",
   "logoUrl": "./brand/logo.png",
   "iconUrl": "./brand/icone.png",
-  "colors": { "primary": "#0046b4", "accent": "#1ec8ff" },
+  "colors": { "primary": "#025ba8", "accent": "#1ec8ff" },
   "examples": ["Pergunta de exemplo exibida na tela de login"]
 }
 ```

@@ -2,7 +2,7 @@
   color-scheme: light dark;
 
   /* Cores da marca: sobrescritas em tempo de execução por brand/brand.json. */
-  --brand-primary: #0046b4;
+  --brand-primary: #025ba8;
   --brand-accent: #1ec8ff;
   /* Azul-marinho profundo derivado da marca: fundos de destaque (ex.: login). */
   --brand-deep: color-mix(in oklab, var(--brand-primary) 38%, #000716);

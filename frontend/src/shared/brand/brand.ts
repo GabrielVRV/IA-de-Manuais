@@ -26,7 +26,7 @@ export const DEFAULT_BRAND: Brand = {
     'Pergunte em linguagem natural e receba a resposta direto dos manuais técnicos, com a página de origem.',
   logoUrl: null,
   iconUrl: null,
-  colors: { primary: '#0046b4', accent: '#1ec8ff' },
+  colors: { primary: '#025ba8', accent: '#1ec8ff' },
   examples: [
     'Qual o torque de aperto dos parafusos da base?',
     'Como faço a manutenção preventiva do motorredutor?',
