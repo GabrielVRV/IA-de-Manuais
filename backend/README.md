@@ -50,15 +50,16 @@ uvicorn --factory manual_assistant.main:create_app --reload
 
 Todas as rotas exigem login, exceto `/api/v1/health` e `/api/v1/auth/login`. Detalhes nos
 ADRs [0007](../docs/adr/0007-autenticacao-e-controle-de-acesso.md) e
-[0008](../docs/adr/0008-login-pelo-totvs-e-sessoes-no-banco.md).
+[0008](../docs/adr/0008-login-pelo-totvs-e-sessoes-no-banco.md) e
+[0011](../docs/adr/0011-login-pelo-active-directory.md).
 
 Há dois tipos de usuário:
 
-- **TOTVS:** entra com o usuário e a senha do Datasul, conferidos pela rota configurada em
-  `APP_TOTVS_LOGIN_URL`. A senha não é guardada aqui. O primeiro login cadastra a pessoa
-  como `pending`, até um administrador liberar.
+- **Rede (AD):** entra com o mesmo usuário e senha do Windows, conferidos no Active
+  Directory configurado em `APP_AD_*`. A senha não é guardada aqui. O primeiro login
+  cadastra a pessoa como `pending`, até um administrador liberar.
 - **Local:** senha guardada aqui (Argon2id), com senha provisória e troca obrigatória. Serve
-  para quem não tem TOTVS e para o administrador de emergência.
+  para quem não tem usuário de rede e para o administrador de emergência.
 
 | Perfil    | Pode                                                   |
 | --------- | ------------------------------------------------------ |
@@ -75,15 +76,16 @@ hash). Ela cai depois de 7 dias sem uso, 30 dias depois do login ou no logout.
 docker compose exec api python -m manual_assistant.cli create-admin --username seu.login --name "Seu Nome"
 ```
 
-**Passar um usuário local a entrar pelo TOTVS**, mantendo o perfil:
+**Passar um usuário a entrar pelo AD**, mantendo o perfil e o histórico. Use `--ad-login`
+quando o login de rede for diferente do atual (ex.: quem vinha do TOTVS):
 
 ```powershell
-docker compose exec api python -m manual_assistant.cli use-totvs --username seu.login
+docker compose exec api python -m manual_assistant.cli use-ad --username gviaro --ad-login gabriel.viaro
 ```
 
 | Método e rota                              | O que faz                                          |
 | ------------------------------------------ | -------------------------------------------------- |
-| `POST /api/v1/auth/login`                  | Entra (local ou TOTVS); a sessão fica num cookie HttpOnly |
+| `POST /api/v1/auth/login`                  | Entra (local ou AD); a sessão fica num cookie HttpOnly |
 | `POST /api/v1/auth/logout`                 | Sai e invalida a sessão no servidor                |
 | `GET /api/v1/auth/me`                      | Usuário da sessão                                  |
 | `POST /api/v1/auth/change-password`        | Troca a própria senha (só usuários locais)         |

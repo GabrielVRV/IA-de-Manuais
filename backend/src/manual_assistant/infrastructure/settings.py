@@ -39,10 +39,16 @@ class Settings(BaseSettings):
     # Só ligue com HTTPS: um cookie "secure" não é enviado em conexões HTTP.
     auth_cookie_secure: bool = False
 
-    # Login pelo TOTVS (ADR 0008). Vazio = só usuários locais entram.
-    # Ex.: http://ip-do-datasul:porta/api/sfc/v1/api_valida_login/validarLogin/
-    totvs_login_url: str | None = None
-    totvs_timeout_seconds: float = Field(default=10, gt=0)
+    # Login pelo Active Directory (ADR 0011). Sem servidor = só usuários locais entram.
+    # Ex.: ldaps://dc01.empresa.local (mais de um, separados por vírgula).
+    ad_server_urls: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    ad_domain: str | None = None  # ex.: empresa.local; o login vira "usuario@empresa.local"
+    ad_base_dn: str | None = None  # ex.: DC=empresa,DC=local
+    # Só quem está neste grupo entra. Vazio = qualquer usuário do AD (ainda aguarda liberação).
+    ad_required_group_dn: str | None = None
+    ad_start_tls: bool = False  # só para ldap:// (porta 389)
+    ad_ca_cert_file: Path | None = None  # CA interna, em PEM; vazio = as do sistema
+    ad_timeout_seconds: float = Field(default=10, gt=0)
 
     # Arquivos dos manuais
     storage_dir: Path = Path("data/manuals")
@@ -90,6 +96,13 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
 
+    @field_validator("ad_server_urls", mode="before")
+    @classmethod
+    def _split_server_urls(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [url.strip() for url in value.split(",") if url.strip()]
+        return value
+
     @field_validator("sync_languages", mode="before")
     @classmethod
     def _split_languages(cls, value: object) -> object:
@@ -97,7 +110,15 @@ class Settings(BaseSettings):
             return [code.strip().upper() for code in value.split(",") if code.strip()]
         return value
 
-    @field_validator("totvs_login_url", "sync_source_dir", "sync_catalog_file", mode="before")
+    @field_validator(
+        "ad_domain",
+        "ad_base_dn",
+        "ad_required_group_dn",
+        "ad_ca_cert_file",
+        "sync_source_dir",
+        "sync_catalog_file",
+        mode="before",
+    )
     @classmethod
     def _blank_as_none(cls, value: object) -> object:
         if isinstance(value, str):
@@ -110,6 +131,12 @@ class Settings(BaseSettings):
             raise ValueError(
                 "APP_AUTH_SESSION_IDLE_DAYS não pode ser maior que APP_AUTH_SESSION_MAX_DAYS"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _ad_is_complete(self) -> Self:
+        if self.ad_server_urls and not (self.ad_domain and self.ad_base_dn):
+            raise ValueError("Com APP_AD_SERVER_URLS, defina também APP_AD_DOMAIN e APP_AD_BASE_DN")
         return self
 
     @property

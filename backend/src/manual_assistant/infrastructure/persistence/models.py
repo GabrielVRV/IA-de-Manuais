@@ -110,8 +110,8 @@ class UserRecord(Base):
 
     __table_args__ = (
         CheckConstraint("role IN ('admin', 'user', 'pending')", name="valid_role"),
-        CheckConstraint("auth_source IN ('local', 'totvs')", name="valid_auth_source"),
-        # Só usuários locais têm senha guardada aqui; a dos usuários do TOTVS fica no Datasul.
+        CheckConstraint("auth_source IN ('local', 'ad')", name="valid_auth_source"),
+        # Só usuários locais têm senha guardada aqui; a dos usuários do AD fica no AD.
         CheckConstraint(
             "(auth_source = 'local') = (password_hash IS NOT NULL)", name="password_matches_source"
         ),

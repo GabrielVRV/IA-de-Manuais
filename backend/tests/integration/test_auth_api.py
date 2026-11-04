@@ -78,26 +78,26 @@ class TestLogin:
         assert backend.sessions.sessions == {}
 
 
-class TestTotvsLogin:
+class TestDirectoryLogin:
     def test_first_login_waits_for_an_administrator(self, backend: FakeBackend) -> None:
-        backend.totvs.add("joao", "senha-do-totvs", name="João da Silva")
+        backend.directory.add("joao", "senha-de-rede", name="João da Silva")
         client = TestClient(backend.build_app())
 
         response = client.post(
-            f"{AUTH}/login", json={"username": "joao", "password": "senha-do-totvs"}
+            f"{AUTH}/login", json={"username": "joao", "password": "senha-de-rede"}
         )
 
         assert response.status_code == 200
-        assert (response.json()["role"], response.json()["auth_source"]) == ("pending", "totvs")
+        assert (response.json()["role"], response.json()["auth_source"]) == ("pending", "ad")
         assert client.get(f"{AUTH}/me").json()["display_name"] == "João da Silva"
         blocked = client.post("/api/v1/questions", json={"question": "Pressão?"})
         assert blocked.status_code == 403
         assert "ainda não foi liberado" in blocked.json()["detail"]
 
     def test_an_administrator_releases_the_access(self, backend: FakeBackend) -> None:
-        backend.totvs.add("joao", "senha-do-totvs")
+        backend.directory.add("joao", "senha-de-rede")
         joao = TestClient(backend.build_app())
-        login(joao, "joao", "senha-do-totvs")
+        login(joao, "joao", "senha-de-rede")
         admin = backend.client_logged_in_as("admin")
 
         pending = next(u for u in admin.get("/api/v1/users").json() if u["username"] == "joao")
@@ -107,9 +107,9 @@ class TestTotvsLogin:
         assert released.status_code == 200
         assert joao.post("/api/v1/questions", json={"question": "Pressão?"}).status_code == 200
 
-    def test_totvs_passwords_are_not_reset_here(self, backend: FakeBackend) -> None:
-        backend.totvs.add("joao", "senha-do-totvs")
-        login(TestClient(backend.build_app()), "joao", "senha-do-totvs")
+    def test_ad_passwords_are_not_reset_here(self, backend: FakeBackend) -> None:
+        backend.directory.add("joao", "senha-de-rede")
+        login(TestClient(backend.build_app()), "joao", "senha-de-rede")
         admin = backend.client_logged_in_as("admin")
         joao = next(u for u in admin.get("/api/v1/users").json() if u["username"] == "joao")
 
@@ -119,21 +119,21 @@ class TestTotvsLogin:
         )
 
         assert response.status_code == 422
-        assert "próprio TOTVS" in response.json()["detail"]
+        assert "troque-a no Windows" in response.json()["detail"]
 
-    def test_expired_totvs_password(self, backend: FakeBackend) -> None:
-        backend.totvs.add("joao", "senha-do-totvs")
-        backend.totvs.expired.add("joao")
+    def test_expired_ad_password(self, backend: FakeBackend) -> None:
+        backend.directory.add("joao", "senha-de-rede")
+        backend.directory.expired.add("joao")
 
         response = TestClient(backend.build_app()).post(
-            f"{AUTH}/login", json={"username": "joao", "password": "senha-do-totvs"}
+            f"{AUTH}/login", json={"username": "joao", "password": "senha-de-rede"}
         )
 
         assert response.status_code == 401
-        assert "Redefina-a no TOTVS" in response.json()["detail"]
+        assert "Troque-a no Windows" in response.json()["detail"]
 
-    def test_totvs_outage(self, backend: FakeBackend) -> None:
-        backend.totvs.error = ExternalServiceError("O TOTVS não respondeu")
+    def test_ad_outage(self, backend: FakeBackend) -> None:
+        backend.directory.error = ExternalServiceError("O AD não respondeu")
 
         response = TestClient(backend.build_app()).post(
             f"{AUTH}/login", json={"username": "joao", "password": "qualquer"}
@@ -141,6 +141,16 @@ class TestTotvsLogin:
 
         assert response.status_code == 503
         assert "qualquer" not in response.text
+
+    def test_blocked_network_account(self, backend: FakeBackend) -> None:
+        backend.directory.blocked.add("joao")
+
+        response = TestClient(backend.build_app()).post(
+            f"{AUTH}/login", json={"username": "joao", "password": "qualquer"}
+        )
+
+        assert response.status_code == 403
+        assert "conta de rede" in response.json()["detail"]
 
 
 class TestAccessControl:

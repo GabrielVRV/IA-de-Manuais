@@ -45,10 +45,10 @@ from manual_assistant.infrastructure.documents.pdf_parser import PdfiumDocumentP
 from manual_assistant.presentation.http.app import create_http_app
 from manual_assistant.presentation.http.dependencies import UseCases
 from tests.fakes import (
+    FakeDirectory,
     FakeEmbeddingProvider,
     FakeLanguageModel,
     FakeManualSource,
-    FakeTotvs,
     InMemoryConversationRepository,
     InMemoryFileStorage,
     InMemoryLoginAttemptRepository,
@@ -76,7 +76,7 @@ class FakeBackend:
     login_attempts: InMemoryLoginAttemptRepository = field(
         default_factory=InMemoryLoginAttemptRepository
     )
-    totvs: FakeTotvs = field(default_factory=FakeTotvs)
+    directory: FakeDirectory = field(default_factory=FakeDirectory)
     conversations: InMemoryConversationRepository = field(
         default_factory=InMemoryConversationRepository
     )
@@ -143,7 +143,7 @@ class FakeBackend:
                 attempts=self.login_attempts,
                 hasher=hasher,
                 sessions=sessions,
-                totvs=self.totvs,
+                directory=self.directory,
             ),
             resolve_session=ResolveSessionUseCase(users=self.users, sessions=sessions),
             logout=LogoutUseCase(sessions),

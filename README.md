@@ -54,7 +54,7 @@ configurável), e só os trechos relevantes dos manuais são enviados a cada per
   indexação em segundo plano.
 - 🔄 **Sincronização com a pasta da Engenharia** — os manuais são lidos da pasta oficial
   (somente leitura), mantendo o acervo atualizado.
-- 🔐 **Autenticação corporativa** — login com o usuário do TOTVS, liberação de acesso pelo
+- 🔐 **Autenticação corporativa** — login com o usuário de rede (AD), liberação de acesso pelo
   administrador, sessões no banco e cookies `HttpOnly`.
 - 🛠️ **Administração** — telas para gerenciar usuários e acompanhar o status dos manuais.
 - 🎨 **Marca configurável** — nome, logo e cores definidos por instalação, sem rebuild.
@@ -101,7 +101,7 @@ presentation / infrastructure  ──▶  application  ──▶  domain
 
 - **domain** — entidades e regras de negócio puras, sem frameworks.
 - **application** — casos de uso e as portas (interfaces) de que eles precisam.
-- **infrastructure** — adaptadores: banco, provedores de IA, leitura de PDF, TOTVS, armazenamento.
+- **infrastructure** — adaptadores: banco, provedores de IA, leitura de PDF, Active Directory, armazenamento.
 - **presentation** — API HTTP (rotas e schemas).
 
 A regra de dependência é verificada automaticamente pelo `import-linter`: um import na
@@ -152,7 +152,7 @@ direção errada quebra o CI. As decisões de arquitetura estão registradas com
 
 ```bash
 cp .env.example .env                  # defina DB_PASSWORD
-cp backend/.env.example backend/.env  # configurações da API (chaves de IA, TOTVS...)
+cp backend/.env.example backend/.env  # configurações da API (chaves de IA, AD...)
 docker compose up -d --build
 curl http://localhost:8084/api/v1/health
 ```
@@ -198,6 +198,7 @@ Todo push e pull request passa por pipelines no GitHub Actions:
 | 9a  | Usuários, login (cookie HttpOnly + Argon2) e proteção das rotas                      | ✅ |
 | 9b  | Telas de login, usuários e acompanhamento dos manuais                                | ✅ |
 | 9c  | Login com usuário do TOTVS, liberação pelo administrador e sessões no banco          | ✅ |
+| 9d  | Login com o usuário de rede (AD) no lugar do TOTVS                                   | ⏳ |
 | 10a | Sincronização com a pasta de manuais da Engenharia (`sync-manuals`)                  | ✅ |
 | 10b | Sincronização periódica na API e acompanhamento na tela de administração            | ⏳ |
 | 11  | Observabilidade: logs estruturados, custo de tokens, feedback 👍/👎 nas respostas     | ⏳ |

@@ -54,6 +54,10 @@ from manual_assistant.application.use_cases.sync_manuals import (
 )
 from manual_assistant.domain.conversation import RetentionPolicy
 from manual_assistant.domain.session import SessionPolicy
+from manual_assistant.infrastructure.active_directory.ldap_credential_verifier import (
+    ActiveDirectoryConfig,
+    LdapCredentialVerifier,
+)
 from manual_assistant.infrastructure.ai.factory import AiProviders, build_ai_providers
 from manual_assistant.infrastructure.documents.line_chunker import LineChunker
 from manual_assistant.infrastructure.documents.pdf_parser import PdfiumDocumentParser
@@ -81,9 +85,6 @@ from manual_assistant.infrastructure.security.argon2_hasher import Argon2Passwor
 from manual_assistant.infrastructure.settings import Settings
 from manual_assistant.infrastructure.source.folder_manual_source import FolderManualSource
 from manual_assistant.infrastructure.storage.local_file_storage import LocalFileStorage
-from manual_assistant.infrastructure.totvs.datasul_credential_verifier import (
-    DatasulCredentialVerifier,
-)
 from manual_assistant.presentation.http.app import create_http_app
 from manual_assistant.presentation.http.dependencies import UseCases
 
@@ -98,9 +99,9 @@ def create_app(
     *,
     ai_providers: AiProviders | None = None,
     password_hasher: PasswordHasher | None = None,
-    totvs: CredentialVerifier | None = None,
+    directory: CredentialVerifier | None = None,
 ) -> FastAPI:
-    """``ai_providers``, ``password_hasher`` e ``totvs`` permitem que os testes usem
+    """``ai_providers``, ``password_hasher`` e ``directory`` permitem que os testes usem
     versões rápidas ou simuladas."""
     # Sem argumentos, o pydantic-settings lê os valores obrigatórios do ambiente.
     settings = settings or Settings()
@@ -121,12 +122,8 @@ def create_app(
             max_age=timedelta(days=settings.auth_session_max_days),
         ),
     )
-    if totvs is None and settings.totvs_login_url:
-        totvs = DatasulCredentialVerifier(
-            settings.totvs_login_url, timeout_seconds=settings.totvs_timeout_seconds
-        )
-    if totvs is None:
-        logger.info("APP_TOTVS_LOGIN_URL vazia: só usuários locais conseguem entrar")
+    if directory is None:
+        directory = _build_directory(settings)
 
     register_manual = RegisterManualUseCase(
         repository, storage, max_bytes=settings.max_upload_bytes
@@ -189,7 +186,7 @@ def create_app(
             attempts=SqlAlchemyLoginAttemptRepository(session_factory),
             hasher=hasher,
             sessions=sessions,
-            totvs=totvs,
+            directory=directory,
             max_failed_attempts=settings.auth_max_failed_attempts,
             lockout=timedelta(minutes=settings.auth_lockout_minutes),
         ),
@@ -241,3 +238,28 @@ async def _purge_periodically(purge: PurgeIdleConversationsUseCase) -> None:
         except ExternalServiceError:
             logger.warning("Não foi possível apagar as conversas antigas", exc_info=True)
         await asyncio.sleep(CONVERSATION_PURGE_INTERVAL.total_seconds())
+
+
+def _build_directory(settings: Settings) -> CredentialVerifier | None:
+    """Login pelo AD (ADR 0011), ou None quando não configurado."""
+    if not settings.ad_server_urls or not settings.ad_domain or not settings.ad_base_dn:
+        logger.info("APP_AD_SERVER_URLS vazia: só usuários locais conseguem entrar")
+        return None
+    if not settings.ad_start_tls and any(
+        not url.lower().startswith("ldaps://") for url in settings.ad_server_urls
+    ):
+        logger.warning(
+            "Login pelo AD sem criptografia: as senhas de rede trafegam abertas. "
+            "Use ldaps:// ou APP_AD_START_TLS=true"
+        )
+    return LdapCredentialVerifier(
+        ActiveDirectoryConfig(
+            server_urls=settings.ad_server_urls,
+            domain=settings.ad_domain,
+            base_dn=settings.ad_base_dn,
+            required_group_dn=settings.ad_required_group_dn,
+            start_tls=settings.ad_start_tls,
+            ca_cert_file=settings.ad_ca_cert_file,
+            timeout_seconds=settings.ad_timeout_seconds,
+        )
+    )

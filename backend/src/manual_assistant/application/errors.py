@@ -33,10 +33,12 @@ class AccountLockedError(ApplicationError):
 
 
 class PasswordExpiredError(ApplicationError):
-    """Senha certa, mas vencida no TOTVS."""
+    """Senha certa, mas vencida (ou com troca obrigatória) no AD."""
 
     def __init__(self) -> None:
-        super().__init__("Sua senha do TOTVS venceu. Redefina-a no TOTVS e entre novamente.")
+        super().__init__(
+            "Sua senha de rede venceu. Troque-a no Windows (Ctrl+Alt+Del) e entre novamente."
+        )
 
 
 class NotAuthenticatedError(ApplicationError):
@@ -64,6 +66,24 @@ class AccountDisabledError(PermissionDeniedError):
 
     def __init__(self) -> None:
         super().__init__("Seu acesso a este sistema foi desativado. Fale com um administrador.")
+
+
+class DirectoryAccountBlockedError(PermissionDeniedError):
+    """A conta de rede está desativada, expirada ou bloqueada no próprio AD."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "Sua conta de rede está bloqueada ou desativada. Procure a TI para liberá-la."
+        )
+
+
+class DirectoryAccessDeniedError(PermissionDeniedError):
+    """Senha certa, mas o usuário não está no grupo do AD que libera este sistema."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "Seu usuário de rede não tem acesso a este sistema. Peça a liberação à TI."
+        )
 
 
 class ConversationNotFoundError(ApplicationError):

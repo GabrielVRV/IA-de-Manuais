@@ -91,8 +91,8 @@ export function UsersAdmin() {
         {pendingCount > 0 && (
           <p className={ui.alert} data-tone="warning" role="status">
             {pendingCount === 1
-              ? '1 usuário do TOTVS aguarda liberação.'
-              : `${String(pendingCount)} usuários do TOTVS aguardam liberação.`}{' '}
+              ? '1 usuário de rede aguarda liberação.'
+              : `${String(pendingCount)} usuários de rede aguardam liberação.`}{' '}
             Clique em <strong>Liberar</strong> ou escolha o perfil para dar acesso.
           </p>
         )}
@@ -164,7 +164,7 @@ export function UsersAdmin() {
                         {isMe && <span className={ui.muted}> (você)</span>}
                       </td>
                       <td>{user.username}</td>
-                      <td>{user.authSource === 'totvs' ? 'TOTVS' : 'Local'}</td>
+                      <td>{user.authSource === 'ad' ? 'Rede (AD)' : 'Local'}</td>
                       <td>
                         <select
                           className={ui.select}
@@ -290,8 +290,8 @@ function CreateUserForm({
     >
       <strong>Novo usuário local</strong>
       <span className={ui.hint}>
-        Usuários do TOTVS não precisam ser criados: eles aparecem aqui no primeiro login, aguardando
-        liberação. Crie aqui só quem não tem acesso ao TOTVS.
+        Usuários de rede (AD) não precisam ser criados: eles aparecem aqui no primeiro login,
+        aguardando liberação. Crie aqui só quem não tem usuário de rede.
       </span>
       <div className={ui.row}>
         <label className={cx(ui.field, ui.grow)}>

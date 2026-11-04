@@ -47,8 +47,8 @@ def make_user(
     return user
 
 
-def make_totvs_user(username: str = "joao", *, role: UserRole = UserRole.USER) -> User:
-    user = User.provision_from_totvs(
+def make_ad_user(username: str = "joao", *, role: UserRole = UserRole.USER) -> User:
+    user = User.provision_from_directory(
         username=username, display_name=username.title(), now=FIXED_NOW
     )
     user.role = role

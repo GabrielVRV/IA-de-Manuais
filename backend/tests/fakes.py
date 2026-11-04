@@ -228,12 +228,14 @@ class InMemoryLoginAttemptRepository:
 
 
 @dataclass
-class FakeTotvs:
-    """TOTVS simulado: logins e senhas cadastrados em ``accounts``."""
+class FakeDirectory:
+    """AD simulado: logins e senhas cadastrados em ``accounts``."""
 
     accounts: dict[str, str] = field(default_factory=dict)
     names: dict[str, str] = field(default_factory=dict)
     expired: set[str] = field(default_factory=set)
+    blocked: set[str] = field(default_factory=set)  # conta bloqueada/desativada no AD
+    outside_group: set[str] = field(default_factory=set)  # fora do grupo exigido
     error: Exception | None = None
     calls: list[str] = field(default_factory=list)
 
@@ -246,8 +248,12 @@ class FakeTotvs:
         self.calls.append(username)
         if self.error is not None:
             raise self.error
+        if username in self.blocked:
+            return CredentialCheck(CredentialStatus.BLOCKED)
         if self.accounts.get(username) != password:
             return CredentialCheck(CredentialStatus.INVALID)
+        if username in self.outside_group:
+            return CredentialCheck(CredentialStatus.NOT_ALLOWED)
         if username in self.expired:
             return CredentialCheck(CredentialStatus.EXPIRED)
         return CredentialCheck(CredentialStatus.VALID, display_name=self.names.get(username))

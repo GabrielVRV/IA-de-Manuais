@@ -112,7 +112,7 @@ class ResetUserPasswordUseCase:
         _require_admin(actor)
         user = await _get_or_raise(self._users, user_id)
         if not user.is_local:
-            raise InvalidValueError("A senha de usuários do TOTVS é trocada no próprio TOTVS")
+            raise InvalidValueError("A senha do AD é a senha de rede: troque-a no Windows")
         validate_password(temporary_password, username=user.username)
         user.reset_password(self._hasher.hash(temporary_password))
         await self._users.save(user)
@@ -151,25 +151,37 @@ class UpdateUserUseCase:
         return user
 
 
-class UseTotvsLoginUseCase:
-    """Passa um usuário local a entrar com a senha do TOTVS, mantendo o perfil.
+class UseDirectoryLoginUseCase:
+    """Passa um usuário a entrar com a senha do AD, mantendo o perfil e o histórico.
 
+    Serve para usuários locais e para quem vinha do TOTVS com um login diferente do de rede.
     Só pelo terminal do servidor: quem tem acesso a ele já é de confiança.
     """
 
     def __init__(self, users: UserRepository) -> None:
         self._users = users
 
-    async def execute_as_system(self, *, username: str) -> User:
+    async def execute_as_system(self, *, username: str, ad_login: str | None = None) -> User:
         """
+        Args:
+            ad_login: o login de rede, quando é diferente de ``username``.
+
         Raises:
             UserNotFoundError: login inexistente.
+            UserAlreadyExistsError: já existe outro usuário com o login de rede.
         """
         normalized = normalize_username(username)
         user = await self._users.get_by_username(normalized)
         if user is None:
             raise UserNotFoundError(normalized)
-        user.use_totvs_login()
+        if ad_login is not None:
+            new_login = normalize_username(ad_login)
+            other = await self._users.get_by_username(new_login)
+            if other is not None and other != user:
+                # Ex.: a pessoa já entrou pelo AD e ganhou um cadastro novo. Desative-o
+                # antes, ou junte os dois à mão.
+                raise UserAlreadyExistsError(new_login)
+        user.use_directory_login(ad_login)
         await self._users.save(user)
         return user
 

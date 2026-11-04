@@ -11,7 +11,7 @@ from manual_assistant.domain.user import (
     validate_password,
 )
 from tests.factories import FIXED_NOW
-from tests.security import make_totvs_user, make_user
+from tests.security import make_ad_user, make_user
 
 
 def register(username: str = "maria.silva", display_name: str = "Maria") -> User:
@@ -68,9 +68,9 @@ def test_logins_are_case_insensitive() -> None:
     assert normalize_username(" GaBriel ") == "gabriel"
 
 
-class TestTotvsProvisioning:
+class TestDirectoryProvisioning:
     def test_enters_awaiting_approval_without_a_password(self) -> None:
-        user = User.provision_from_totvs(
+        user = User.provision_from_directory(
             username=" JOAO.Silva ", display_name="  João da Silva ", now=FIXED_NOW
         )
 
@@ -80,20 +80,20 @@ class TestTotvsProvisioning:
         assert user.password_hash is None
         assert not user.must_change_password
 
-    def test_falls_back_to_the_login_when_the_totvs_has_no_name(self) -> None:
-        user = User.provision_from_totvs(username="joao", display_name="  ", now=FIXED_NOW)
+    def test_falls_back_to_the_login_when_the_ad_has_no_name(self) -> None:
+        user = User.provision_from_directory(username="joao", display_name="  ", now=FIXED_NOW)
 
         assert user.display_name == "joao"
 
-    def test_long_totvs_names_are_cut_to_fit(self) -> None:
-        user = make_totvs_user()
+    def test_long_ad_names_are_cut_to_fit(self) -> None:
+        user = make_ad_user()
 
         user.sync_display_name("x" * 150)
 
         assert len(user.display_name) == 100
 
     @pytest.mark.parametrize(
-        ("source", "password_hash"), [(AuthSource.LOCAL, None), (AuthSource.TOTVS, "hash")]
+        ("source", "password_hash"), [(AuthSource.LOCAL, None), (AuthSource.AD, "hash")]
     )
     def test_only_local_users_store_a_password(
         self, source: AuthSource, password_hash: str | None
@@ -109,14 +109,25 @@ class TestTotvsProvisioning:
                 auth_source=source,
             )
 
-    def test_a_local_user_can_switch_to_the_totvs_keeping_the_role(self) -> None:
+    def test_a_local_user_can_switch_to_the_ad_keeping_the_role(self) -> None:
         user = make_user(role=UserRole.ADMIN, must_change_password=True)
 
-        user.use_totvs_login()
+        user.use_directory_login()
 
-        assert (user.auth_source, user.password_hash) == (AuthSource.TOTVS, None)
+        assert (user.auth_source, user.password_hash) == (AuthSource.AD, None)
         assert user.is_admin
         assert not user.must_change_password
+
+    def test_switching_to_the_ad_can_take_the_network_login(self) -> None:
+        user = make_ad_user("gviaro")
+
+        user.use_directory_login(" Gabriel.Viaro ")
+
+        assert user.username == "gabriel.viaro"
+
+    def test_the_network_login_must_be_valid(self) -> None:
+        with pytest.raises(InvalidValueError, match="login"):
+            make_ad_user("gviaro").use_directory_login("gabriel viaro")
 
 
 class TestPasswordLifecycle:
@@ -129,9 +140,9 @@ class TestPasswordLifecycle:
         assert user.must_change_password
 
     @pytest.mark.parametrize("change", ["reset_password", "change_password"])
-    def test_totvs_passwords_are_not_managed_here(self, change: str) -> None:
-        with pytest.raises(InvalidValueError, match="próprio TOTVS"):
-            getattr(make_totvs_user(), change)("hash")
+    def test_ad_passwords_are_not_managed_here(self, change: str) -> None:
+        with pytest.raises(InvalidValueError, match="troque-a no Windows"):
+            getattr(make_ad_user(), change)("hash")
 
     def test_change_password_clears_the_pending_change(self) -> None:
         user = make_user(must_change_password=True)

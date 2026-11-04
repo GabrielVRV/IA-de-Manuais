@@ -38,3 +38,9 @@ manuais-para-importar/
 Thumbs.db
 .DS_Store
 .claude/
+
+# Certificados internos (CA do AD): ficam só no servidor
+backend/certs/
+
+# Ajustes do docker-compose só deste servidor (ex.: IP do AD): não vão para o git
+docker-compose.override.yml

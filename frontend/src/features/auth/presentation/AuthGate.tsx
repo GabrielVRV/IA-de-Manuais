@@ -41,7 +41,7 @@ export function AuthGate({ children }: { readonly children: ReactNode }) {
   return children
 }
 
-/** Primeiro acesso pelo TOTVS: o usuário já está cadastrado e aguarda um administrador. */
+/** Primeiro acesso pelo AD: o usuário já está cadastrado e aguarda um administrador. */
 function PendingAccess({ user }: { readonly user: SessionUser }) {
   const { refresh, logout } = useSession()
   const [checking, setChecking] = useState(false)

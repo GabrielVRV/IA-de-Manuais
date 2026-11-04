@@ -13,7 +13,7 @@ export interface ManagedUser {
   readonly lastLoginAt: Date | null
 }
 
-/** Usuário local. Os do TOTVS são cadastrados sozinhos no primeiro login. */
+/** Usuário local. Os do AD são cadastrados sozinhos no primeiro login. */
 export interface NewUser {
   readonly username: string
   readonly displayName: string

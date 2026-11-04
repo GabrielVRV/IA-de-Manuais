@@ -1,6 +1,7 @@
 # ADR 0008 — Login pelo TOTVS e sessões no banco
 
-- **Status:** aceito
+- **Status:** aceito; o login pelo TOTVS (item 1) foi substituído pelo AD na
+  [ADR 0011](0011-login-pelo-active-directory.md)
 - **Data:** 2026-10-09
 - **Substitui:** os itens 1, 3 (para usuários do TOTVS), 4 e 6 (bloqueio) da
   [ADR 0007](0007-autenticacao-e-controle-de-acesso.md)

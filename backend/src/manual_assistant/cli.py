@@ -7,6 +7,10 @@ No Docker (na raiz do projeto):
     docker compose exec api python -m manual_assistant.cli create-admin \
         --username gabriel --name "Gabriel"
 
+Passar alguém a entrar com o usuário de rede (AD), mantendo perfil e histórico. Use
+--ad-login quando o login de rede for diferente do atual (ex.: vinha do TOTVS):
+    python -m manual_assistant.cli use-ad --username gviaro --ad-login gabriel.viaro
+
 Sincronizar com a pasta de manuais da Engenharia (a pasta só é lida, nunca alterada):
     python -m manual_assistant.cli sync-manuals --dry-run      # só mostra o plano
     python -m manual_assistant.cli sync-manuals --limit 3      # indexa no máximo 3
@@ -25,7 +29,7 @@ from manual_assistant.application.use_cases.delete_manual import DeleteManualUse
 from manual_assistant.application.use_cases.index_manual import IndexManualUseCase
 from manual_assistant.application.use_cases.manage_users import (
     CreateUserUseCase,
-    UseTotvsLoginUseCase,
+    UseDirectoryLoginUseCase,
 )
 from manual_assistant.application.use_cases.register_manual import RegisterManualUseCase
 from manual_assistant.application.use_cases.sync_manuals import (
@@ -78,12 +82,14 @@ async def create_admin(settings: Settings, username: str, display_name: str, pas
         await engine.dispose()
 
 
-async def use_totvs(settings: Settings, username: str) -> None:
+async def use_ad(settings: Settings, username: str, ad_login: str | None) -> None:
     engine = create_database_engine(settings.database_url)
     try:
         users = SqlAlchemyUserRepository(create_session_factory(engine))
-        user = await UseTotvsLoginUseCase(users).execute_as_system(username=username)
-        print(f"'{user.username}' agora entra com a senha do TOTVS.")
+        user = await UseDirectoryLoginUseCase(users).execute_as_system(
+            username=username, ad_login=ad_login
+        )
+        print(f"'{user.username}' agora entra com a senha de rede (AD).")
     finally:
         await engine.dispose()
 
@@ -183,10 +189,11 @@ def main(argv: list[str] | None = None) -> int:
     admin = commands.add_parser("create-admin", help="Cria um usuário administrador")
     admin.add_argument("--username", required=True)
     admin.add_argument("--name", required=True, help="Nome de exibição")
-    totvs = commands.add_parser(
-        "use-totvs", help="Passa um usuário local a entrar com a senha do TOTVS"
+    ad = commands.add_parser(
+        "use-ad", help="Passa um usuário a entrar com a senha de rede (AD), mantendo o perfil"
     )
-    totvs.add_argument("--username", required=True)
+    ad.add_argument("--username", required=True, help="Login atual neste sistema")
+    ad.add_argument("--ad-login", help="Login de rede, se for diferente do atual")
     sync = commands.add_parser(
         "sync-manuals", help="Sincroniza com a pasta de manuais da Engenharia (só leitura)"
     )
@@ -213,8 +220,8 @@ def main(argv: list[str] | None = None) -> int:
                     yes=args.yes,
                 )
             )
-        if args.command == "use-totvs":
-            asyncio.run(use_totvs(Settings(), args.username))
+        if args.command == "use-ad":
+            asyncio.run(use_ad(Settings(), args.username, args.ad_login))
         else:
             asyncio.run(create_admin(Settings(), args.username, args.name, _ask_password()))
     except (InvalidValueError, ApplicationError) as error:

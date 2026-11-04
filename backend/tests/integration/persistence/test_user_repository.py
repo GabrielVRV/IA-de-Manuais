@@ -5,12 +5,12 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from manual_assistant.application.errors import UserAlreadyExistsError
-from manual_assistant.cli import create_admin, use_totvs
+from manual_assistant.cli import create_admin, use_ad
 from manual_assistant.domain.user import AuthSource, UserId, UserRole
 from manual_assistant.infrastructure.persistence.user_repository import SqlAlchemyUserRepository
 from manual_assistant.infrastructure.settings import Settings
 from tests.factories import FIXED_NOW
-from tests.security import fast_hasher, make_totvs_user, make_user
+from tests.security import fast_hasher, make_ad_user, make_user
 
 pytestmark = [pytest.mark.db, pytest.mark.anyio]
 
@@ -51,14 +51,14 @@ async def test_saves_and_restores_every_field(repository: SqlAlchemyUserReposito
     )
 
 
-async def test_saves_totvs_users_awaiting_approval(repository: SqlAlchemyUserRepository) -> None:
-    await repository.save(make_totvs_user("joao", role=UserRole.PENDING))
+async def test_saves_ad_users_awaiting_approval(repository: SqlAlchemyUserRepository) -> None:
+    await repository.save(make_ad_user("joao", role=UserRole.PENDING))
 
     restored = await repository.get_by_username("joao")
 
     assert restored is not None
     assert (restored.auth_source, restored.role, restored.password_hash) == (
-        AuthSource.TOTVS,
+        AuthSource.AD,
         UserRole.PENDING,
         None,
     )
@@ -107,17 +107,17 @@ async def test_cli_creates_an_admin_with_a_final_password(
     assert fast_hasher().verify("senha-definitiva", admin.password_hash)
 
 
-async def test_cli_switches_a_user_to_the_totvs(
+async def test_cli_switches_a_user_to_the_ad(
     postgres_settings: Settings, repository: SqlAlchemyUserRepository
 ) -> None:
     await repository.save(make_user("ana", role=UserRole.ADMIN))
 
-    await use_totvs(postgres_settings, "ana")
+    await use_ad(postgres_settings, "ana", None)
 
     ana = await repository.get_by_username("ana")
     assert ana is not None
     assert (ana.auth_source, ana.password_hash, ana.role) == (
-        AuthSource.TOTVS,
+        AuthSource.AD,
         None,
         UserRole.ADMIN,
     )

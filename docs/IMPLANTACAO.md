@@ -77,10 +77,31 @@ Preencha **obrigatoriamente**:
 | -------- | ------------- |
 | `APP_GEMINI_API_KEY` | A chave da API do Gemini |
 | `APP_CORS_ORIGINS` | O endereço da **tela** como aparece no navegador. Ex.: `http://IP-DO-SERVIDOR:8084`. Como a tela chama a API pelo mesmo endereço, quase não é usado, mas deixe certo |
-| `APP_TOTVS_LOGIN_URL` | O endereço da rota `validarLogin` do Datasul, para os usuários entrarem com a senha do TOTVS. Ex.: `http://IP-DO-DATASUL:PORTA/api/sfc/v1/api_valida_login/validarLogin/`. Vazio = só entram usuários criados aqui |
+| `APP_AD_SERVER_URLS` | O controlador de domínio, para os usuários entrarem com o usuário de rede. Ex.: `ldaps://dc01.empresa.local` (vários: separados por vírgula). Vazio = só entram usuários criados aqui |
+| `APP_AD_DOMAIN` | O domínio. Ex.: `empresa.local` (o login vira `fulano@empresa.local`) |
+| `APP_AD_BASE_DN` | Onde procurar os usuários. Ex.: `DC=empresa,DC=local` (é o "BaseDN" do GLPI) |
+
+Opcionais: `APP_AD_REQUIRED_GROUP_DN` (só quem está nesse grupo entra), `APP_AD_START_TLS`
+(para `ldap://`) e `APP_AD_CA_CERT_FILE` (certificado da CA interna, ver abaixo). Os
+valores podem ser copiados da configuração LDAP do GLPI. O backend **não precisa** da
+conta de serviço do GLPI: ele autentica como o próprio usuário.
+
+> **Certificado do AD:** com `ldaps://`, a API confere o certificado do controlador. Se ele
+> foi emitido por uma CA interna, peça à TI o certificado da CA em PEM (`.pem` ou `.crt`
+> em Base64) e salve-o em `backend\certs\ca-ad.pem`. O `docker-compose.yml` já monta essa
+> pasta no container e aponta `APP_AD_CA_CERT_FILE` para ela. A pasta fica fora do git.
+> Num computador do domínio, a CA costuma estar no Windows e dá para exportá-la assim:
+>
+> ```powershell
+> $c = Get-ChildItem Cert:\LocalMachine\Root | Where-Object Subject -like '*NOME-DA-CA*'
+> "-----BEGIN CERTIFICATE-----`n$([Convert]::ToBase64String($c.RawData, 'InsertLineBreaks'))`n-----END CERTIFICATE-----" | Set-Content -Encoding ascii backend\certs\ca-ad.pem
+> ```
+>
+> Use em `APP_AD_SERVER_URLS` o **nome** do servidor que está no certificado (ex.:
+> `ldaps://dc01.empresa.local`), não o IP: com o IP, o certificado não confere.
 
 > O `backend\.env` nunca vai para o GitHub (está no `.gitignore`): é nele que ficam a chave
-> do Gemini e o endereço do Datasul.
+> do Gemini e os dados do AD.
 
 > As variáveis `APP_DB_*` desse arquivo só valem quando a API roda fora do Docker. Dentro
 > do Docker, elas vêm automaticamente do `.env` da raiz.
@@ -118,14 +139,23 @@ docker compose exec api python -m manual_assistant.cli create-admin --username s
 ```
 
 O comando pede a senha **duas vezes**, sem mostrá-la na tela. Ele é um usuário **local**:
-entra com essa senha mesmo se o Datasul estiver fora do ar, então guarde-o como acesso de
-emergência. Os colegas entram com o usuário do TOTVS (passo 6).
+entra com essa senha mesmo se o AD estiver fora do ar, então guarde-o como acesso de
+emergência. Os colegas entram com o usuário de rede (passo 6).
 
-Se quiser que o seu próprio login passe a usar a senha do TOTVS, crie antes um segundo
+Se quiser que o seu próprio login passe a usar a senha de rede, crie antes um segundo
 administrador local de emergência e então rode, mantendo o perfil de administrador:
 
 ```powershell
-docker compose exec api python -m manual_assistant.cli use-totvs --username seu.login
+docker compose exec api python -m manual_assistant.cli use-ad --username seu.login
+```
+
+**Vindo do TOTVS:** quem entrava pelo TOTVS passa a entrar pelo AD automaticamente, com o
+mesmo login, perfil e histórico. Se o login de rede for diferente (ex.: `gviaro` no
+TOTVS e `gabriel.viaro` na rede), ajuste **antes** de a pessoa entrar, para não surgir um
+cadastro novo:
+
+```powershell
+docker compose exec api python -m manual_assistant.cli use-ad --username gviaro --ad-login gabriel.viaro
 ```
 
 ---
@@ -151,18 +181,18 @@ Para trocar a porta, defina `WEB_PUBLISHED_PORT` no `.env` da raiz e rode
 2. **Manuais:** arraste os PDFs para a área tracejada, ou clique em **Escolher PDFs**. Cada
    manual aparece como *Na fila* → *Indexando…* → **Disponível**. A tela se atualiza sozinha.
 3. **Chat:** faça perguntas. As fontes no fim de cada resposta abrem o PDF na página citada.
-4. **Usuários:** os colegas entram com o **usuário e a senha do TOTVS**. No primeiro
+4. **Usuários:** os colegas entram com o **usuário e a senha de rede** (os do Windows). No primeiro
    acesso, eles veem uma tela "Aguardando liberação" e aparecem no topo da aba
    **Usuários**, com um aviso. Clique em **Liberar** (ou escolha o perfil):
    - **Usuário:** só usa o chat.
    - **Administrador:** também gerencia manuais e usuários.
 
-   Para recusar alguém, clique em **Desativar**. Quem não tem TOTVS pode ser criado na
+   Para recusar alguém, clique em **Desativar**. Quem não tem usuário de rede pode ser criado na
    própria tela, como **usuário local**: uma **senha provisória** é gerada e mostrada
    **uma única vez**, e a pessoa a troca no primeiro acesso.
 
    A sessão fica aberta: só pede login de novo depois de **7 dias sem uso**, ou **30 dias**
-   depois do último login. Senha trocada ou usuário bloqueado no TOTVS só valem no próximo
+   depois do último login. Senha trocada ou usuário bloqueado no AD só valem no próximo
    login. Para cortar o acesso na hora, desative o usuário aqui.
 
 ### Roteiro sugerido para a demonstração (defender a chave paga)
@@ -242,8 +272,8 @@ reindexado, e o manual que saiu da pasta é removido do sistema.
 | Erro de porta `8000` em uso | Outro serviço usando a porta | No `docker-compose.yml`, troque `"8000:8000"` por `"8001:8000"` (a tela não usa essa porta) |
 | Build falha no `npm ci` | Sem acesso ao npm (proxy corporativo) | Configure o proxy no Docker, como no item acima |
 | API não fica *healthy* | Variável obrigatória faltando | `docker compose logs api`: procure por `APP_GEMINI_API_KEY` ou `DB_PASSWORD` |
-| Login do TOTVS: **"temporariamente indisponível"** | Datasul fora do ar, URL errada ou o container não alcança o IP do Datasul | Confira `APP_TOTVS_LOGIN_URL`; `docker compose logs api` mostra o erro (ex.: `HTTP 404`, `não respondeu`, `Campos: ...`). Teste de dentro do container: `docker compose exec api python -c "import httpx; print(httpx.post('<url>').status_code)"` (401 = alcançou o Datasul) |
-| Usuário do TOTVS: **"Usuário ou senha inválidos"** com a senha certa | Datasul não aceita o Basic Auth de usuários comuns | Ver a seção "A confirmar no primeiro deploy" do README da API de login no Progress |
+| Login de rede: **"temporariamente indisponível"** | AD fora do ar, endereço errado, porta 636 bloqueada ou certificado não confiável | `docker compose logs api` mostra o motivo (ex.: `exige conexão segura`, `certificate verify failed`). Teste de dentro do container: `docker compose exec api python -c "import socket; socket.create_connection(('dc01.empresa.local', 636), 5); print('ok')"`. Certificado: veja `APP_AD_CA_CERT_FILE` no passo 2 |
+| Usuário de rede: **"não tem acesso a este sistema"** | Fora do grupo de `APP_AD_REQUIRED_GROUP_DN`, ou fora de `APP_AD_BASE_DN` | Peça à TI para incluir a pessoa no grupo; confira o DN do grupo e a base |
 | Tela mostra **"Offline"** no cabeçalho | API fora do ar | Teste o passo 3 e veja `docker compose logs api` |
 | Entra e **é deslogado em seguida** | Tela aberta por um endereço que não passa pelo container `web` (ex.: XAMPP em outro servidor) | Acesse a tela pela porta 8084 do servidor da API |
 | Manual **"Falhou: serviço externo"** | Limite ou cota do plano gratuito do Gemini | Aguarde a cota renovar (diária) ou use a chave paga, e clique em **Reprocessar** |
@@ -257,9 +287,10 @@ reindexado, e o manual que saiu da pasta é removido do sistema.
 
 - **Chave paga:** no plano gratuito do Gemini, o Google pode usar o conteúdo enviado para
   treinar modelos. **Não use manuais confidenciais com a chave gratuita.**
-- **HTTPS:** sem ele, as senhas (inclusive as do TOTVS) trafegam abertas na rede interna,
-  como já acontece no acesso ao Datasul por HTTP. Quando houver um certificado interno,
-  defina `APP_AUTH_COOKIE_SECURE=true`. Ver o
-  [ADR 0008](adr/0008-login-pelo-totvs-e-sessoes-no-banco.md).
+- **HTTPS:** sem ele, as senhas de rede trafegam abertas entre o navegador e a API. É a
+  mesma senha do Windows e do e-mail, então priorize um certificado interno e defina
+  `APP_AUTH_COOKIE_SECURE=true`. Entre a API e o AD, use sempre `ldaps://`. Ver as ADRs
+  [0008](adr/0008-login-pelo-totvs-e-sessoes-no-banco.md) e
+  [0011](adr/0011-login-pelo-active-directory.md).
 - **Backup:** faça backup regular do volume do banco (`manual-assistant_db-data`) e do
   volume dos PDFs (`manual-assistant_manual-files`).

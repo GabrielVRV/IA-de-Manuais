@@ -88,7 +88,7 @@ function HeaderActions() {
           {user.displayName}
         </NavLink>
       ) : (
-        <span className={styles.userName} title="Usuário do TOTVS">
+        <span className={styles.userName} title="Usuário de rede (AD)">
           {user.displayName}
         </span>
       )}

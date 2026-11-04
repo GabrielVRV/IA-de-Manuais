@@ -78,7 +78,7 @@ export function LoginPage({ notice }: { readonly notice?: string | undefined }) 
     mood === 'watching' && focus === 'username'
       ? username.trim()
         ? `Oi, ${username.trim()}!`
-        : 'Qual é o seu usuário do TOTVS?'
+        : 'Qual é o seu usuário de rede?'
       : BOT_LINES[mood]
 
   const trackCapsLock = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -111,7 +111,7 @@ export function LoginPage({ notice }: { readonly notice?: string | undefined }) 
             </li>
             <li>
               <FeatureIcon d="M4.5 7.5V5.5a3.5 3.5 0 0 1 7 0v2M3 7.5h10v7H3zM8 10.5v1.5" />
-              Acesso com seu login TOTVS
+              Acesso com seu usuário de rede
             </li>
           </ul>
         </section>
@@ -134,7 +134,7 @@ export function LoginPage({ notice }: { readonly notice?: string | undefined }) 
           <div className={styles.cardHeader}>
             <h2 className={styles.title}>Acesse sua conta</h2>
             <p className={styles.subtitle}>
-              Entre com seu usuário e senha do TOTVS para consultar os manuais.
+              Entre com o mesmo usuário e senha do Windows para consultar os manuais.
             </p>
           </div>
 
@@ -257,8 +257,8 @@ export function LoginPage({ notice }: { readonly notice?: string | undefined }) 
           </button>
 
           <p className={styles.hint}>
-            Esqueceu a senha? Redefina-a no TOTVS. Se o seu usuário foi criado aqui, peça a um
-            administrador.
+            Esqueceu a senha? É a mesma do Windows: peça à TI. Se o seu usuário foi criado aqui,
+            peça a um administrador.
           </p>
         </form>
       </div>

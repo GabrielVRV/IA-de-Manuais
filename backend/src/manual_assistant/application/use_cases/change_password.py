@@ -13,7 +13,7 @@ class ChangePasswordUseCase:
 
     async def execute(self, user: User, *, current_password: str, new_password: str) -> None:
         if user.password_hash is None:
-            raise InvalidValueError("A senha de usuários do TOTVS é trocada no próprio TOTVS")
+            raise InvalidValueError("A senha do AD é a senha de rede: troque-a no Windows")
         if not self._hasher.verify(current_password, user.password_hash):
             raise InvalidValueError("A senha atual está incorreta")
         if new_password == current_password:

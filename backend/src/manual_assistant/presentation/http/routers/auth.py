@@ -29,7 +29,7 @@ UNAUTHORIZED: dict[int | str, dict[str, Any]] = {
         status.HTTP_429_TOO_MANY_REQUESTS: {"model": ErrorResponse},
         status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ErrorResponse},
     },
-    summary="Entra no sistema (usuário local ou do TOTVS); a sessão fica num cookie HttpOnly",
+    summary="Entra no sistema (usuário local ou do AD); a sessão fica num cookie HttpOnly",
 )
 async def login(
     credentials: LoginRequest, request: Request, response: Response, use_cases: UseCasesDep

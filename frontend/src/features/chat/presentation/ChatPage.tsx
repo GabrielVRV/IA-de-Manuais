@@ -60,7 +60,7 @@ export function ChatPage({ userName }: { readonly userName: string }) {
   )
 }
 
-/** "GABRIEL VIARO" (como vem do TOTVS) vira "Gabriel" na saudação. */
+/** "GABRIEL VIARO" (como pode vir do AD) vira "Gabriel" na saudação. */
 function firstName(name: string): string {
   const first = name.trim().split(/\s+/)[0] ?? ''
   if (first !== first.toUpperCase()) return first

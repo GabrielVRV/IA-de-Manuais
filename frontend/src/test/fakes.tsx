@@ -45,14 +45,14 @@ export const REGULAR: SessionUser = {
   role: 'user',
 }
 
-/** Primeiro login pelo TOTVS: ainda aguarda um administrador liberar o acesso. */
+/** Primeiro login pelo AD: ainda aguarda um administrador liberar o acesso. */
 export const PENDING: SessionUser = {
   ...REGULAR,
   id: 'u-pedro',
   username: 'pedro',
-  displayName: 'Pedro do TOTVS',
+  displayName: 'Pedro da Rede',
   role: 'pending',
-  authSource: 'totvs',
+  authSource: 'ad',
 }
 
 export class FakeAuthGateway implements AuthGateway {

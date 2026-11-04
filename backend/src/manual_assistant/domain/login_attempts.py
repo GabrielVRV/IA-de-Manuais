@@ -6,8 +6,8 @@ from datetime import datetime, timedelta
 class LoginAttempts:
     """Erros de senha seguidos de um login digitado, existindo ele no cadastro ou não.
 
-    Fica fora do usuário porque quem ainda não entrou pelo TOTVS não tem cadastro, e
-    precisa ser barrado antes de chegar ao Datasul.
+    Fica fora do usuário porque quem ainda não entrou pelo AD não tem cadastro, e
+    precisa ser barrado antes de chegar ao AD.
     """
 
     username: str

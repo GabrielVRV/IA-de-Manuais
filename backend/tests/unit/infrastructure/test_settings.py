@@ -11,7 +11,10 @@ def isolated_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "APP_CORS_ORIGINS",
         "APP_DB_HOST",
         "APP_DB_PASSWORD",
-        "APP_TOTVS_LOGIN_URL",
+        "APP_AD_SERVER_URLS",
+        "APP_AD_DOMAIN",
+        "APP_AD_BASE_DN",
+        "APP_AD_REQUIRED_GROUP_DN",
         "APP_SYNC_SOURCE_DIR",
         "APP_SYNC_LANGUAGES",
     ):
@@ -32,7 +35,7 @@ def test_uses_development_defaults() -> None:
     assert settings.environment == "development"
     assert settings.cors_origins == ["http://localhost:5173"]
     assert (settings.auth_session_idle_days, settings.auth_session_max_days) == (7, 30)
-    assert settings.totvs_login_url is None
+    assert settings.ad_server_urls == []
 
 
 def test_sync_is_off_by_default_and_imports_only_portuguese() -> None:
@@ -48,10 +51,30 @@ def test_reads_sync_languages_as_comma_separated_list(monkeypatch: pytest.Monkey
     assert Settings(_env_file=None, db_password="x").sync_languages == ["P", "E"]
 
 
-def test_a_blank_totvs_url_turns_the_totvs_login_off(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("APP_TOTVS_LOGIN_URL", "  ")
+def test_blank_ad_servers_turn_the_ad_login_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_AD_SERVER_URLS", " , ")
 
-    assert Settings(_env_file=None, db_password="x").totvs_login_url is None
+    assert Settings(_env_file=None, db_password="x").ad_server_urls == []
+
+
+def test_reads_the_ad_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_AD_SERVER_URLS", "ldaps://dc01.empresa.local, ldaps://dc02.empresa.local")
+    monkeypatch.setenv("APP_AD_DOMAIN", "empresa.local")
+    monkeypatch.setenv("APP_AD_BASE_DN", "DC=empresa,DC=local")
+    monkeypatch.setenv("APP_AD_REQUIRED_GROUP_DN", "  ")
+
+    settings = Settings(_env_file=None, db_password="x")
+
+    assert settings.ad_server_urls == ["ldaps://dc01.empresa.local", "ldaps://dc02.empresa.local"]
+    assert (settings.ad_domain, settings.ad_base_dn) == ("empresa.local", "DC=empresa,DC=local")
+    assert settings.ad_required_group_dn is None
+
+
+def test_ad_servers_need_the_domain_and_the_base_dn(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_AD_SERVER_URLS", "ldaps://dc01.empresa.local")
+
+    with pytest.raises(ValidationError, match="APP_AD_DOMAIN"):
+        Settings(_env_file=None, db_password="x")
 
 
 def test_idle_timeout_cannot_exceed_the_maximum_age() -> None:

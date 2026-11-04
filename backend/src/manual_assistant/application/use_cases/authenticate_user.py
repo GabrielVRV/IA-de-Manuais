@@ -6,6 +6,8 @@ from manual_assistant.application.clock import Clock, utc_now
 from manual_assistant.application.errors import (
     AccountDisabledError,
     AccountLockedError,
+    DirectoryAccessDeniedError,
+    DirectoryAccountBlockedError,
     InvalidCredentialsError,
     PasswordExpiredError,
     PermissionDeniedError,
@@ -22,7 +24,7 @@ from manual_assistant.application.ports.security import (
 from manual_assistant.application.ports.user_repository import UserRepository
 from manual_assistant.application.sessions import SessionManager
 from manual_assistant.domain.login_attempts import LoginAttempts
-from manual_assistant.domain.user import User, is_valid_username, normalize_username
+from manual_assistant.domain.user import User, is_valid_username, normalize_typed_login
 
 DEFAULT_MAX_FAILED_ATTEMPTS = 5
 DEFAULT_LOCKOUT = timedelta(minutes=15)
@@ -37,14 +39,14 @@ class AuthenticatedSession:
 @dataclass(frozen=True, slots=True)
 class _Verification:
     valid: bool
-    # Nome vindo do TOTVS, quando a senha foi conferida lá.
-    totvs_display_name: str | None = None
+    # Nome vindo do AD, quando a senha foi conferida lá.
+    directory_display_name: str | None = None
 
 
 class AuthenticateUserUseCase:
-    """Login. Usuários locais têm a senha conferida aqui; os demais, no TOTVS.
+    """Login. Usuários locais têm a senha conferida aqui; os demais, no AD.
 
-    Um login do TOTVS que ainda não existe aqui é cadastrado como "aguardando liberação".
+    Um login do AD que ainda não existe aqui é cadastrado como "aguardando liberação".
     """
 
     def __init__(
@@ -54,7 +56,7 @@ class AuthenticateUserUseCase:
         attempts: LoginAttemptRepository,
         hasher: PasswordHasher,
         sessions: SessionManager,
-        totvs: CredentialVerifier | None = None,
+        directory: CredentialVerifier | None = None,
         max_failed_attempts: int = DEFAULT_MAX_FAILED_ATTEMPTS,
         lockout: timedelta = DEFAULT_LOCKOUT,
         clock: Clock = utc_now,
@@ -63,7 +65,7 @@ class AuthenticateUserUseCase:
         self._attempts = attempts
         self._hasher = hasher
         self._sessions = sessions
-        self._totvs = totvs
+        self._directory = directory
         self._max_failed_attempts = max_failed_attempts
         self._lockout = lockout
         self._clock = clock
@@ -76,14 +78,16 @@ class AuthenticateUserUseCase:
         Raises:
             InvalidCredentialsError: login inexistente ou senha errada.
             AccountLockedError: muitas tentativas erradas seguidas.
-            PasswordExpiredError: senha certa, mas vencida no TOTVS.
-            AccountDisabledError: senha certa, mas usuário desativado.
-            ExternalServiceError: TOTVS fora do ar (não conta como tentativa errada).
+            PasswordExpiredError: senha certa, mas vencida no AD.
+            DirectoryAccountBlockedError: conta de rede bloqueada ou desativada no AD.
+            DirectoryAccessDeniedError: senha certa, mas fora do grupo do AD exigido.
+            AccountDisabledError: senha certa, mas usuário desativado aqui.
+            ExternalServiceError: AD fora do ar (não conta como tentativa errada).
         """
         now = self._clock()
-        name = normalize_username(username)
-        # O bloqueio vem antes do TOTVS: ninguém consegue bloquear a conta de um colega no
-        # Datasul errando a senha aqui de propósito.
+        name = normalize_typed_login(username)
+        # O bloqueio vem antes do AD: ninguém consegue bloquear a conta de rede de um colega
+        # (e com ela o Windows, o e-mail...) errando a senha aqui de propósito.
         attempts = await self._attempts.get(name)
         if attempts.is_locked(now):
             raise AccountLockedError(_minutes_left(attempts, now))
@@ -97,9 +101,9 @@ class AuthenticateUserUseCase:
             await self._attempts.clear(name)
 
         if user is None:
-            user = self._provision(name, verification.totvs_display_name or name, now)
-        elif verification.totvs_display_name:
-            user.sync_display_name(verification.totvs_display_name)
+            user = self._provision(name, verification.directory_display_name or name, now)
+        elif verification.directory_display_name:
+            user.sync_display_name(verification.directory_display_name)
 
         if not user.is_active:
             raise AccountDisabledError()
@@ -113,16 +117,22 @@ class AuthenticateUserUseCase:
     async def _verify(self, user: User | None, name: str, password: str) -> _Verification:
         if user is not None and user.password_hash is not None:  # usuário local
             return _Verification(valid=self._hasher.verify(password, user.password_hash))
-        if self._totvs is None:  # login pelo TOTVS desligado
+        if self._directory is None:  # login pelo AD desligado
             self._hasher.verify(password, self._dummy_hash)
             return _Verification(valid=False)
 
-        check = await self._totvs.verify(name, password)
-        if check.status is CredentialStatus.EXPIRED:
+        check = await self._directory.verify(name, password)
+        if check.status is CredentialStatus.BLOCKED:
+            # O AD já bloqueou a conta; a senha não foi conferida, então nada é limpo.
+            raise DirectoryAccountBlockedError()
+        if check.status in (CredentialStatus.EXPIRED, CredentialStatus.NOT_ALLOWED):
             await self._attempts.clear(name)  # a senha conferiu: não é força bruta
-            raise PasswordExpiredError()
+            if check.status is CredentialStatus.EXPIRED:
+                raise PasswordExpiredError()
+            raise DirectoryAccessDeniedError()
         return _Verification(
-            valid=check.status is CredentialStatus.VALID, totvs_display_name=check.display_name
+            valid=check.status is CredentialStatus.VALID,
+            directory_display_name=check.display_name,
         )
 
     async def _record_failure(self, attempts: LoginAttempts, now: datetime) -> None:
@@ -135,10 +145,10 @@ class AuthenticateUserUseCase:
     def _provision(name: str, display_name: str, now: datetime) -> User:
         if not is_valid_username(name):
             raise PermissionDeniedError(
-                "Seu login do TOTVS não pode ser usado neste sistema. "
+                "Seu login de rede não pode ser usado neste sistema. "
                 "Peça a um administrador um usuário local."
             )
-        return User.provision_from_totvs(username=name, display_name=display_name, now=now)
+        return User.provision_from_directory(username=name, display_name=display_name, now=now)
 
 
 def _minutes_left(attempts: LoginAttempts, now: datetime) -> int:

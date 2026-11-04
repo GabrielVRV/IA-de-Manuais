@@ -12,13 +12,13 @@ from manual_assistant.application.use_cases.manage_users import (
     ListUsersUseCase,
     ResetUserPasswordUseCase,
     UpdateUserUseCase,
-    UseTotvsLoginUseCase,
+    UseDirectoryLoginUseCase,
 )
 from manual_assistant.domain.errors import InvalidValueError
 from manual_assistant.domain.user import AuthSource, UserId, UserRole
 from tests.factories import FIXED_NOW
 from tests.fakes import InMemoryUserRepository
-from tests.security import fast_hasher, make_totvs_user, make_user
+from tests.security import fast_hasher, make_ad_user, make_user
 
 pytestmark = pytest.mark.anyio
 
@@ -121,11 +121,11 @@ async def test_resets_a_password(users: InMemoryUserRepository) -> None:
     assert hasher.verify("provisoria-2", user.password_hash)
 
 
-async def test_totvs_passwords_cannot_be_reset_here(users: InMemoryUserRepository) -> None:
-    user = make_totvs_user("joao")
+async def test_ad_passwords_cannot_be_reset_here(users: InMemoryUserRepository) -> None:
+    user = make_ad_user("joao")
     await users.save(user)
 
-    with pytest.raises(InvalidValueError, match="próprio TOTVS"):
+    with pytest.raises(InvalidValueError, match="troque-a no Windows"):
         await ResetUserPasswordUseCase(users=users, hasher=fast_hasher()).execute(
             admin, user.id, temporary_password="provisoria-2"
         )
@@ -142,7 +142,7 @@ class TestUpdate:
         assert user.is_admin
 
     async def test_approves_a_user_awaiting_access(self, users: InMemoryUserRepository) -> None:
-        pending = make_totvs_user("joao", role=UserRole.PENDING)
+        pending = make_ad_user("joao", role=UserRole.PENDING)
         await users.save(pending)
 
         await UpdateUserUseCase(users).execute(admin, pending.id, role=UserRole.USER)
@@ -166,18 +166,43 @@ class TestUpdate:
             await UpdateUserUseCase(users).execute(admin, UserId(uuid4()), is_active=True)
 
 
-class TestUseTotvsLogin:
+class TestUseDirectoryLogin:
     async def test_switches_a_local_user_keeping_the_role(
         self, users: InMemoryUserRepository
     ) -> None:
         user = make_user("ana", role=UserRole.ADMIN)
         await users.save(user)
 
-        await UseTotvsLoginUseCase(users).execute_as_system(username=" ANA ")
+        await UseDirectoryLoginUseCase(users).execute_as_system(username=" ANA ")
 
-        assert (user.auth_source, user.password_hash) == (AuthSource.TOTVS, None)
+        assert (user.auth_source, user.password_hash) == (AuthSource.AD, None)
         assert user.is_admin
 
     async def test_unknown_user(self, users: InMemoryUserRepository) -> None:
         with pytest.raises(UserNotFoundError):
-            await UseTotvsLoginUseCase(users).execute_as_system(username="ninguem")
+            await UseDirectoryLoginUseCase(users).execute_as_system(username="ninguem")
+
+    async def test_takes_the_network_login_when_it_is_different(
+        self, users: InMemoryUserRepository
+    ) -> None:
+        user = make_ad_user("gviaro", role=UserRole.ADMIN)  # login antigo, do TOTVS
+        await users.save(user)
+
+        await UseDirectoryLoginUseCase(users).execute_as_system(
+            username="gviaro", ad_login="Gabriel.Viaro"
+        )
+
+        assert await users.get_by_username("gabriel.viaro") is user
+        assert await users.get_by_username("gviaro") is None
+        assert user.is_admin
+
+    async def test_refuses_a_network_login_already_taken(
+        self, users: InMemoryUserRepository
+    ) -> None:
+        await users.save(make_ad_user("gviaro"))
+        await users.save(make_ad_user("gabriel.viaro", role=UserRole.PENDING))
+
+        with pytest.raises(UserAlreadyExistsError):
+            await UseDirectoryLoginUseCase(users).execute_as_system(
+                username="gviaro", ad_login="gabriel.viaro"
+            )

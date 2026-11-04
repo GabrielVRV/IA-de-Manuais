@@ -50,7 +50,7 @@ class ChangePasswordRequest(BaseModel):
 
 
 class CreateUserRequest(BaseModel):
-    """Usuário local. Os do TOTVS são cadastrados sozinhos no primeiro login."""
+    """Usuário local. Os do AD são cadastrados sozinhos no primeiro login."""
 
     username: str = Field(examples=["maria.silva"])
     display_name: str = Field(max_length=DISPLAY_NAME_MAX_LENGTH, examples=["Maria Silva"])

@@ -10,7 +10,7 @@ const apiUser = {
   username: 'maria',
   display_name: 'Maria Silva',
   role: 'admin',
-  auth_source: 'totvs',
+  auth_source: 'ad',
   must_change_password: false,
   is_active: true,
 }
@@ -32,7 +32,7 @@ describe('HttpAuthGateway', () => {
       username: 'maria',
       displayName: 'Maria Silva',
       role: 'admin',
-      authSource: 'totvs',
+      authSource: 'ad',
       mustChangePassword: false,
     })
     expect(fetchFn).toHaveBeenCalledWith(

@@ -10,9 +10,9 @@ const joao = managedUser()
 const pedro = managedUser({
   id: 'u-pedro',
   username: 'pedro',
-  displayName: 'Pedro do TOTVS',
+  displayName: 'Pedro da Rede',
   role: 'pending',
-  authSource: 'totvs',
+  authSource: 'ad',
 })
 
 function setup() {
@@ -86,14 +86,14 @@ describe('<UsersAdmin />', () => {
     expect(within(row('Ana Admin')).getByLabelText('Perfil de Ana Admin')).toBeDisabled()
   })
 
-  it('highlights TOTVS users awaiting approval and releases them', async () => {
+  it('highlights AD users awaiting approval and releases them', async () => {
     const { users, user } = setup()
     await screen.findByRole('table')
 
-    expect(screen.getByText(/1 usuário do TOTVS aguarda liberação/)).toBeInTheDocument()
+    expect(screen.getByText(/1 usuário de rede aguarda liberação/)).toBeInTheDocument()
     // Quem aguarda aparece no topo da tabela.
-    expect(screen.getAllByRole('row')[1]).toHaveTextContent('Pedro do TOTVS')
-    expect(row('Pedro')).toHaveTextContent('TOTVS')
+    expect(screen.getAllByRole('row')[1]).toHaveTextContent('Pedro da Rede')
+    expect(row('Pedro')).toHaveTextContent('Rede (AD)')
     expect(within(row('Pedro')).queryByRole('button', { name: 'Redefinir senha' })).toBeNull()
 
     await user.click(within(row('Pedro')).getByRole('button', { name: 'Liberar' }))

@@ -62,7 +62,7 @@ describe('<App />', () => {
       expect(auth.changePassword).not.toHaveBeenCalled()
     })
 
-    it('keeps TOTVS users awaiting approval out until an administrator releases them', async () => {
+    it('keeps AD users awaiting approval out until an administrator releases them', async () => {
       const user = userEvent.setup()
       const auth = new FakeAuthGateway(PENDING)
       renderApp({ auth })
@@ -70,7 +70,7 @@ describe('<App />', () => {
       expect(
         await screen.findByRole('heading', { name: 'Aguardando liberação' }),
       ).toBeInTheDocument()
-      expect(screen.getByText('Pedro do TOTVS')).toBeInTheDocument()
+      expect(screen.getByText('Pedro da Rede')).toBeInTheDocument()
       expect(screen.queryByRole('textbox', { name: /sua pergunta/i })).not.toBeInTheDocument()
 
       await user.click(screen.getByRole('button', { name: 'Verificar novamente' }))
@@ -134,8 +134,8 @@ describe('<App />', () => {
       expect(screen.getByRole('heading', { name: 'Trocar minha senha' })).toBeInTheDocument()
     })
 
-    it('does not offer a password change to TOTVS users', async () => {
-      renderApp({ auth: new FakeAuthGateway({ ...REGULAR, authSource: 'totvs' }), path: '/senha' })
+    it('does not offer a password change to AD users', async () => {
+      renderApp({ auth: new FakeAuthGateway({ ...REGULAR, authSource: 'ad' }), path: '/senha' })
 
       expect(await screen.findByRole('textbox', { name: /sua pergunta/i })).toBeInTheDocument()
       expect(screen.getByText('João')).not.toHaveAttribute('href')

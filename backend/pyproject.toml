@@ -21,7 +21,8 @@ dependencies = [
     "google-genai>=2.28",
     "openai>=3.26",
     "httpx2>=2.13",  # cliente HTTP usado pelo SDK da OpenAI
-    "httpx>=0.28",  # chamadas ao TOTVS (login)
+    "httpx>=0.28",
+    "ldap3>=2.9",  # login pelo Active Directory
     "argon2-cffi>=25.1",
     "openpyxl>=3.1",  # planilha de manuais da Engenharia (sincronização)
 ]
@@ -85,7 +86,9 @@ files = ["src", "tests"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["pypdfium2", "pypdfium2.*", "openpyxl", "openpyxl.*"]  # sem anotações de tipo
+module = [  # sem anotações de tipo
+    "pypdfium2", "pypdfium2.*", "openpyxl", "openpyxl.*", "ldap3", "ldap3.*",
+]
 ignore_missing_imports = true
 
 # --------------------------------------------------------------------------- #
