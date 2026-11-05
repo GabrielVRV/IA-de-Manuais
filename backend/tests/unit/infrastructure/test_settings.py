@@ -58,7 +58,9 @@ def test_blank_ad_servers_turn_the_ad_login_off(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_reads_the_ad_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("APP_AD_SERVER_URLS", "ldaps://dc01.empresa.local, ldaps://dc02.empresa.local")
+    monkeypatch.setenv(
+        "APP_AD_SERVER_URLS", "ldaps://dc01.empresa.local, ldaps://dc02.empresa.local"
+    )
     monkeypatch.setenv("APP_AD_DOMAIN", "empresa.local")
     monkeypatch.setenv("APP_AD_BASE_DN", "DC=empresa,DC=local")
     monkeypatch.setenv("APP_AD_REQUIRED_GROUP_DN", "  ")

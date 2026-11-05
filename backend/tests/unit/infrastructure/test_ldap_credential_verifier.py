@@ -18,7 +18,9 @@ from manual_assistant.infrastructure.active_directory.ldap_credential_verifier i
 pytestmark = pytest.mark.anyio
 
 CONFIG = ActiveDirectoryConfig(
-    server_urls=["ldaps://dc01.empresa.local"], domain="empresa.local", base_dn="DC=empresa,DC=local"
+    server_urls=["ldaps://dc01.empresa.local"],
+    domain="empresa.local",
+    base_dn="DC=empresa,DC=local",
 )
 GROUP = "CN=IA Manuais,OU=Grupos,DC=empresa,DC=local"
 

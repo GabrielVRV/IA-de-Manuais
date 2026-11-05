@@ -2,17 +2,22 @@
 de propósito, para que o domínio não dependa do SQLAlchemy."""
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Identity,
     Index,
     MetaData,
+    Numeric,
+    SmallInteger,
     String,
     Text,
     UniqueConstraint,
@@ -167,3 +172,45 @@ class ExchangeRecord(Base):
     asked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (CheckConstraint("position >= 0", name="valid_position"),)
+
+
+class QuestionUsageRecord(Base):
+    """Consumo de cada pergunta respondida. Só números: o texto fica no histórico."""
+
+    __tablename__ = "question_usage"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    asked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    model: Mapped[str | None] = mapped_column(String(100))
+    input_tokens: Mapped[int]
+    output_tokens: Mapped[int]
+
+    __table_args__ = (
+        CheckConstraint("input_tokens >= 0 AND output_tokens >= 0", name="valid_tokens"),
+        # O relatório e a limpeza por retenção filtram por data.
+        Index("ix_question_usage_asked_at", "asked_at"),
+        Index("ix_question_usage_user_id_asked_at", "user_id", "asked_at"),
+    )
+
+
+class SystemSettingsRecord(Base):
+    """Uma linha só (id = 1) com as configurações alteradas pela tela."""
+
+    __tablename__ = "system_settings"
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=False)
+    usage_retention_months: Mapped[int]
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_by: Mapped[str | None] = mapped_column(String(100))
+
+    __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
+
+
+class ModelPriceRecord(Base):
+    __tablename__ = "model_prices"
+
+    model: Mapped[str] = mapped_column(String(100), primary_key=True)
+    # Dólares por milhão de tokens.
+    input_per_million: Mapped[Decimal] = mapped_column(Numeric(12, 6))
+    output_per_million: Mapped[Decimal] = mapped_column(Numeric(12, 6))

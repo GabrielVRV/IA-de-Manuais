@@ -25,6 +25,7 @@ dependencies = [
     "ldap3>=2.9",  # login pelo Active Directory
     "argon2-cffi>=25.1",
     "openpyxl>=3.1",  # planilha de manuais da Engenharia (sincronização)
+    "tzdata>=2025.2",  # fusos horários (APP_TIMEZONE) mesmo sem a base do sistema operacional
 ]
 
 [project.optional-dependencies]

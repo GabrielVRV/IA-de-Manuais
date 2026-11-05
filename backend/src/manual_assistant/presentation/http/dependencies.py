@@ -36,6 +36,14 @@ from manual_assistant.application.use_cases.resolve_session import (
     ResolveSessionUseCase,
 )
 from manual_assistant.application.use_cases.sync_manuals import ManualSyncService
+from manual_assistant.application.use_cases.system_settings import (
+    DeleteModelPriceUseCase,
+    GetSystemSettingsUseCase,
+    ListModelPricesUseCase,
+    SetModelPriceUseCase,
+    UpdateSystemSettingsUseCase,
+)
+from manual_assistant.application.use_cases.usage_report import GetUsageReportUseCase
 from manual_assistant.domain.user import User
 
 SESSION_COOKIE = "ma_session"
@@ -66,6 +74,12 @@ class UseCases:
     list_users: ListUsersUseCase
     reset_user_password: ResetUserPasswordUseCase
     update_user: UpdateUserUseCase
+    usage_report: GetUsageReportUseCase
+    get_settings: GetSystemSettingsUseCase
+    update_settings: UpdateSystemSettingsUseCase
+    list_model_prices: ListModelPricesUseCase
+    set_model_price: SetModelPriceUseCase
+    delete_model_price: DeleteModelPriceUseCase
 
 
 def get_use_cases(request: Request) -> UseCases:

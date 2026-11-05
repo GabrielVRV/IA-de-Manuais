@@ -119,16 +119,18 @@ def ask_question_use_case(client: genai.Client) -> AskQuestionUseCase:
 async def test_model_answers_from_the_chunks_and_cites_the_right_source(
     client: genai.Client,
 ) -> None:
-    answer = await ask_question_use_case(client).execute(
+    result = await ask_question_use_case(client).execute(
         Question("Qual a pressão máxima da prensa P-200?")
     )
+    answer = result.answer
 
     assert "180" in answer.text
     assert [c.manual_title for c in answer.citations] == ["Manual da Prensa P-200"]
 
 
 async def test_model_says_it_did_not_find_unrelated_information(client: genai.Client) -> None:
-    answer = await ask_question_use_case(client).execute(Question("Como faço um bolo de cenoura?"))
+    result = await ask_question_use_case(client).execute(Question("Como faço um bolo de cenoura?"))
+    answer = result.answer
 
     assert answer.text == NOT_FOUND_MESSAGE
     assert not answer.has_sources

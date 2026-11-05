@@ -13,6 +13,8 @@ from manual_assistant.presentation.http.routers import (
     manual_sync,
     manuals,
     questions,
+    settings,
+    usage,
     users,
 )
 
@@ -59,4 +61,6 @@ def create_http_app(
     app.include_router(manual_sync.router, prefix=API_PREFIX)
     app.include_router(questions.router, prefix=API_PREFIX)
     app.include_router(conversations.router, prefix=API_PREFIX)
+    app.include_router(usage.router, prefix=API_PREFIX)
+    app.include_router(settings.router, prefix=API_PREFIX)
     return app

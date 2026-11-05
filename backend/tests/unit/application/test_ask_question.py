@@ -34,7 +34,7 @@ class Context:
 async def test_answers_with_citations_of_the_chunks_used() -> None:
     ctx = Context()
 
-    answer = await ctx.use_case.execute(Question("Qual a pressão máxima?"))
+    answer = (await ctx.use_case.execute(Question("Qual a pressão máxima?"))).answer
 
     assert answer.text == "A pressão máxima é 180 bar."
     assert [(c.manual_title, c.pages) for c in answer.citations] == [
@@ -68,7 +68,26 @@ async def test_does_not_call_the_model_when_nothing_is_found() -> None:
     ctx = Context()
     ctx.vector_store.search_results = []
 
-    answer = await ctx.use_case.execute(Question("Como faço café?"))
+    answer = (await ctx.use_case.execute(Question("Como faço café?"))).answer
 
     assert answer.text == NOT_FOUND_MESSAGE
     assert ctx.language_model.requests == []
+
+
+async def test_reports_the_tokens_spent_by_the_model() -> None:
+    ctx = Context()
+
+    result = await ctx.use_case.execute(Question("Qual a pressão máxima?"))
+
+    assert result.model == "fake-model"
+    assert (result.usage.input_tokens, result.usage.output_tokens) == (1, 1)
+
+
+async def test_reports_no_model_and_no_tokens_when_nothing_is_found() -> None:
+    ctx = Context()
+    ctx.vector_store.search_results = []
+
+    result = await ctx.use_case.execute(Question("Como faço café?"))
+
+    assert result.model is None
+    assert result.usage.total_tokens == 0

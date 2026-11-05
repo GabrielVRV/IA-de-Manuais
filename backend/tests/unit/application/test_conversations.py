@@ -23,6 +23,7 @@ from tests.fakes import (
     FakeEmbeddingProvider,
     FakeLanguageModel,
     InMemoryConversationRepository,
+    InMemoryUsageRepository,
     InMemoryVectorStore,
 )
 from tests.security import make_user
@@ -38,6 +39,7 @@ class Context:
         self.conversations = InMemoryConversationRepository()
         self.embeddings = FakeEmbeddingProvider()
         self.language_model = FakeLanguageModel(answer="A pressão máxima é 180 bar [1].")
+        self.usage = InMemoryUsageRepository()
         self.chat = ChatUseCase(
             conversations=self.conversations,
             ask_question=AskQuestionUseCase(
@@ -52,6 +54,7 @@ class Context:
                 ),
                 language_model=self.language_model,
             ),
+            usage=self.usage,
             clock=lambda: self.now,
         )
         self.maria = make_user("maria")
@@ -117,6 +120,45 @@ class TestChat:
             await ctx.ask("Qual a pressão máxima?", as_=ctx.maria)
 
         assert ctx.conversations.conversations == {}
+
+    async def test_records_the_tokens_spent_without_the_question_text(self) -> None:
+        ctx = Context()
+
+        await ctx.ask("Qual a pressão máxima?", as_=ctx.maria)
+
+        (usage,) = ctx.usage.records
+        assert usage.user_id == ctx.maria.id
+        assert usage.asked_at == ctx.now
+        assert usage.model == "fake-model"
+        assert (usage.input_tokens, usage.output_tokens) == (1, 1)
+
+    async def test_records_a_question_answered_without_calling_the_model(self) -> None:
+        ctx = Context()
+        ctx.chat = ChatUseCase(
+            conversations=ctx.conversations,
+            ask_question=AskQuestionUseCase(
+                embeddings=ctx.embeddings,
+                vector_store=InMemoryVectorStore(),
+                language_model=ctx.language_model,
+            ),
+            usage=ctx.usage,
+            clock=lambda: ctx.now,
+        )
+
+        await ctx.ask("Como faço café?", as_=ctx.maria)
+
+        (usage,) = ctx.usage.records
+        assert usage.model is None
+        assert usage.total_tokens == 0
+
+    async def test_records_no_usage_when_the_answer_fails(self) -> None:
+        ctx = Context()
+        ctx.language_model.error = ExternalServiceError("IA fora do ar")
+
+        with pytest.raises(ExternalServiceError):
+            await ctx.ask("Qual a pressão máxima?", as_=ctx.maria)
+
+        assert ctx.usage.records == []
 
     async def test_cannot_continue_someone_elses_conversation(self) -> None:
         ctx = Context()

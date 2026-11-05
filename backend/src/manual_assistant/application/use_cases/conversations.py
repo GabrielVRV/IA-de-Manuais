@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from manual_assistant.application.clock import Clock, utc_now
 from manual_assistant.application.errors import ConversationNotFoundError
 from manual_assistant.application.ports.conversation_repository import ConversationRepository
+from manual_assistant.application.ports.usage_repository import UsageRepository
 from manual_assistant.application.use_cases.ask_question import AskQuestionUseCase
 from manual_assistant.domain.conversation import (
     Conversation,
@@ -20,6 +21,7 @@ from manual_assistant.domain.conversation import (
     RetentionPolicy,
 )
 from manual_assistant.domain.question import Question
+from manual_assistant.domain.usage import QuestionUsage
 from manual_assistant.domain.user import User
 
 logger = logging.getLogger(__name__)
@@ -48,7 +50,8 @@ class ChatUseCase:
     """Responde uma pergunta dentro de uma conversa e guarda a troca no histórico.
 
     Sem ``conversation_id``, começa uma conversa nova. Nada é gravado se a resposta
-    falhar: o histórico só tem perguntas que foram respondidas.
+    falhar: o histórico só tem perguntas que foram respondidas. O consumo do modelo
+    (sem o texto da pergunta) é registrado à parte, para o controle de custos.
     """
 
     def __init__(
@@ -56,10 +59,12 @@ class ChatUseCase:
         *,
         conversations: ConversationRepository,
         ask_question: AskQuestionUseCase,
+        usage: UsageRepository,
         clock: Clock = utc_now,
     ) -> None:
         self._conversations = conversations
         self._ask_question = ask_question
+        self._usage = usage
         self._clock = clock
 
     async def execute(
@@ -71,10 +76,21 @@ class ChatUseCase:
             conversation = await _owned_conversation(self._conversations, actor, conversation_id)
             is_new = False
 
-        answer = await self._ask_question.execute(
+        result = await self._ask_question.execute(
             question, history=conversation.recent(CONTEXT_EXCHANGES)
         )
-        exchange = conversation.record(question, answer, self._clock())
+        now = self._clock()
+        # Primeiro o consumo: os tokens já foram gastos, mesmo que salvar a conversa falhe.
+        await self._usage.add(
+            QuestionUsage(
+                user_id=actor.id,
+                asked_at=now,
+                model=result.model,
+                input_tokens=result.usage.input_tokens,
+                output_tokens=result.usage.output_tokens,
+            )
+        )
+        exchange = conversation.record(question, result.answer, now)
 
         if is_new:
             await self._conversations.add(conversation)

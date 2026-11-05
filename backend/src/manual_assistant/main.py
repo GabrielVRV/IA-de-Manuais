@@ -52,6 +52,15 @@ from manual_assistant.application.use_cases.sync_manuals import (
     ManualSyncService,
     PlanManualSyncUseCase,
 )
+from manual_assistant.application.use_cases.system_settings import (
+    DeleteModelPriceUseCase,
+    GetSystemSettingsUseCase,
+    ListModelPricesUseCase,
+    PurgeOldUsageUseCase,
+    SetModelPriceUseCase,
+    UpdateSystemSettingsUseCase,
+)
+from manual_assistant.application.use_cases.usage_report import GetUsageReportUseCase
 from manual_assistant.domain.conversation import RetentionPolicy
 from manual_assistant.domain.session import SessionPolicy
 from manual_assistant.infrastructure.active_directory.ldap_credential_verifier import (
@@ -79,6 +88,11 @@ from manual_assistant.infrastructure.persistence.models import EMBEDDING_DIMENSI
 from manual_assistant.infrastructure.persistence.session_repository import (
     SqlAlchemySessionRepository,
 )
+from manual_assistant.infrastructure.persistence.settings_repository import (
+    SqlAlchemyModelPriceRepository,
+    SqlAlchemySystemSettingsRepository,
+)
+from manual_assistant.infrastructure.persistence.usage_repository import SqlAlchemyUsageRepository
 from manual_assistant.infrastructure.persistence.user_repository import SqlAlchemyUserRepository
 from manual_assistant.infrastructure.persistence.vector_store import PgVectorStore
 from manual_assistant.infrastructure.security.argon2_hasher import Argon2PasswordHasher
@@ -90,8 +104,8 @@ from manual_assistant.presentation.http.dependencies import UseCases
 
 logger = logging.getLogger(__name__)
 
-# De quanto em quanto tempo as conversas paradas além do prazo de retenção são apagadas.
-CONVERSATION_PURGE_INTERVAL = timedelta(hours=6)
+# De quanto em quanto tempo as conversas e o consumo além do prazo de retenção são apagados.
+PURGE_INTERVAL = timedelta(hours=6)
 
 
 def create_app(
@@ -114,6 +128,9 @@ def create_app(
     storage = LocalFileStorage(settings.storage_dir)
     users = SqlAlchemyUserRepository(session_factory)
     conversations = SqlAlchemyConversationRepository(session_factory)
+    usage = SqlAlchemyUsageRepository(session_factory)
+    system_settings = SqlAlchemySystemSettingsRepository(session_factory)
+    model_prices = SqlAlchemyModelPriceRepository(session_factory)
     hasher = password_hasher or Argon2PasswordHasher()
     sessions = SessionManager(
         SqlAlchemySessionRepository(session_factory),
@@ -176,6 +193,7 @@ def create_app(
                 top_k=settings.rag_top_k,
                 min_score=settings.rag_min_score,
             ),
+            usage=usage,
         ),
         list_conversations=ListConversationsUseCase(conversations),
         get_conversation=GetConversationUseCase(conversations),
@@ -197,6 +215,14 @@ def create_app(
         list_users=ListUsersUseCase(users),
         reset_user_password=ResetUserPasswordUseCase(users=users, hasher=hasher),
         update_user=UpdateUserUseCase(users),
+        usage_report=GetUsageReportUseCase(
+            usage=usage, users=users, prices=model_prices, timezone=settings.zone
+        ),
+        get_settings=GetSystemSettingsUseCase(system_settings),
+        update_settings=UpdateSystemSettingsUseCase(system_settings),
+        list_model_prices=ListModelPricesUseCase(prices=model_prices, usage=usage),
+        set_model_price=SetModelPriceUseCase(model_prices),
+        delete_model_price=DeleteModelPriceUseCase(model_prices),
     )
     recover_interrupted = RecoverInterruptedIndexingUseCase(repository)
     retention_days = settings.conversation_retention_days
@@ -204,6 +230,7 @@ def create_app(
         conversations,
         RetentionPolicy(timedelta(days=retention_days) if retention_days else None),
     )
+    purge_usage = PurgeOldUsageUseCase(usage=usage, settings=system_settings)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -212,7 +239,7 @@ def create_app(
         except ExternalServiceError:
             # Banco fora do ar na partida: a API sobe mesmo assim e o health check acusa.
             logger.warning("Não foi possível verificar indexações interrompidas", exc_info=True)
-        purge_task = asyncio.create_task(_purge_periodically(purge_conversations))
+        purge_task = asyncio.create_task(_purge_periodically(purge_conversations, purge_usage))
         yield
         await manual_sync.stop()
         purge_task.cancel()
@@ -230,14 +257,20 @@ def create_app(
     )
 
 
-async def _purge_periodically(purge: PurgeIdleConversationsUseCase) -> None:
-    """Aplica a retenção do histórico na partida e depois a cada intervalo."""
+async def _purge_periodically(
+    conversations: PurgeIdleConversationsUseCase, usage: PurgeOldUsageUseCase
+) -> None:
+    """Aplica a retenção do histórico e do consumo na partida e depois a cada intervalo."""
     while True:
         try:
-            await purge.execute()
+            await conversations.execute()
         except ExternalServiceError:
             logger.warning("Não foi possível apagar as conversas antigas", exc_info=True)
-        await asyncio.sleep(CONVERSATION_PURGE_INTERVAL.total_seconds())
+        try:
+            await usage.execute()
+        except ExternalServiceError:
+            logger.warning("Não foi possível apagar o consumo antigo", exc_info=True)
+        await asyncio.sleep(PURGE_INTERVAL.total_seconds())
 
 
 def _build_directory(settings: Settings) -> CredentialVerifier | None:

@@ -4,9 +4,11 @@ O mypy garante que cada fake segue o contrato da porta que substitui.
 """
 
 import asyncio
+from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
-from datetime import datetime
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from manual_assistant.application.errors import StoredFileNotFoundError
 from manual_assistant.application.ports.credential_verifier import (
@@ -21,6 +23,7 @@ from manual_assistant.application.ports.language_model import (
 )
 from manual_assistant.application.ports.manual_source import SourceDocument
 from manual_assistant.application.ports.text_chunker import TextFragment
+from manual_assistant.application.ports.usage_repository import UsageAggregate
 from manual_assistant.application.ports.vector_store import EmbeddedChunk
 from manual_assistant.domain.chunk import ScoredChunk
 from manual_assistant.domain.conversation import (
@@ -33,6 +36,8 @@ from manual_assistant.domain.login_attempts import LoginAttempts
 from manual_assistant.domain.manual import Manual, ManualId
 from manual_assistant.domain.pages import Page, PageRange
 from manual_assistant.domain.session import Session
+from manual_assistant.domain.system_settings import SystemSettings
+from manual_assistant.domain.usage import ModelPrice, QuestionUsage
 from manual_assistant.domain.user import User, UserId
 
 
@@ -333,6 +338,68 @@ class InMemoryConversationRepository:
         for conversation_id in idle:
             del self.conversations[conversation_id]
         return len(idle)
+
+
+@dataclass
+class InMemoryUsageRepository:
+    records: list[QuestionUsage] = field(default_factory=list)
+
+    async def add(self, usage: QuestionUsage) -> None:
+        self.records.append(usage)
+
+    async def aggregate(
+        self, *, since: datetime, until: datetime, timezone: ZoneInfo
+    ) -> Sequence[UsageAggregate]:
+        groups: dict[tuple[UserId, str | None, date], list[QuestionUsage]] = defaultdict(list)
+        for usage in self.records:
+            if since <= usage.asked_at < until:
+                day = usage.asked_at.astimezone(timezone).date()
+                groups[(usage.user_id, usage.model, day)].append(usage)
+        return [
+            UsageAggregate(
+                user_id=user_id,
+                model=model,
+                day=day,
+                questions=len(items),
+                input_tokens=sum(u.input_tokens for u in items),
+                output_tokens=sum(u.output_tokens for u in items),
+            )
+            for (user_id, model, day), items in groups.items()
+        ]
+
+    async def models(self) -> Sequence[str]:
+        return sorted({u.model for u in self.records if u.model is not None})
+
+    async def delete_before(self, cutoff: datetime) -> int:
+        kept = [u for u in self.records if u.asked_at >= cutoff]
+        removed = len(self.records) - len(kept)
+        self.records = kept
+        return removed
+
+
+@dataclass
+class InMemorySystemSettingsRepository:
+    settings: SystemSettings = field(default_factory=SystemSettings)
+
+    async def get(self) -> SystemSettings:
+        return replace(self.settings)
+
+    async def save(self, settings: SystemSettings) -> None:
+        self.settings = replace(settings)
+
+
+@dataclass
+class InMemoryModelPriceRepository:
+    prices: dict[str, ModelPrice] = field(default_factory=dict)
+
+    async def list_all(self) -> Sequence[ModelPrice]:
+        return [self.prices[model] for model in sorted(self.prices)]
+
+    async def save(self, price: ModelPrice) -> None:
+        self.prices[price.model] = price
+
+    async def delete(self, model: str) -> None:
+        self.prices.pop(model, None)
 
 
 def _copy(conversation: Conversation) -> Conversation:

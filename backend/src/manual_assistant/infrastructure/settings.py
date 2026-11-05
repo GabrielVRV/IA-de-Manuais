@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Annotated, Literal, Self
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -19,6 +20,9 @@ class Settings(BaseSettings):
 
     app_name: str = "Assistente de Manuais"
     environment: Literal["development", "test", "production"] = "development"
+    # Fuso da empresa: o "dia" do relatório de consumo e o horário dos agendamentos.
+    # Sem ele, num contêiner Docker (UTC), "00:00" seria 21:00 no horário de Brasília.
+    timezone: str = "America/Sao_Paulo"
     cors_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:5173"],
     )
@@ -125,6 +129,15 @@ class Settings(BaseSettings):
             return value.strip() or None
         return value
 
+    @field_validator("timezone")
+    @classmethod
+    def _known_timezone(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as error:
+            raise ValueError(f"Fuso horário desconhecido em APP_TIMEZONE: {value!r}") from error
+        return value
+
     @model_validator(mode="after")
     def _idle_fits_in_max(self) -> Self:
         if self.auth_session_idle_days > self.auth_session_max_days:
@@ -150,6 +163,10 @@ class Settings(BaseSettings):
             port=self.db_port,
             database=self.db_name,
         )
+
+    @property
+    def zone(self) -> ZoneInfo:
+        return ZoneInfo(self.timezone)
 
     @property
     def max_upload_bytes(self) -> int:

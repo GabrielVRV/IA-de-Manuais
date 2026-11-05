@@ -1,6 +1,7 @@
 """Monta a API HTTP com fakes em memória (sem banco nem IA reais)."""
 
 from dataclasses import dataclass, field
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -39,6 +40,14 @@ from manual_assistant.application.use_cases.sync_manuals import (
     ManualSyncService,
     PlanManualSyncUseCase,
 )
+from manual_assistant.application.use_cases.system_settings import (
+    DeleteModelPriceUseCase,
+    GetSystemSettingsUseCase,
+    ListModelPricesUseCase,
+    SetModelPriceUseCase,
+    UpdateSystemSettingsUseCase,
+)
+from manual_assistant.application.use_cases.usage_report import GetUsageReportUseCase
 from manual_assistant.domain.user import User, UserRole
 from manual_assistant.infrastructure.documents.line_chunker import LineChunker
 from manual_assistant.infrastructure.documents.pdf_parser import PdfiumDocumentParser
@@ -53,13 +62,17 @@ from tests.fakes import (
     InMemoryFileStorage,
     InMemoryLoginAttemptRepository,
     InMemoryManualRepository,
+    InMemoryModelPriceRepository,
     InMemorySessionRepository,
+    InMemorySystemSettingsRepository,
+    InMemoryUsageRepository,
     InMemoryUserRepository,
     InMemoryVectorStore,
 )
 from tests.security import DEFAULT_PASSWORD, fast_hasher, make_user, session_manager
 
 FRONTEND_ORIGIN = "http://servidor-interno"
+TIMEZONE = ZoneInfo("America/Sao_Paulo")
 
 
 @dataclass
@@ -80,6 +93,11 @@ class FakeBackend:
     conversations: InMemoryConversationRepository = field(
         default_factory=InMemoryConversationRepository
     )
+    usage: InMemoryUsageRepository = field(default_factory=InMemoryUsageRepository)
+    system_settings: InMemorySystemSettingsRepository = field(
+        default_factory=InMemorySystemSettingsRepository
+    )
+    model_prices: InMemoryModelPriceRepository = field(default_factory=InMemoryModelPriceRepository)
     health_indicators: list[HealthIndicator] = field(default_factory=list)
     max_upload_bytes: int = 1024 * 1024
     # None = pasta de manuais não configurada (sincronização desligada).
@@ -133,6 +151,7 @@ class FakeBackend:
                     vector_store=self.vector_store,
                     language_model=self.language_model,
                 ),
+                usage=self.usage,
             ),
             list_conversations=ListConversationsUseCase(self.conversations),
             get_conversation=GetConversationUseCase(self.conversations),
@@ -152,6 +171,14 @@ class FakeBackend:
             list_users=ListUsersUseCase(self.users),
             reset_user_password=ResetUserPasswordUseCase(users=self.users, hasher=hasher),
             update_user=UpdateUserUseCase(self.users),
+            usage_report=GetUsageReportUseCase(
+                usage=self.usage, users=self.users, prices=self.model_prices, timezone=TIMEZONE
+            ),
+            get_settings=GetSystemSettingsUseCase(self.system_settings),
+            update_settings=UpdateSystemSettingsUseCase(self.system_settings),
+            list_model_prices=ListModelPricesUseCase(prices=self.model_prices, usage=self.usage),
+            set_model_price=SetModelPriceUseCase(self.model_prices),
+            delete_model_price=DeleteModelPriceUseCase(self.model_prices),
         )
         return create_http_app(
             title="test",

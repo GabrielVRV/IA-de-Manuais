@@ -1,8 +1,13 @@
 import logging
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 from manual_assistant.application.ports.embedding_provider import EmbeddingProvider
-from manual_assistant.application.ports.language_model import CompletionRequest, LanguageModel
+from manual_assistant.application.ports.language_model import (
+    CompletionRequest,
+    LanguageModel,
+    TokenUsage,
+)
 from manual_assistant.application.ports.vector_store import VectorStore
 from manual_assistant.application.rag_prompt import (
     NOT_FOUND_MESSAGE,
@@ -19,6 +24,14 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_TOP_K = 6  # ~6 x 1500 caracteres: contexto suficiente com custo baixo
 DEFAULT_MAX_OUTPUT_TOKENS = 1024
+NO_USAGE = TokenUsage(input_tokens=0, output_tokens=0)
+
+
+@dataclass(frozen=True, slots=True)
+class QuestionResult:
+    answer: Answer
+    model: str | None  # None quando nada foi enviado ao modelo (não gastou tokens)
+    usage: TokenUsage = NO_USAGE
 
 
 class AskQuestionUseCase:
@@ -41,7 +54,7 @@ class AskQuestionUseCase:
         # "relevante" de "irrelevante". Quem decide "não encontrei" é o modelo.
         self._min_score = min_score
 
-    async def execute(self, question: Question, history: Sequence[Exchange] = ()) -> Answer:
+    async def execute(self, question: Question, history: Sequence[Exchange] = ()) -> QuestionResult:
         """``history``: últimas trocas da conversa, para entender perguntas de continuação."""
         query = await self._embeddings.embed_query(retrieval_query(question, history))
         results = await self._vector_store.search(
@@ -49,7 +62,7 @@ class AskQuestionUseCase:
         )
         if not results:
             # Nada indexado (ou nada acima do corte): não gasta tokens do modelo.
-            return Answer(NOT_FOUND_MESSAGE)
+            return QuestionResult(Answer(NOT_FOUND_MESSAGE), model=None)
 
         chunks = [result.chunk for result in results]
         completion = await self._language_model.complete(
@@ -71,4 +84,4 @@ class AskQuestionUseCase:
             len(answer.citations),
             len(history),
         )
-        return answer
+        return QuestionResult(answer, model=completion.model, usage=completion.usage)

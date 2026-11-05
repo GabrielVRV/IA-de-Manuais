@@ -165,8 +165,7 @@ def _real_connection_factory(config: ActiveDirectoryConfig) -> ConnectionFactory
         ca_certs_file=str(config.ca_cert_file) if config.ca_cert_file else None,
     )
     servers = [
-        Server(url, tls=tls, get_info=NONE, connect_timeout=timeout)
-        for url in config.server_urls
+        Server(url, tls=tls, get_info=NONE, connect_timeout=timeout) for url in config.server_urls
     ]
     # Com mais de um, o pool tenta o próximo quando um cai. active=1: dá uma volta pelos
     # servidores e desiste, em vez de tentar para sempre.
