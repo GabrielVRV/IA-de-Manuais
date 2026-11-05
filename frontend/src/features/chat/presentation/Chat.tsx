@@ -6,6 +6,8 @@ import { cx } from '@/shared/cx'
 import { type Gaze, VisorBot } from '@/shared/mascot/VisorBot'
 import ui from '@/styles/ui.module.css'
 
+import { type Assistant, ENGINEERING_ASSISTANT } from '../domain/assistant'
+
 import styles from './Chat.module.css'
 import { Composer, type ComposerActivity } from './Composer'
 import { Icon, Message, Thinking } from './Message'
@@ -27,9 +29,18 @@ interface ChatProps {
   readonly onOpenHistory: () => void
   /** Muda a cada conversa aberta: o campo de pergunta volta a ter o foco. */
   readonly conversationKey: string
+  /** Quem responde nesta conversa. */
+  readonly assistant?: Assistant
 }
 
-export function Chat({ chat, title, userName, onOpenHistory, conversationKey }: ChatProps) {
+export function Chat({
+  chat,
+  title,
+  userName,
+  onOpenHistory,
+  conversationKey,
+  assistant = ENGINEERING_ASSISTANT,
+}: ChatProps) {
   const { messages, pending, loading, loadError, ask, retry, stop } = chat
   const brand = useBrand()
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -58,7 +69,7 @@ export function Chat({ chat, title, userName, onOpenHistory, conversationKey }: 
     : undefined
 
   return (
-    <section className={styles.chat} aria-label="Conversa com o assistente">
+    <section className={styles.chat} aria-label={`Conversa com o ${assistant.name}`}>
       <header className={styles.topBar}>
         <button
           type="button"
@@ -68,7 +79,12 @@ export function Chat({ chat, title, userName, onOpenHistory, conversationKey }: 
         >
           <Icon d="M2.5 4h11M2.5 8h11M2.5 12h11" />
         </button>
-        <h2 className={styles.conversationTitle}>{title ?? 'Nova conversa'}</h2>
+        <div className={styles.heading}>
+          <h2 className={styles.conversationTitle}>{title ?? 'Nova conversa'}</h2>
+          <p className={styles.assistantLine}>
+            {assistant.name} · {assistant.topic}
+          </p>
+        </div>
         {!isEmpty && (
           <Link to="/" className={styles.newChatLink}>
             <Icon d="M8 3v10M3 8h10" />
@@ -92,13 +108,14 @@ export function Chat({ chat, title, userName, onOpenHistory, conversationKey }: 
           {isEmpty && (
             <div className={styles.welcome}>
               <VisorBot mood="watching" gaze={gaze} className={styles.welcomeBot} />
+              <p className={styles.assistantBadge}>
+                <Icon d="M3 2.5h7.5L13 5v8.5H3zM5.5 6.5h5M5.5 9h5M5.5 11.5h3" />
+                {assistant.name}
+              </p>
               <h2 className={styles.welcomeTitle}>
                 Olá, {userName}! <span>Como posso ajudar?</span>
               </h2>
-              <p className={styles.welcomeText}>
-                Pergunte em linguagem natural. Eu procuro nos manuais e mostro de qual manual e
-                página veio cada informação.
-              </p>
+              <p className={styles.welcomeText}>{assistant.description}</p>
               <ul className={styles.suggestions}>
                 {brand.examples.slice(0, 4).map((suggestion, index) => (
                   <li key={suggestion} style={{ animationDelay: `${String(120 + index * 70)}ms` }}>

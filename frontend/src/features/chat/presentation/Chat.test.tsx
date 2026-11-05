@@ -50,6 +50,23 @@ describe('<ChatPage />', () => {
     expect(screen.getAllByRole('button', { name: /\?$/ })).toHaveLength(4)
   })
 
+  it('says which assistant answers and what it covers', async () => {
+    const user = userEvent.setup()
+    renderChat()
+
+    const chat = screen.getByRole('region', { name: 'Conversa com o Assistente de Engenharia' })
+    expect(
+      within(chat).getByText('Assistente de Engenharia · Manuais técnicos'),
+    ).toBeInTheDocument()
+    expect(within(chat).getByText(/manuais técnicos dos equipamentos/)).toBeInTheDocument()
+
+    await user.type(input(), 'Qual a pressão máxima?{Enter}')
+    await screen.findByText('10 bar')
+
+    // Durante a conversa, o assistente continua identificado no topo.
+    expect(screen.getByText('Assistente de Engenharia · Manuais técnicos')).toBeInTheDocument()
+  })
+
   it('answers with a link to the cited page and saves the new conversation', async () => {
     const user = userEvent.setup()
     const gateway = renderChat()
