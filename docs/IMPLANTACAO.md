@@ -82,7 +82,9 @@ Preencha **obrigatoriamente**:
 | `APP_AD_BASE_DN` | Onde procurar os usuários. Ex.: `DC=empresa,DC=local` (é o "BaseDN" do GLPI) |
 
 Opcionais: `APP_AD_REQUIRED_GROUP_DN` (só quem está nesse grupo entra), `APP_AD_START_TLS`
-(para `ldap://`) e `APP_AD_CA_CERT_FILE` (certificado da CA interna, ver abaixo). Os
+(para `ldap://`) e `APP_AD_CA_CERT_FILE` (certificado da CA interna, ver abaixo).
+`APP_TIMEZONE` (padrão `America/Sao_Paulo`) define o fuso do relatório de consumo e do
+horário da sincronização agendada; só mude se o servidor atender outro fuso. Os
 valores podem ser copiados da configuração LDAP do GLPI. O backend **não precisa** da
 conta de serviço do GLPI: ele autentica como o próprio usuário.
 
@@ -194,6 +196,17 @@ Para trocar a porta, defina `WEB_PUBLISHED_PORT` no `.env` da raiz e rode
    A sessão fica aberta: só pede login de novo depois de **7 dias sem uso**, ou **30 dias**
    depois do último login. Senha trocada ou usuário bloqueado no AD só valem no próximo
    login. Para cortar o acesso na hora, desative o usuário aqui.
+5. **Configurações** (administrador), sem mexer no `.env` nem reiniciar:
+   - **Limite de perguntas** por usuário, por minuto e em 24 horas (padrão: 10 e 200;
+     `0` desliga). Quem passa do limite recebe um aviso no chat, e a pergunta não gasta
+     tokens.
+   - **Preço dos modelos**, em dólares por milhão de tokens, copiado da tabela de preços do
+     provedor. Os modelos já usados aparecem na lista; sem preço, a tela de Consumo mostra
+     só os tokens.
+   - **Retenção do consumo** (padrão: 12 meses).
+6. **Consumo** (administrador): perguntas, tokens e custo estimado do período, por dia,
+   **por usuário** (quem mais usou primeiro) e por modelo. Só números: as perguntas não
+   aparecem. Vale avisar os usuários de que o uso é registrado para controle de custo.
 
 ### Roteiro sugerido para a demonstração (defender a chave paga)
 
@@ -229,6 +242,11 @@ Engenharia. A pasta **só é lida**, nunca alterada.
      andamento e o resultado (inclusive as falhas) aparecem no quadro.
 
    Uma sincronização por vez. O resumo da última some se a API reiniciar (os manuais ficam).
+   - **Sincronizar automaticamente todo dia às…**: marque, escolha o horário (ex.: `00:00`,
+     no horário de Brasília) e clique em **Salvar agendamento**. A próxima execução aparece
+     logo abaixo. Se o servidor estiver desligado no horário, ela roda quando ele voltar;
+     se não conseguir começar (pasta fora do ar), o motivo aparece no quadro e ela tenta
+     de novo no dia seguinte.
 
 O mesmo também pode ser feito pelo comando, útil para testar com poucos manuais:
 
@@ -278,6 +296,8 @@ reindexado, e o manual que saiu da pasta é removido do sistema.
 | Entra e **é deslogado em seguida** | Tela aberta por um endereço que não passa pelo container `web` (ex.: XAMPP em outro servidor) | Acesse a tela pela porta 8084 do servidor da API |
 | Manual **"Falhou: serviço externo"** | Limite ou cota do plano gratuito do Gemini | Aguarde a cota renovar (diária) ou use a chave paga, e clique em **Reprocessar** |
 | Manual **"Falhou: ... OCR"** | PDF escaneado (imagem, sem texto) | Ainda não suportado; use a versão digital do PDF |
+| Chat: **"Você atingiu o limite de N pergunta(s)…"** | Limite de perguntas por usuário | Aguarde, ou ajuste o limite em **Configurações** (`0` desliga) |
+| Sincronização agendada **"não começou"** | Pasta de rede fora do ar ou outra sincronização rodando | Confira a pasta com o passo de verificação acima; ela tenta de novo no horário do dia seguinte |
 | Chat responde **"temporariamente indisponível"** | Gemini sobrecarregado ou sem cota | Tente em instantes; `docker compose logs api` mostra o motivo |
 | Esqueceu a senha do administrador | — | Crie outro administrador com o comando do passo 4 (outro login) e redefina a senha pela tela |
 
@@ -292,5 +312,9 @@ reindexado, e o manual que saiu da pasta é removido do sistema.
   `APP_AUTH_COOKIE_SECURE=true`. Entre a API e o AD, use sempre `ldaps://`. Ver as ADRs
   [0008](adr/0008-login-pelo-totvs-e-sessoes-no-banco.md) e
   [0011](adr/0011-login-pelo-active-directory.md).
+- **Consumo por usuário (LGPD):** a tela de Consumo mostra quanto cada pessoa usou (sem as
+  perguntas). Avise os usuários de que o uso é registrado para controle de custo e
+  confirme com o jurídico ou o encarregado de dados. Ver a
+  [ADR 0012](adr/0012-consumo-limites-e-agendamento.md).
 - **Backup:** faça backup regular do volume do banco (`manual-assistant_db-data`) e do
   volume dos PDFs (`manual-assistant_manual-files`).

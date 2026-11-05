@@ -57,6 +57,10 @@ configurável), e só os trechos relevantes dos manuais são enviados a cada per
 - 🔐 **Autenticação corporativa** — login com o usuário de rede (AD), liberação de acesso pelo
   administrador, sessões no banco e cookies `HttpOnly`.
 - 🛠️ **Administração** — telas para gerenciar usuários e acompanhar o status dos manuais.
+- 📊 **Consumo e custo** — tokens gastos por dia, por usuário e por modelo, com custo
+  estimado a partir do preço de cada modelo informado na tela.
+- 🚦 **Limite de perguntas** — por minuto e por dia, por usuário, para proteger a cota da API.
+- ⏰ **Sincronização agendada** — atualiza os manuais todo dia no horário escolhido na tela.
 - 🎨 **Marca configurável** — nome, logo e cores definidos por instalação, sem rebuild.
 - 🔌 **Provedor de IA intercambiável** — Gemini ou OpenAI, trocados por configuração.
 
@@ -200,8 +204,9 @@ Todo push e pull request passa por pipelines no GitHub Actions:
 | 9c  | Login com usuário do TOTVS, liberação pelo administrador e sessões no banco          | ✅ |
 | 9d  | Login com o usuário de rede (AD) no lugar do TOTVS                                   | ✅ |
 | 10a | Sincronização com a pasta de manuais da Engenharia (`sync-manuals`)                  | ✅ |
-| 10b | Sincronização periódica na API e acompanhamento na tela de administração            | ⏳ |
-| 11  | Observabilidade: logs estruturados, custo de tokens, feedback 👍/👎 nas respostas     | ⏳ |
+| 10b | Sincronização diária agendada pela tela de administração                             | ✅ |
+| 11a | Consumo de tokens e custo por usuário, limite de perguntas, configurações pela tela   | ✅ |
+| 11b | Observabilidade: logs estruturados e feedback 👍/👎 nas respostas                       | ⏳ |
 
 ## Convenções
 
