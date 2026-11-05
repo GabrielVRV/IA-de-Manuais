@@ -159,13 +159,15 @@ export function UsersAdmin() {
                   const pending = user.role === 'pending'
                   return (
                     <tr key={user.id} className={cx(!user.isActive && styles.inactive)}>
-                      <td>
+                      <td className={styles.name}>
                         {user.displayName}
                         {isMe && <span className={ui.muted}> (você)</span>}
                       </td>
-                      <td>{user.username}</td>
-                      <td>{user.authSource === 'ad' ? 'Rede (AD)' : 'Local'}</td>
-                      <td>
+                      <td data-label="Login">{user.username}</td>
+                      <td className={styles.nowrap} data-label="Origem">
+                        {user.authSource === 'ad' ? 'Rede (AD)' : 'Local'}
+                      </td>
+                      <td data-label="Perfil">
                         <select
                           className={ui.select}
                           aria-label={`Perfil de ${user.displayName}`}
@@ -182,7 +184,7 @@ export function UsersAdmin() {
                           <option value="admin">Administrador</option>
                         </select>
                       </td>
-                      <td>
+                      <td data-label="Situação">
                         {!user.isActive ? (
                           <span className={ui.badge} data-tone="danger">
                             Inativo
@@ -201,10 +203,10 @@ export function UsersAdmin() {
                           </span>
                         )}
                       </td>
-                      <td className={ui.muted}>
+                      <td className={cx(ui.muted, styles.nowrap)} data-label="Último acesso">
                         {user.lastLoginAt ? dateFormat.format(user.lastLoginAt) : 'Nunca'}
                       </td>
-                      <td>
+                      <td className={styles.actionsCell}>
                         <div className={styles.actions}>
                           {pending && user.isActive && (
                             <button

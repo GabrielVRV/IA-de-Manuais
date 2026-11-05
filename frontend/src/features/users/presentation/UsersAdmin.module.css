@@ -1,4 +1,6 @@
 .tableWrapper {
+  /* As linhas viram cartões quando a área disponível não comporta a tabela. */
+  container-type: inline-size;
   overflow-x: auto;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -32,8 +34,14 @@
   border-bottom: none;
 }
 
+/* O seletor de perfil cabe na opção mais longa ("Aguardando liberação") sem cortar. */
 .table select {
-  min-width: 9.5rem;
+  width: auto;
+}
+
+/* Origem e data não quebram linha; o nome é quem cede espaço. */
+.nowrap {
+  white-space: nowrap;
 }
 
 .inactive td {
@@ -44,4 +52,70 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
+}
+
+/*
+ * Área estreita (notebook pequeno, tablet, celular): cada usuário vira um cartão com
+ * o nome no topo, os campos rotulados em grade e as ações embaixo, sem rolagem lateral.
+ */
+@container (width < 66rem) {
+  .table,
+  .table tbody,
+  .table td {
+    display: block;
+  }
+
+  .table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .table tr {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+    gap: var(--space-3) var(--space-4);
+    align-items: start;
+    padding: var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .table tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  .table td,
+  .table tbody tr:last-child td {
+    padding: 0;
+    border: none;
+  }
+
+  .table td[data-label]::before {
+    display: block;
+    margin-bottom: var(--space-1);
+    color: var(--color-text-muted);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    content: attr(data-label);
+  }
+
+  .name,
+  .actionsCell {
+    grid-column: 1 / -1;
+  }
+
+  .name {
+    font-size: 0.9375rem;
+    font-weight: 600;
+  }
+
+  .actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
 }

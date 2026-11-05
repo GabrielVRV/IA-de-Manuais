@@ -40,20 +40,22 @@ export function AdminLayout() {
   return (
     <div className={styles.admin}>
       <nav className={styles.sidebar} aria-label="Administração">
-        {ADMIN_SECTIONS.map((section) => (
-          <div key={section.title} className={styles.section}>
-            <h2 className={styles.sectionTitle}>{section.title}</h2>
-            <ul className={styles.links}>
-              {section.links.map((item) => (
-                <li key={item.to}>
-                  <NavLink to={item.to} className={link}>
-                    {item.label}
-                  </NavLink>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+        <div className={styles.sidebarInner}>
+          {ADMIN_SECTIONS.map((section) => (
+            <div key={section.title} className={styles.section}>
+              <h2 className={styles.sectionTitle}>{section.title}</h2>
+              <ul className={styles.links}>
+                {section.links.map((item) => (
+                  <li key={item.to}>
+                    <NavLink to={item.to} className={link}>
+                      {item.label}
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
       </nav>
       <div className={styles.content}>
         <Outlet />
