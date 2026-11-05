@@ -7,6 +7,8 @@ import { useCurrentUser, useSession } from '@/features/auth/presentation/session
 import { ChatPage } from '@/features/chat/presentation/ChatPage'
 import { ApiStatus } from '@/features/health/presentation/ApiStatus'
 import { ManualsAdmin } from '@/features/manuals/presentation/ManualsAdmin'
+import { SettingsAdmin } from '@/features/settings/presentation/SettingsAdmin'
+import { UsageReport } from '@/features/usage/presentation/UsageReport'
 import { UsersAdmin } from '@/features/users/presentation/UsersAdmin'
 import { cx } from '@/shared/cx'
 import ui from '@/styles/ui.module.css'
@@ -43,6 +45,11 @@ function AuthenticatedApp() {
         {/* Usuários comuns que tentarem abrir uma tela de administração voltam ao chat. */}
         <Route path="/manuais" element={admin ? <ManualsAdmin /> : <Navigate to="/" replace />} />
         <Route path="/usuarios" element={admin ? <UsersAdmin /> : <Navigate to="/" replace />} />
+        <Route path="/consumo" element={admin ? <UsageReport /> : <Navigate to="/" replace />} />
+        <Route
+          path="/configuracoes"
+          element={admin ? <SettingsAdmin /> : <Navigate to="/" replace />}
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
@@ -70,6 +77,12 @@ function MainNav({ admin }: { readonly admin: boolean }) {
           </NavLink>
           <NavLink to="/usuarios" className={link}>
             Usuários
+          </NavLink>
+          <NavLink to="/consumo" className={link}>
+            Consumo
+          </NavLink>
+          <NavLink to="/configuracoes" className={link}>
+            Configurações
           </NavLink>
         </>
       )}

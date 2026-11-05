@@ -24,6 +24,16 @@ import type {
   SyncStatus,
 } from '@/features/manuals/domain/manuals'
 import { ManualsGatewayContext } from '@/features/manuals/presentation/manuals-gateway-context'
+import type {
+  ModelPrice,
+  NewModelPrice,
+  SettingsChanges,
+  SettingsGateway,
+  SystemSettings,
+} from '@/features/settings/domain/settings'
+import { SettingsGatewayContext } from '@/features/settings/presentation/settings-gateway-context'
+import type { UsageGateway, UsageReport, UsageTotals } from '@/features/usage/domain/usage'
+import { UsageGatewayContext } from '@/features/usage/presentation/usage-gateway-context'
 import type { ManagedUser, UserRole, UsersGateway } from '@/features/users/domain/users'
 import { UsersGatewayContext } from '@/features/users/presentation/users-gateway-context'
 import { HttpError } from '@/shared/http/errors'
@@ -217,6 +227,105 @@ export function fakeUsersGateway(initial: ManagedUser[]) {
   } satisfies UsersGateway & { state: typeof state }
 }
 
+export function usageTotals(overrides: Partial<UsageTotals> = {}): UsageTotals {
+  return {
+    questions: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+    costUsd: 0,
+    costIsPartial: false,
+    ...overrides,
+  }
+}
+
+export function usageReport(overrides: Partial<UsageReport> = {}): UsageReport {
+  const maria = usageTotals({
+    questions: 12,
+    inputTokens: 30_000,
+    outputTokens: 3_000,
+    totalTokens: 33_000,
+    costUsd: 0.0168,
+  })
+  const joao = usageTotals({
+    questions: 3,
+    inputTokens: 9_000,
+    outputTokens: 900,
+    totalTokens: 9_900,
+    costUsd: 0.00504,
+  })
+  return {
+    firstDay: '2026-10-30',
+    lastDay: '2026-11-05',
+    timezone: 'America/Sao_Paulo',
+    totals: usageTotals({
+      questions: 15,
+      inputTokens: 39_000,
+      outputTokens: 3_900,
+      totalTokens: 42_900,
+      costUsd: 0.02184,
+    }),
+    byDay: ['30', '31']
+      .map((d) => ({ day: `2026-10-${d}`, totals: usageTotals() }))
+      .concat(
+        ['01', '02', '03', '04', '05'].map((d) => ({
+          day: `2026-11-${d}`,
+          totals: d === '05' ? maria : usageTotals(),
+        })),
+      ),
+    byUser: [
+      { userId: 'u-maria', username: 'maria', displayName: 'Maria Silva', totals: maria },
+      { userId: 'u-joao', username: 'joao', displayName: 'João', totals: joao },
+    ],
+    byModel: [{ model: 'gpt-4.1-mini', priced: true, totals: maria }],
+    unpricedModels: [],
+    ...overrides,
+  }
+}
+
+export function fakeUsageGateway(report: UsageReport = usageReport()) {
+  return {
+    report: vi.fn(() => Promise.resolve(report)),
+  } satisfies UsageGateway
+}
+
+export function fakeSettingsGateway(
+  initialPrices: ModelPrice[] = [],
+  initialSettings: SystemSettings = {
+    usageRetentionMonths: 12,
+    updatedAt: null,
+    updatedBy: null,
+  },
+) {
+  const state = { settings: initialSettings, prices: [...initialPrices] }
+  const gateway = {
+    state,
+    get: vi.fn(() => Promise.resolve(state.settings)),
+    update: vi.fn((changes: SettingsChanges) => {
+      state.settings = {
+        ...state.settings,
+        ...changes,
+        updatedAt: new Date('2026-11-05T12:00:00Z'),
+        updatedBy: 'Ana Admin',
+      }
+      return Promise.resolve(state.settings)
+    }),
+    listModelPrices: vi.fn(() => Promise.resolve([...state.prices])),
+    setModelPrice: vi.fn((price: NewModelPrice) => {
+      const saved: ModelPrice = { ...price, configured: true }
+      state.prices = [...state.prices.filter((p) => p.model !== price.model), saved].sort((a, b) =>
+        a.model.localeCompare(b.model),
+      )
+      return Promise.resolve(saved)
+    }),
+    deleteModelPrice: vi.fn((model: string) => {
+      state.prices = state.prices.filter((p) => p.model !== model)
+      return Promise.resolve()
+    }),
+  } satisfies SettingsGateway & { state: typeof state }
+  return gateway
+}
+
 export const ANSWER: Answer = {
   text: 'A pressão máxima é **10 bar**.',
   found: true,
@@ -304,6 +413,8 @@ interface RenderAppOptions {
   readonly auth?: FakeAuthGateway
   readonly manuals?: ManualsGateway
   readonly users?: UsersGateway
+  readonly usage?: UsageGateway
+  readonly settings?: SettingsGateway
   readonly questions?: QuestionGateway
   readonly path?: string
 }
@@ -320,11 +431,15 @@ export function renderApp(options: RenderAppOptions = {}) {
         <QuestionGatewayContext value={questions}>
           <ManualsGatewayContext value={options.manuals ?? fakeManualsGateway()}>
             <UsersGatewayContext value={options.users ?? fakeUsersGateway([])}>
-              <SessionProvider>
-                <MemoryRouter initialEntries={[options.path ?? '/']}>
-                  <App />
-                </MemoryRouter>
-              </SessionProvider>
+              <UsageGatewayContext value={options.usage ?? fakeUsageGateway()}>
+                <SettingsGatewayContext value={options.settings ?? fakeSettingsGateway()}>
+                  <SessionProvider>
+                    <MemoryRouter initialEntries={[options.path ?? '/']}>
+                      <App />
+                    </MemoryRouter>
+                  </SessionProvider>
+                </SettingsGatewayContext>
+              </UsageGatewayContext>
             </UsersGatewayContext>
           </ManualsGatewayContext>
         </QuestionGatewayContext>

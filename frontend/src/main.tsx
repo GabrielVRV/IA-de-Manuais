@@ -20,6 +20,10 @@ import { HttpHealthGateway } from '@/features/health/infrastructure/http-health-
 import { HealthGatewayContext } from '@/features/health/presentation/health-gateway-context'
 import { HttpManualsGateway } from '@/features/manuals/infrastructure/http-manuals-gateway'
 import { ManualsGatewayContext } from '@/features/manuals/presentation/manuals-gateway-context'
+import { HttpSettingsGateway } from '@/features/settings/infrastructure/http-settings-gateway'
+import { SettingsGatewayContext } from '@/features/settings/presentation/settings-gateway-context'
+import { HttpUsageGateway } from '@/features/usage/infrastructure/http-usage-gateway'
+import { UsageGatewayContext } from '@/features/usage/presentation/usage-gateway-context'
 import { HttpUsersGateway } from '@/features/users/infrastructure/http-users-gateway'
 import { UsersGatewayContext } from '@/features/users/presentation/users-gateway-context'
 import { applyBrand, loadBrand } from '@/shared/brand/brand'
@@ -45,12 +49,16 @@ async function bootstrap(): Promise<void> {
               <QuestionGatewayContext value={new HttpQuestionGateway(http)}>
                 <ManualsGatewayContext value={new HttpManualsGateway(http)}>
                   <UsersGatewayContext value={new HttpUsersGateway(http)}>
-                    <SessionProvider>
-                      {/* Rotas por "#": funcionam em qualquer subpasta do XAMPP sem reescrita. */}
-                      <HashRouter>
-                        <App />
-                      </HashRouter>
-                    </SessionProvider>
+                    <UsageGatewayContext value={new HttpUsageGateway(http)}>
+                      <SettingsGatewayContext value={new HttpSettingsGateway(http)}>
+                        <SessionProvider>
+                          {/* Rotas por "#": funcionam em qualquer subpasta do XAMPP sem reescrita. */}
+                          <HashRouter>
+                            <App />
+                          </HashRouter>
+                        </SessionProvider>
+                      </SettingsGatewayContext>
+                    </UsageGatewayContext>
                   </UsersGatewayContext>
                 </ManualsGatewayContext>
               </QuestionGatewayContext>

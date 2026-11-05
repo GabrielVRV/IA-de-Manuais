@@ -49,6 +49,10 @@ export class HttpClient {
     return this.#request(path, withJson('PATCH', body), options)
   }
 
+  putJson(path: string, body: unknown, options: RequestOptions = {}): Promise<unknown> {
+    return this.#request(path, withJson('PUT', body), options)
+  }
+
   delete(path: string, options: RequestOptions = {}): Promise<unknown> {
     return this.#request(
       path,
