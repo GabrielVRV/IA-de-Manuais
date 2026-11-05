@@ -1,9 +1,11 @@
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Self
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from manual_assistant.domain.assistant import AssistantId, UserAccess
 from manual_assistant.domain.user import (
     DISPLAY_NAME_MAX_LENGTH,
     PASSWORD_MAX_LENGTH,
@@ -23,9 +25,15 @@ class UserResponse(BaseModel):
     must_change_password: bool
     last_login_at: datetime | None
     created_at: datetime
+    assistant_access: dict[AssistantId, UserAccess] = Field(
+        default_factory=dict,
+        description="Exceções ao acesso padrão; assistente ausente = segue o padrão",
+    )
 
     @classmethod
-    def from_entity(cls, user: User) -> Self:
+    def from_entity(
+        cls, user: User, assistant_access: Mapping[AssistantId, UserAccess] | None = None
+    ) -> Self:
         return cls(
             id=user.id,
             username=user.username,
@@ -36,6 +44,7 @@ class UserResponse(BaseModel):
             must_change_password=user.must_change_password,
             last_login_at=user.last_login_at,
             created_at=user.created_at,
+            assistant_access=dict(assistant_access or {}),
         )
 
 

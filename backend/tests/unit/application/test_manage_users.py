@@ -141,17 +141,9 @@ class TestUpdate:
         assert not user.is_active
         assert user.is_admin
 
-    async def test_approves_a_user_awaiting_access(self, users: InMemoryUserRepository) -> None:
-        pending = make_ad_user("joao", role=UserRole.PENDING)
-        await users.save(pending)
-
-        await UpdateUserUseCase(users).execute(admin, pending.id, role=UserRole.USER)
-
-        assert not pending.is_pending
-
     @pytest.mark.parametrize(
         "change",
-        [{"is_active": False}, {"role": UserRole.USER}, {"role": UserRole.PENDING}],
+        [{"is_active": False}, {"role": UserRole.USER}],
     )
     async def test_admins_cannot_lock_themselves_out(
         self, users: InMemoryUserRepository, change: dict[str, object]
@@ -200,7 +192,7 @@ class TestUseDirectoryLogin:
         self, users: InMemoryUserRepository
     ) -> None:
         await users.save(make_ad_user("gviaro"))
-        await users.save(make_ad_user("gabriel.viaro", role=UserRole.PENDING))
+        await users.save(make_ad_user("gabriel.viaro"))
 
         with pytest.raises(UserAlreadyExistsError):
             await UseDirectoryLoginUseCase(users).execute_as_system(

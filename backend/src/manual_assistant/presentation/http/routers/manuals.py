@@ -7,6 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Response, U
 
 from manual_assistant.domain.manual import TITLE_MAX_LENGTH, ManualId
 from manual_assistant.presentation.http.dependencies import (
+    CurrentUser,
     UseCasesDep,
     get_admin_user,
     get_current_user,
@@ -69,8 +70,8 @@ async def get_manual(manual_id: UUID, use_cases: UseCasesDep) -> ManualResponse:
     responses={**NOT_FOUND, status.HTTP_200_OK: {"content": {"application/pdf": {}}}},
     summary="Abre o PDF original (use #page=N na URL para ir direto à página)",
 )
-async def get_manual_file(manual_id: UUID, use_cases: UseCasesDep) -> Response:
-    manual_file = await use_cases.get_manual_file.execute(ManualId(manual_id))
+async def get_manual_file(manual_id: UUID, user: CurrentUser, use_cases: UseCasesDep) -> Response:
+    manual_file = await use_cases.get_manual_file.execute(user, ManualId(manual_id))
     return Response(
         content=manual_file.content,
         media_type="application/pdf",

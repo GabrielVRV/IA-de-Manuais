@@ -3,8 +3,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, status
 
+from manual_assistant.domain.assistant import AssistantId, UserAccess
 from manual_assistant.domain.user import UserId
 from manual_assistant.presentation.http.dependencies import AdminUser, UseCasesDep
+from manual_assistant.presentation.http.schemas.assistants import SetUserAccessRequest
 from manual_assistant.presentation.http.schemas.manuals import ErrorResponse
 from manual_assistant.presentation.http.schemas.users import (
     CreateUserRequest,
@@ -20,7 +22,11 @@ NOT_FOUND: dict[int | str, dict[str, Any]] = {status.HTTP_404_NOT_FOUND: {"model
 
 @router.get("", summary="Lista os usuários (somente administradores)")
 async def list_users(admin: AdminUser, use_cases: UseCasesDep) -> list[UserResponse]:
-    return [UserResponse.from_entity(u) for u in await use_cases.list_users.execute(admin)]
+    access = await use_cases.list_user_access.execute(admin)
+    return [
+        UserResponse.from_entity(user, access.get(user.id))
+        for user in await use_cases.list_users.execute(admin)
+    ]
 
 
 @router.post(
@@ -59,7 +65,7 @@ async def reset_password(
 @router.patch(
     "/{user_id}",
     responses=NOT_FOUND,
-    summary="Ativa/desativa, muda o perfil ou libera o acesso (somente administradores)",
+    summary="Ativa/desativa ou muda o perfil (somente administradores)",
 )
 async def update_user(
     user_id: UUID, request: UpdateUserRequest, admin: AdminUser, use_cases: UseCasesDep
@@ -68,3 +74,23 @@ async def update_user(
         admin, UserId(user_id), is_active=request.is_active, role=request.role
     )
     return UserResponse.from_entity(user)
+
+
+@router.put(
+    "/{user_id}/assistants/{assistant_id}",
+    responses=NOT_FOUND,
+    summary="Libera ou bloqueia um assistente para o usuário, ou volta ao padrão "
+    "(somente administradores)",
+)
+async def set_user_access(
+    user_id: UUID,
+    assistant_id: AssistantId,
+    request: SetUserAccessRequest,
+    admin: AdminUser,
+    use_cases: UseCasesDep,
+) -> dict[AssistantId, UserAccess]:
+    return dict(
+        await use_cases.set_user_access.execute(
+            admin, UserId(user_id), assistant_id, request.access
+        )
+    )

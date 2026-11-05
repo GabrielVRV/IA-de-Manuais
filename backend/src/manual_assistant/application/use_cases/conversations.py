@@ -13,10 +13,15 @@ from manual_assistant.application.errors import (
     ConversationNotFoundError,
     QuestionLimitExceededError,
 )
+from manual_assistant.application.ports.assistant_access_repository import (
+    AssistantAccessRepository,
+)
 from manual_assistant.application.ports.conversation_repository import ConversationRepository
 from manual_assistant.application.ports.settings_repository import SystemSettingsRepository
 from manual_assistant.application.ports.usage_repository import UsageRepository
 from manual_assistant.application.use_cases.ask_question import AskQuestionUseCase
+from manual_assistant.application.use_cases.assistant_access import ensure_assistant_access
+from manual_assistant.domain.assistant import AssistantId
 from manual_assistant.domain.conversation import (
     Conversation,
     ConversationId,
@@ -57,8 +62,9 @@ class ChatUseCase:
     falhar: o histórico só tem perguntas que foram respondidas. O consumo do modelo
     (sem o texto da pergunta) é registrado à parte, para o controle de custos.
 
-    Antes de chamar o modelo, confere o limite de perguntas por usuário definido na tela
-    de configurações: acima dele, a pergunta é recusada sem gastar tokens.
+    Antes de chamar o modelo, confere se o usuário tem acesso ao assistente e o limite de
+    perguntas definido na tela de configurações: sem acesso ou acima do limite, a pergunta
+    é recusada sem gastar tokens.
     """
 
     def __init__(
@@ -68,9 +74,11 @@ class ChatUseCase:
         ask_question: AskQuestionUseCase,
         usage: UsageRepository,
         settings: SystemSettingsRepository,
+        access: AssistantAccessRepository,
         clock: Clock = utc_now,
     ) -> None:
         self._conversations = conversations
+        self._access = access
         self._ask_question = ask_question
         self._usage = usage
         self._settings = settings
@@ -81,9 +89,12 @@ class ChatUseCase:
     ) -> ChatReply:
         """
         Raises:
+            AssistantAccessDeniedError: se o usuário não tem acesso ao assistente.
             QuestionLimitExceededError: se o usuário passou do limite de perguntas.
             ConversationNotFoundError: se a conversa não existe ou é de outro usuário.
         """
+        # Hoje só há o assistente de Engenharia; com outros, a conversa dirá qual é.
+        await ensure_assistant_access(self._access, actor, AssistantId.ENGINEERING)
         await self._check_question_limits(actor)
         if conversation_id is None:
             conversation, is_new = Conversation.start(actor.id, question, self._clock()), True

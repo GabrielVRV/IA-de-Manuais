@@ -44,7 +44,8 @@ async def engine(postgres_settings: Settings) -> AsyncIterator[AsyncEngine]:
             text(
                 "TRUNCATE manuals, chunks, users, sessions, login_attempts,"
                 " conversations, conversation_exchanges, question_usage, system_settings,"
-                " model_prices, sync_schedule CASCADE"
+                " model_prices, sync_schedule, assistant_access_policies,"
+                " user_assistant_access CASCADE"
             )
         )
     await engine.dispose()

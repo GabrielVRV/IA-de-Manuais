@@ -4,10 +4,16 @@ from typing import Annotated, cast
 from fastapi import Depends, Request
 
 from manual_assistant.application.errors import (
-    AccessPendingError,
     NotAuthenticatedError,
     PasswordChangeRequiredError,
     PermissionDeniedError,
+)
+from manual_assistant.application.use_cases.assistant_access import (
+    ListAccessPoliciesUseCase,
+    ListMyAssistantsUseCase,
+    ListUserAccessUseCase,
+    SetUserAccessUseCase,
+    UpdateAccessPolicyUseCase,
 )
 from manual_assistant.application.use_cases.authenticate_user import AuthenticateUserUseCase
 from manual_assistant.application.use_cases.change_password import ChangePasswordUseCase
@@ -86,6 +92,11 @@ class UseCases:
     list_model_prices: ListModelPricesUseCase
     set_model_price: SetModelPriceUseCase
     delete_model_price: DeleteModelPriceUseCase
+    list_my_assistants: ListMyAssistantsUseCase
+    list_access_policies: ListAccessPoliciesUseCase
+    update_access_policy: UpdateAccessPolicyUseCase
+    list_user_access: ListUserAccessUseCase
+    set_user_access: SetUserAccessUseCase
 
 
 def get_use_cases(request: Request) -> UseCases:
@@ -100,8 +111,7 @@ def get_check_health(use_cases: UseCasesDep) -> CheckHealthUseCase:
 
 
 async def get_session_user(request: Request, use_cases: UseCasesDep) -> User:
-    """Usuário da sessão, mesmo que ainda precise trocar a senha provisória ou aguarde
-    a liberação do acesso."""
+    """Usuário da sessão, mesmo que ainda precise trocar a senha provisória."""
     token = request.cookies.get(SESSION_COOKIE)
     if not token:
         raise NotAuthenticatedError()
@@ -112,9 +122,8 @@ SessionUser = Annotated[User, Depends(get_session_user)]
 
 
 def get_current_user(user: SessionUser) -> User:
-    """Usuário liberado para usar o sistema: acesso aprovado e sem troca de senha pendente."""
-    if user.is_pending:
-        raise AccessPendingError()
+    """Usuário liberado para usar o sistema: sem troca de senha pendente. O acesso a cada
+    assistente é conferido nos casos de uso."""
     if user.must_change_password:
         raise PasswordChangeRequiredError()
     return user

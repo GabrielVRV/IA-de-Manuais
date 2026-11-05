@@ -56,9 +56,8 @@ class PasswordChangeRequiredError(PermissionDeniedError):
         super().__init__("Troque sua senha provisória para continuar")
 
 
-class AccessPendingError(PermissionDeniedError):
-    def __init__(self) -> None:
-        super().__init__("Seu acesso ainda não foi liberado. Aguarde um administrador.")
+class AssistantAccessDeniedError(PermissionDeniedError):
+    """O usuário não tem acesso ao assistente; a mensagem diz como pedir."""
 
 
 class AccountDisabledError(PermissionDeniedError):

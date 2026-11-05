@@ -51,15 +51,15 @@ async def test_saves_and_restores_every_field(repository: SqlAlchemyUserReposito
     )
 
 
-async def test_saves_ad_users_awaiting_approval(repository: SqlAlchemyUserRepository) -> None:
-    await repository.save(make_ad_user("joao", role=UserRole.PENDING))
+async def test_saves_ad_users_without_password(repository: SqlAlchemyUserRepository) -> None:
+    await repository.save(make_ad_user("joao"))
 
     restored = await repository.get_by_username("joao")
 
     assert restored is not None
     assert (restored.auth_source, restored.role, restored.password_hash) == (
         AuthSource.AD,
-        UserRole.PENDING,
+        UserRole.USER,
         None,
     )
 

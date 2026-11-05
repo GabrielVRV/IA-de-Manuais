@@ -17,6 +17,13 @@ from manual_assistant.application.ports.credential_verifier import CredentialVer
 from manual_assistant.application.ports.security import PasswordHasher
 from manual_assistant.application.sessions import SessionManager
 from manual_assistant.application.use_cases.ask_question import AskQuestionUseCase
+from manual_assistant.application.use_cases.assistant_access import (
+    ListAccessPoliciesUseCase,
+    ListMyAssistantsUseCase,
+    ListUserAccessUseCase,
+    SetUserAccessUseCase,
+    UpdateAccessPolicyUseCase,
+)
 from manual_assistant.application.use_cases.authenticate_user import AuthenticateUserUseCase
 from manual_assistant.application.use_cases.change_password import ChangePasswordUseCase
 from manual_assistant.application.use_cases.check_health import CheckHealthUseCase
@@ -75,6 +82,9 @@ from manual_assistant.infrastructure.active_directory.ldap_credential_verifier i
 from manual_assistant.infrastructure.ai.factory import AiProviders, build_ai_providers
 from manual_assistant.infrastructure.documents.line_chunker import LineChunker
 from manual_assistant.infrastructure.documents.pdf_parser import PdfiumDocumentParser
+from manual_assistant.infrastructure.persistence.assistant_access_repository import (
+    SqlAlchemyAssistantAccessRepository,
+)
 from manual_assistant.infrastructure.persistence.conversation_repository import (
     SqlAlchemyConversationRepository,
 )
@@ -141,6 +151,7 @@ def create_app(
     usage = SqlAlchemyUsageRepository(session_factory)
     system_settings = SqlAlchemySystemSettingsRepository(session_factory)
     model_prices = SqlAlchemyModelPriceRepository(session_factory)
+    assistant_access = SqlAlchemyAssistantAccessRepository(session_factory)
     hasher = password_hasher or Argon2PasswordHasher()
     sessions = SessionManager(
         SqlAlchemySessionRepository(session_factory),
@@ -192,7 +203,7 @@ def create_app(
         index_manual=index_manual,
         list_manuals=ListManualsUseCase(repository),
         get_manual=GetManualUseCase(repository),
-        get_manual_file=GetManualFileUseCase(repository, storage),
+        get_manual_file=GetManualFileUseCase(repository, storage, assistant_access),
         delete_manual=delete_manual,
         manual_sync=manual_sync,
         get_sync_schedule=GetSyncScheduleUseCase(
@@ -212,6 +223,7 @@ def create_app(
             ),
             usage=usage,
             settings=system_settings,
+            access=assistant_access,
         ),
         list_conversations=ListConversationsUseCase(conversations),
         get_conversation=GetConversationUseCase(conversations),
@@ -238,6 +250,11 @@ def create_app(
         ),
         get_settings=GetSystemSettingsUseCase(system_settings),
         update_settings=UpdateSystemSettingsUseCase(system_settings),
+        list_my_assistants=ListMyAssistantsUseCase(assistant_access),
+        list_access_policies=ListAccessPoliciesUseCase(assistant_access),
+        update_access_policy=UpdateAccessPolicyUseCase(assistant_access),
+        list_user_access=ListUserAccessUseCase(assistant_access),
+        set_user_access=SetUserAccessUseCase(access=assistant_access, users=users),
         list_model_prices=ListModelPricesUseCase(prices=model_prices, usage=usage),
         set_model_price=SetModelPriceUseCase(model_prices),
         delete_model_price=DeleteModelPriceUseCase(model_prices),

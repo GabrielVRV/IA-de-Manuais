@@ -115,7 +115,7 @@ class UserRecord(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
-        CheckConstraint("role IN ('admin', 'user', 'pending')", name="valid_role"),
+        CheckConstraint("role IN ('admin', 'user')", name="valid_role"),
         CheckConstraint("auth_source IN ('local', 'ad')", name="valid_auth_source"),
         # Só usuários locais têm senha guardada aqui; a dos usuários do AD fica no AD.
         CheckConstraint(
@@ -233,3 +233,33 @@ class SyncScheduleRecord(Base):
     last_trigger_error: Mapped[str | None] = mapped_column(String(500))
 
     __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
+
+
+class AssistantAccessPolicyRecord(Base):
+    """Acesso padrão de cada assistente do chat. Sem linha = liberado para todos."""
+
+    __tablename__ = "assistant_access_policies"
+
+    assistant_id: Mapped[str] = mapped_column(String(30), primary_key=True)
+    default_access: Mapped[str] = mapped_column(String(20))
+    request_instructions: Mapped[str | None] = mapped_column(String(300))
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_by: Mapped[str | None] = mapped_column(String(100))
+
+    __table_args__ = (
+        CheckConstraint("default_access IN ('open', 'restricted')", name="valid_default_access"),
+    )
+
+
+class UserAssistantAccessRecord(Base):
+    """Exceção ao acesso padrão de um assistente, para um usuário."""
+
+    __tablename__ = "user_assistant_access"
+
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    assistant_id: Mapped[str] = mapped_column(String(30), primary_key=True)
+    access: Mapped[str] = mapped_column(String(20))
+
+    __table_args__ = (CheckConstraint("access IN ('granted', 'denied')", name="valid_access"),)

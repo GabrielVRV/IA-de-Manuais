@@ -152,14 +152,14 @@ class TestLocalUsers:
 
 
 class TestDirectoryUsers:
-    async def test_first_login_registers_the_user_awaiting_approval(self, ctx: Context) -> None:
+    async def test_first_login_registers_a_regular_user(self, ctx: Context) -> None:
         ctx.directory.add("joao", "senha-de-rede", name="João da Silva")
 
         session = await ctx.login("JOAO", "senha-de-rede")
 
         user = session.user
         assert (user.username, user.display_name) == ("joao", "João da Silva")
-        assert (user.role, user.auth_source) == (UserRole.PENDING, AuthSource.AD)
+        assert (user.role, user.auth_source) == (UserRole.USER, AuthSource.AD)
         assert user.password_hash is None
         assert not user.must_change_password
         assert await ctx.users.get_by_username("joao") is user

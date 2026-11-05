@@ -79,7 +79,7 @@ class TestLogin:
 
 
 class TestDirectoryLogin:
-    def test_first_login_waits_for_an_administrator(self, backend: FakeBackend) -> None:
+    def test_first_login_uses_the_assistants_open_to_everyone(self, backend: FakeBackend) -> None:
         backend.directory.add("joao", "senha-de-rede", name="João da Silva")
         client = TestClient(backend.build_app())
 
@@ -88,24 +88,9 @@ class TestDirectoryLogin:
         )
 
         assert response.status_code == 200
-        assert (response.json()["role"], response.json()["auth_source"]) == ("pending", "ad")
+        assert (response.json()["role"], response.json()["auth_source"]) == ("user", "ad")
         assert client.get(f"{AUTH}/me").json()["display_name"] == "João da Silva"
-        blocked = client.post("/api/v1/questions", json={"question": "Pressão?"})
-        assert blocked.status_code == 403
-        assert "ainda não foi liberado" in blocked.json()["detail"]
-
-    def test_an_administrator_releases_the_access(self, backend: FakeBackend) -> None:
-        backend.directory.add("joao", "senha-de-rede")
-        joao = TestClient(backend.build_app())
-        login(joao, "joao", "senha-de-rede")
-        admin = backend.client_logged_in_as("admin")
-
-        pending = next(u for u in admin.get("/api/v1/users").json() if u["username"] == "joao")
-        assert pending["role"] == "pending"
-        released = admin.patch(f"/api/v1/users/{pending['id']}", json={"role": "user"})
-
-        assert released.status_code == 200
-        assert joao.post("/api/v1/questions", json={"question": "Pressão?"}).status_code == 200
+        assert client.post("/api/v1/questions", json={"question": "Pressão?"}).status_code == 200
 
     def test_ad_passwords_are_not_reset_here(self, backend: FakeBackend) -> None:
         backend.directory.add("joao", "senha-de-rede")

@@ -69,13 +69,13 @@ def test_logins_are_case_insensitive() -> None:
 
 
 class TestDirectoryProvisioning:
-    def test_enters_awaiting_approval_without_a_password(self) -> None:
+    def test_enters_as_a_regular_user_without_a_password(self) -> None:
         user = User.provision_from_directory(
             username=" JOAO.Silva ", display_name="  João da Silva ", now=FIXED_NOW
         )
 
         assert (user.username, user.display_name) == ("joao.silva", "João da Silva")
-        assert user.is_pending
+        assert user.role is UserRole.USER
         assert not user.is_local
         assert user.password_hash is None
         assert not user.must_change_password

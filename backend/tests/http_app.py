@@ -9,6 +9,13 @@ from fastapi.testclient import TestClient
 from manual_assistant import __version__
 from manual_assistant.application.ports.health_indicator import HealthIndicator
 from manual_assistant.application.use_cases.ask_question import AskQuestionUseCase
+from manual_assistant.application.use_cases.assistant_access import (
+    ListAccessPoliciesUseCase,
+    ListMyAssistantsUseCase,
+    ListUserAccessUseCase,
+    SetUserAccessUseCase,
+    UpdateAccessPolicyUseCase,
+)
 from manual_assistant.application.use_cases.authenticate_user import AuthenticateUserUseCase
 from manual_assistant.application.use_cases.change_password import ChangePasswordUseCase
 from manual_assistant.application.use_cases.check_health import CheckHealthUseCase
@@ -62,6 +69,7 @@ from tests.fakes import (
     FakeEmbeddingProvider,
     FakeLanguageModel,
     FakeManualSource,
+    InMemoryAssistantAccessRepository,
     InMemoryConversationRepository,
     InMemoryFileStorage,
     InMemoryLoginAttemptRepository,
@@ -106,6 +114,9 @@ class FakeBackend:
     sync_schedule: InMemorySyncScheduleRepository = field(
         default_factory=InMemorySyncScheduleRepository
     )
+    assistant_access: InMemoryAssistantAccessRepository = field(
+        default_factory=InMemoryAssistantAccessRepository
+    )
     health_indicators: list[HealthIndicator] = field(default_factory=list)
     max_upload_bytes: int = 1024 * 1024
     # None = pasta de manuais não configurada (sincronização desligada).
@@ -149,7 +160,9 @@ class FakeBackend:
             index_manual=index_manual,
             list_manuals=ListManualsUseCase(self.repository),
             get_manual=GetManualUseCase(self.repository),
-            get_manual_file=GetManualFileUseCase(self.repository, self.storage),
+            get_manual_file=GetManualFileUseCase(
+                self.repository, self.storage, self.assistant_access
+            ),
             delete_manual=delete_manual,
             manual_sync=self.manual_sync,
             get_sync_schedule=GetSyncScheduleUseCase(
@@ -167,6 +180,7 @@ class FakeBackend:
                 ),
                 usage=self.usage,
                 settings=self.system_settings,
+                access=self.assistant_access,
             ),
             list_conversations=ListConversationsUseCase(self.conversations),
             get_conversation=GetConversationUseCase(self.conversations),
@@ -194,6 +208,11 @@ class FakeBackend:
             list_model_prices=ListModelPricesUseCase(prices=self.model_prices, usage=self.usage),
             set_model_price=SetModelPriceUseCase(self.model_prices),
             delete_model_price=DeleteModelPriceUseCase(self.model_prices),
+            list_my_assistants=ListMyAssistantsUseCase(self.assistant_access),
+            list_access_policies=ListAccessPoliciesUseCase(self.assistant_access),
+            update_access_policy=UpdateAccessPolicyUseCase(self.assistant_access),
+            list_user_access=ListUserAccessUseCase(self.assistant_access),
+            set_user_access=SetUserAccessUseCase(access=self.assistant_access, users=self.users),
         )
         return create_http_app(
             title="test",

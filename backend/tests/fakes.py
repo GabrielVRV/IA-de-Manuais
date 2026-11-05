@@ -5,7 +5,7 @@ O mypy garante que cada fake segue o contrato da porta que substitui.
 
 import asyncio
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
@@ -25,6 +25,7 @@ from manual_assistant.application.ports.manual_source import SourceDocument
 from manual_assistant.application.ports.text_chunker import TextFragment
 from manual_assistant.application.ports.usage_repository import UsageAggregate
 from manual_assistant.application.ports.vector_store import EmbeddedChunk
+from manual_assistant.domain.assistant import AccessPolicy, AssistantId, UserAccess
 from manual_assistant.domain.chunk import ScoredChunk
 from manual_assistant.domain.conversation import (
     Conversation,
@@ -420,3 +421,31 @@ class InMemoryModelPriceRepository:
 def _copy(conversation: Conversation) -> Conversation:
     """Cópia independente, como se viesse do banco: o teste não altera o "armazenado"."""
     return replace(conversation, exchanges=list(conversation.exchanges))
+
+
+@dataclass
+class InMemoryAssistantAccessRepository:
+    policies: dict[AssistantId, AccessPolicy] = field(default_factory=dict)
+    access: dict[UserId, dict[AssistantId, UserAccess]] = field(default_factory=dict)
+
+    async def get_policy(self, assistant_id: AssistantId) -> AccessPolicy:
+        policy = self.policies.get(assistant_id)
+        return replace(policy) if policy else AccessPolicy(assistant_id=assistant_id)
+
+    async def save_policy(self, policy: AccessPolicy) -> None:
+        self.policies[policy.assistant_id] = replace(policy)
+
+    async def user_access(self, user_id: UserId) -> Mapping[AssistantId, UserAccess]:
+        return dict(self.access.get(user_id, {}))
+
+    async def all_user_access(self) -> Mapping[UserId, Mapping[AssistantId, UserAccess]]:
+        return {user_id: dict(items) for user_id, items in self.access.items() if items}
+
+    async def set_user_access(
+        self, user_id: UserId, assistant_id: AssistantId, access: UserAccess | None
+    ) -> None:
+        items = self.access.setdefault(user_id, {})
+        if access is None:
+            items.pop(assistant_id, None)
+        else:
+            items[assistant_id] = access

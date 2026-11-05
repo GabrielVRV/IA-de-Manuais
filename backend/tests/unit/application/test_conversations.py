@@ -27,6 +27,7 @@ from tests.factories import FIXED_NOW, make_chunk, make_manual
 from tests.fakes import (
     FakeEmbeddingProvider,
     FakeLanguageModel,
+    InMemoryAssistantAccessRepository,
     InMemoryConversationRepository,
     InMemorySystemSettingsRepository,
     InMemoryUsageRepository,
@@ -47,6 +48,7 @@ class Context:
         self.language_model = FakeLanguageModel(answer="A pressão máxima é 180 bar [1].")
         self.usage = InMemoryUsageRepository()
         self.settings = InMemorySystemSettingsRepository()
+        self.access = InMemoryAssistantAccessRepository()
         self.chat = ChatUseCase(
             conversations=self.conversations,
             ask_question=AskQuestionUseCase(
@@ -63,6 +65,7 @@ class Context:
             ),
             usage=self.usage,
             settings=self.settings,
+            access=self.access,
             clock=lambda: self.now,
         )
         self.maria = make_user("maria")
@@ -151,6 +154,7 @@ class TestChat:
             ),
             usage=ctx.usage,
             settings=ctx.settings,
+            access=ctx.access,
             clock=lambda: ctx.now,
         )
 

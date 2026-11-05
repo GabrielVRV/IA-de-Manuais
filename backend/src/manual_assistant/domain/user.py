@@ -20,8 +20,7 @@ INVALID_USERNAME_MESSAGE = (
 
 class UserRole(StrEnum):
     ADMIN = "admin"  # usa o chat e administra manuais e usuários
-    USER = "user"  # usa o chat
-    PENDING = "pending"  # entrou pelo AD e aguarda um administrador liberar o acesso
+    USER = "user"  # usa os assistentes do chat a que tem acesso (ADR 0013)
 
 
 class AuthSource(StrEnum):
@@ -106,12 +105,13 @@ class User:
 
     @classmethod
     def provision_from_directory(cls, *, username: str, display_name: str, now: datetime) -> Self:
-        """Primeiro login de um usuário do AD: entra, mas aguarda um administrador liberar."""
+        """Primeiro login de um usuário do AD: entra como usuário comum e usa os assistentes
+        liberados para todos (ADR 0013)."""
         return cls(
             id=UserId(uuid4()),
             username=normalize_username(username),
             display_name=_fit_display_name(display_name, fallback=username),
-            role=UserRole.PENDING,
+            role=UserRole.USER,
             password_hash=None,
             created_at=now,
             auth_source=AuthSource.AD,
@@ -121,10 +121,6 @@ class User:
     @property
     def is_admin(self) -> bool:
         return self.role is UserRole.ADMIN
-
-    @property
-    def is_pending(self) -> bool:
-        return self.role is UserRole.PENDING
 
     @property
     def is_local(self) -> bool:
