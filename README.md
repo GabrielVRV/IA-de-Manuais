@@ -198,7 +198,7 @@ Todo push e pull request passa por pipelines no GitHub Actions:
 | 9a  | Usuários, login (cookie HttpOnly + Argon2) e proteção das rotas                      | ✅ |
 | 9b  | Telas de login, usuários e acompanhamento dos manuais                                | ✅ |
 | 9c  | Login com usuário do TOTVS, liberação pelo administrador e sessões no banco          | ✅ |
-| 9d  | Login com o usuário de rede (AD) no lugar do TOTVS                                   | ⏳ |
+| 9d  | Login com o usuário de rede (AD) no lugar do TOTVS                                   | ✅ |
 | 10a | Sincronização com a pasta de manuais da Engenharia (`sync-manuals`)                  | ✅ |
 | 10b | Sincronização periódica na API e acompanhamento na tela de administração            | ⏳ |
 | 11  | Observabilidade: logs estruturados, custo de tokens, feedback 👍/👎 nas respostas     | ⏳ |
