@@ -193,8 +193,9 @@ Assistente de Engenharia).
    - **Usuário:** usa o chat.
    - **Administrador:** também acessa a Administração e usa todos os assistentes.
 
-   Na coluna **Acesso**, cada pessoa pode seguir o **padrão** do assistente, ficar
-   **liberada** ou ficar **bloqueada**. Para tirar alguém do sistema inteiro, clique em
+   A coluna **Acesso** mostra quais assistentes cada pessoa usa. Em **Gerenciar**, escolha
+   para cada assistente se ela segue o **padrão**, fica **liberada** ou fica **bloqueada**,
+   e clique em **Salvar acessos**. Para tirar alguém do sistema inteiro, clique em
    **Desativar**. Para limitar quem entra, use o grupo do AD (`APP_AD_REQUIRED_GROUP_DN`).
    Quem não tem usuário de rede pode ser criado na Quem não tem usuário de rede pode ser criado na
    própria tela, como **usuário local**: uma **senha provisória** é gerada e mostrada
@@ -311,7 +312,7 @@ reindexado, e o manual que saiu da pasta é removido do sistema.
 | Entra e **é deslogado em seguida** | Tela aberta por um endereço que não passa pelo container `web` (ex.: XAMPP em outro servidor) | Acesse a tela pela porta 8084 do servidor da API |
 | Manual **"Falhou: serviço externo"** | Limite ou cota do plano gratuito do Gemini | Aguarde a cota renovar (diária) ou use a chave paga, e clique em **Reprocessar** |
 | Manual **"Falhou: ... OCR"** | PDF escaneado (imagem, sem texto) | Ainda não suportado; use a versão digital do PDF |
-| Chat: **"Você ainda não tem acesso a este assistente"** | O assistente está "só para quem for liberado" e a pessoa não foi liberada | Libere a pessoa na coluna **Acesso** da tela **Usuários**, ou mude o padrão em **Acessos** |
+| Chat: **"Você ainda não tem acesso a este assistente"** | O assistente está "só para quem for liberado" e a pessoa não foi liberada | Na tela **Usuários**, clique em **Gerenciar** na linha da pessoa e libere o assistente, ou mude o padrão em **Acessos** |
 | Chat: **"Você atingiu o limite de N pergunta(s)…"** | Limite de perguntas por usuário | Aguarde, ou ajuste o limite em **Configurações** (`0` desliga) |
 | Sincronização agendada **"não começou"** | Pasta de rede fora do ar ou outra sincronização rodando | Confira a pasta com o passo de verificação acima; ela tenta de novo no horário do dia seguinte |
 | Chat responde **"temporariamente indisponível"** | Gemini sobrecarregado ou sem cota | Tente em instantes; `docker compose logs api` mostra o motivo |

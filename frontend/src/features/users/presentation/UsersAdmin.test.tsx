@@ -94,25 +94,49 @@ describe('<UsersAdmin />', () => {
     expect(screen.queryByRole('button', { name: 'Liberar' })).not.toBeInTheDocument()
   })
 
-  it('grants or blocks the assistant for one user and returns them to the default', async () => {
+  it('opens the user access and says which assistant each choice is for', async () => {
     const { users, user } = setup()
-    const select = await screen.findByLabelText<HTMLSelectElement>(
-      'Acesso de Pedro da Rede ao Assistente de Engenharia',
-    )
-    expect(select.value).toBe('')
-    expect(
-      within(select).getByRole('option', { name: 'Padrão (liberado para todos)' }),
-    ).toBeInTheDocument()
+    await screen.findByRole('table')
+    expect(row('Pedro')).toHaveTextContent('Usa Assistente de Engenharia')
 
-    await user.selectOptions(select, 'Bloqueado')
-    expect(users.setAssistantAccess).toHaveBeenLastCalledWith('u-pedro', 'engenharia', 'denied')
+    await user.click(screen.getByRole('button', { name: 'Gerenciar acessos de Pedro da Rede' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Acessos de Pedro da Rede' })
+    const engineering = within(dialog).getByRole('group', { name: 'Assistente de Engenharia' })
+    expect(within(engineering).getByRole('radio', { name: 'Seguir o padrão' })).toBeChecked()
+    expect(within(dialog).getByRole('button', { name: 'Salvar acessos' })).toBeDisabled()
+
+    await user.click(within(engineering).getByRole('radio', { name: 'Bloqueado' }))
+    expect(engineering).toHaveTextContent('Sem acesso')
+    await user.click(within(dialog).getByRole('button', { name: 'Salvar acessos' }))
+
+    expect(users.setAssistantAccess).toHaveBeenCalledWith('u-pedro', 'engenharia', 'denied')
     await waitFor(() => {
-      expect(select.value).toBe('denied')
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
+    expect(row('Pedro')).toHaveTextContent('Sem acesso Assistente de Engenharia')
+    expect(row('Pedro')).toHaveTextContent('Bloqueado para esta pessoa')
+  })
 
-    await user.selectOptions(select, 'Padrão (liberado para todos)')
-    expect(users.setAssistantAccess).toHaveBeenLastCalledWith('u-pedro', 'engenharia', null)
-    // Administradores usam todos os assistentes: não há o que escolher.
+  it('returns a user to the default and cancels without saving', async () => {
+    const { users, user } = setup()
+    users.state.users = users.state.users.map((u) =>
+      u.id === 'u-pedro' ? { ...u, assistantAccess: { engenharia: 'granted' } } : u,
+    )
+    await screen.findByRole('table')
+
+    await user.click(screen.getByRole('button', { name: 'Gerenciar acessos de Pedro da Rede' }))
+    await user.click(screen.getByRole('radio', { name: 'Seguir o padrão' }))
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(users.setAssistantAccess).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Gerenciar acessos de Pedro da Rede' }))
+    await user.click(screen.getByRole('radio', { name: 'Seguir o padrão' }))
+    await user.click(screen.getByRole('button', { name: 'Salvar acessos' }))
+
+    expect(users.setAssistantAccess).toHaveBeenCalledWith('u-pedro', 'engenharia', null)
+    // Administradores usam todos os assistentes: não há o que gerenciar.
     expect(row('Ana Admin')).toHaveTextContent('Todos (administrador)')
+    expect(screen.queryByRole('button', { name: 'Gerenciar acessos de Ana Admin' })).toBeNull()
   })
 })

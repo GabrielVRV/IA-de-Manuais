@@ -16,6 +16,12 @@ export interface ManagedUser {
   readonly assistantAccess: Partial<Record<AssistantId, UserAccess>>
 }
 
+/** Exceção a gravar: ``null`` = o usuário volta a seguir o padrão do assistente. */
+export interface AssistantAccessChange {
+  readonly assistantId: AssistantId
+  readonly access: UserAccess | null
+}
+
 /** Usuário local. Os do AD são cadastrados sozinhos no primeiro login. */
 export interface NewUser {
   readonly username: string

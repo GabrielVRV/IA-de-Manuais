@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import {
-  type AccessPolicy,
-  DEFAULT_ACCESS_LABELS,
-  type UserAccess,
-} from '@/features/assistants/domain/assistants'
+import { type AccessPolicy, canUseAssistant } from '@/features/assistants/domain/assistants'
 import { useAssistantsGateway } from '@/features/assistants/presentation/assistants-gateway-context'
 import { useCurrentUser } from '@/features/auth/presentation/session-context'
 import { cx } from '@/shared/cx'
@@ -12,7 +8,8 @@ import { describeError } from '@/shared/http/describe-error'
 import { randomPassword } from '@/shared/random-password'
 import ui from '@/styles/ui.module.css'
 
-import type { ManagedUser, UserRole } from '../domain/users'
+import type { AssistantAccessChange, ManagedUser, UserRole } from '../domain/users'
+import { UserAccessDialog } from './UserAccessDialog'
 import { useUsersGateway } from './users-gateway-context'
 import styles from './UsersAdmin.module.css'
 
@@ -31,6 +28,7 @@ export function UsersAdmin() {
   const me = useCurrentUser()
   const [users, setUsers] = useState<ManagedUser[] | null>(null)
   const [policies, setPolicies] = useState<AccessPolicy[]>([])
+  const [editingAccess, setEditingAccess] = useState<ManagedUser | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [handover, setHandover] = useState<Handover | null>(null)
 
@@ -80,6 +78,13 @@ export function UsersAdmin() {
       setHandover({ username: user.username, password, action: 'redefinida' })
     })
   }
+
+  const saveAccess = (user: ManagedUser, changes: readonly AssistantAccessChange[]) =>
+    run(async () => {
+      for (const change of changes) {
+        await gateway.setAssistantAccess(user.id, change.assistantId, change.access)
+      }
+    })
 
   return (
     <div className={ui.page}>
@@ -179,21 +184,21 @@ export function UsersAdmin() {
                         </select>
                       </td>
                       {policies.length > 0 && (
-                        <td data-label="Acesso">
+                        <td className={styles.accessCell} data-label="Acesso">
                           <div className={styles.access}>
-                            {policies.map((policy) => (
-                              <AssistantAccessSelect
-                                key={policy.assistantId}
-                                user={user}
-                                policy={policy}
-                                showName={policies.length > 1}
-                                onChange={(access) => {
-                                  void run(() =>
-                                    gateway.setAssistantAccess(user.id, policy.assistantId, access),
-                                  )
+                            <AccessSummary user={user} policies={policies} />
+                            {user.role !== 'admin' && (
+                              <button
+                                type="button"
+                                className={cx(ui.button, styles.manage)}
+                                aria-label={`Gerenciar acessos de ${user.displayName}`}
+                                onClick={() => {
+                                  setEditingAccess(user)
                                 }}
-                              />
-                            ))}
+                              >
+                                Gerenciar
+                              </button>
+                            )}
                           </div>
                         </td>
                       )}
@@ -248,6 +253,17 @@ export function UsersAdmin() {
           </div>
         )}
       </div>
+
+      {editingAccess && (
+        <UserAccessDialog
+          user={editingAccess}
+          policies={policies}
+          onSave={(changes) => saveAccess(editingAccess, changes)}
+          onClose={() => {
+            setEditingAccess(null)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -365,47 +381,36 @@ function CreateUserForm({
   )
 }
 
-const ACCESS_OPTIONS: readonly { value: UserAccess; label: string }[] = [
-  { value: 'granted', label: 'Liberado' },
-  { value: 'denied', label: 'Bloqueado' },
-]
-
-/** Exceção do usuário ao acesso padrão de um assistente; administradores usam todos. */
-function AssistantAccessSelect({
+/** Resumo do acesso a cada assistente, na tabela; a edição fica no diálogo. */
+function AccessSummary({
   user,
-  policy,
-  showName,
-  onChange,
+  policies,
 }: {
   readonly user: ManagedUser
-  readonly policy: AccessPolicy
-  readonly showName: boolean
-  readonly onChange: (access: UserAccess | null) => void
+  readonly policies: readonly AccessPolicy[]
 }) {
-  const label = `Acesso de ${user.displayName} ao ${policy.name}`
   if (user.role === 'admin') {
     return <span className={ui.muted}>Todos (administrador)</span>
   }
   return (
-    <label className={styles.accessField}>
-      {showName && <span className={styles.subtle}>{policy.name}</span>}
-      <select
-        className={ui.select}
-        aria-label={label}
-        value={user.assistantAccess[policy.assistantId] ?? ''}
-        onChange={(event) => {
-          onChange(event.target.value === '' ? null : (event.target.value as UserAccess))
-        }}
-      >
-        <option value="">
-          Padrão ({DEFAULT_ACCESS_LABELS[policy.defaultAccess].toLowerCase()})
-        </option>
-        {ACCESS_OPTIONS.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
+    <ul className={styles.accessList}>
+      {policies.map((policy) => {
+        const access = user.assistantAccess[policy.assistantId]
+        const allowed = canUseAssistant(policy, access)
+        return (
+          <li key={policy.assistantId}>
+            <span className={ui.badge} data-tone={allowed ? 'success' : 'danger'}>
+              {allowed ? 'Usa' : 'Sem acesso'}
+            </span>{' '}
+            {policy.name}
+            {access && (
+              <span className={styles.subtle}>
+                {access === 'granted' ? 'Liberado para esta pessoa' : 'Bloqueado para esta pessoa'}
+              </span>
+            )}
+          </li>
+        )
+      })}
+    </ul>
   )
 }

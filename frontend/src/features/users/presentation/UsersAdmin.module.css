@@ -46,16 +46,29 @@
   font-size: 0.75rem;
 }
 
+/* Resumo dos acessos e o botão que abre o diálogo de edição. */
 .access {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  align-items: center;
+  gap: var(--space-3);
 }
 
-.accessField {
+.accessList {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.accessList li {
+  white-space: nowrap;
+}
+
+.manage {
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.8125rem;
 }
 
 /* Origem e data não quebram linha; o nome é quem cede espaço. */
@@ -124,8 +137,18 @@
   }
 
   .name,
+  .accessCell,
   .actionsCell {
     grid-column: 1 / -1;
+  }
+
+  /* No cartão há espaço na largura toda: o nome do assistente pode quebrar linha. */
+  .access {
+    flex-wrap: wrap;
+  }
+
+  .accessList li {
+    white-space: normal;
   }
 
   .name {

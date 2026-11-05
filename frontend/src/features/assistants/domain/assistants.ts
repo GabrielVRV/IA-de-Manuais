@@ -40,6 +40,12 @@ export const DEFAULT_ACCESS_LABELS: Readonly<Record<DefaultAccess, string>> = {
   restricted: 'Só para quem for liberado',
 }
 
+/** Se um usuário que não é administrador usa o assistente: vale a exceção, senão o padrão. */
+export function canUseAssistant(policy: AccessPolicy, access: UserAccess | undefined): boolean {
+  if (access) return access === 'granted'
+  return policy.defaultAccess === 'open'
+}
+
 /** Porta: os assistentes do chat e o acesso a cada um, independente de transporte. */
 export interface AssistantsGateway {
   /** Os assistentes e se o usuário da sessão pode usar cada um. */
