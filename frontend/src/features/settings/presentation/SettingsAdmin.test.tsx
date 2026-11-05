@@ -15,7 +15,7 @@ const unpriced = {
 
 function setup(prices = [unpriced]) {
   const settings = fakeSettingsGateway(prices)
-  renderApp({ path: '/configuracoes', settings })
+  renderApp({ path: '/admin/configuracoes', settings })
   return { settings, user: userEvent.setup() }
 }
 
@@ -101,7 +101,7 @@ describe('<SettingsAdmin />', () => {
   })
 
   it('is only reachable by admins', async () => {
-    renderApp({ path: '/configuracoes', auth: new FakeAuthGateway(REGULAR) })
+    renderApp({ path: '/admin/configuracoes', auth: new FakeAuthGateway(REGULAR) })
 
     await screen.findByRole('textbox')
     expect(screen.queryByRole('link', { name: 'Configurações' })).not.toBeInTheDocument()

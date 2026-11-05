@@ -17,7 +17,7 @@ const pedro = managedUser({
 
 function setup() {
   const users = fakeUsersGateway([me, joao, pedro])
-  renderApp({ users, path: '/usuarios' })
+  renderApp({ users, path: '/admin/usuarios' })
   return { users, user: userEvent.setup() }
 }
 

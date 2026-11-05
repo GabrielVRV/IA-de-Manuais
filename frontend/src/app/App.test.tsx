@@ -130,23 +130,51 @@ describe('<App />', () => {
   })
 
   describe('navigation', () => {
-    it('shows the administration pages only to administrators', async () => {
+    it('gives administrators one entry to the administration area', async () => {
+      const user = userEvent.setup()
       renderApp({ auth: new FakeAuthGateway(ADMIN) })
 
-      expect(
+      await user.click(
         await within(
           await screen.findByRole('navigation', { name: 'Navegação principal' }),
-        ).findByRole('link', { name: 'Manuais' }),
+        ).findByRole('link', { name: 'Administração' }),
+      )
+
+      expect(within(nav()).queryByRole('link', { name: 'Manuais' })).not.toBeInTheDocument()
+      const admin = screen.getByRole('navigation', { name: 'Administração' })
+      expect(within(admin).getByRole('heading', { name: 'Geral' })).toBeInTheDocument()
+      expect(
+        within(admin).getByRole('heading', { name: 'Assistente de Engenharia' }),
       ).toBeInTheDocument()
-      expect(within(nav()).getByRole('link', { name: 'Usuários' })).toBeInTheDocument()
-      expect(screen.getByText('Ana Admin')).toBeInTheDocument()
+      // A área abre em Usuários.
+      expect(await screen.findByRole('heading', { name: 'Usuários', level: 2 })).toBeInTheDocument()
+      expect(within(admin).getByRole('link', { name: 'Usuários' })).toHaveAttribute(
+        'aria-current',
+        'page',
+      )
+      expect(within(nav()).getByRole('link', { name: 'Administração' })).toHaveClass(/active/)
+
+      await user.click(within(admin).getByRole('link', { name: 'Manuais' }))
+
+      expect(await screen.findByRole('heading', { name: 'Manuais', level: 2 })).toBeInTheDocument()
     })
 
-    it('hides them from regular users and sends direct visits back to the chat', async () => {
-      renderApp({ auth: new FakeAuthGateway(REGULAR), path: '/manuais' })
+    it('sends old bookmarks to the new administration addresses', async () => {
+      renderApp({ auth: new FakeAuthGateway(ADMIN), path: '/consumo' })
+
+      expect(await screen.findByRole('heading', { name: 'Consumo', level: 2 })).toBeInTheDocument()
+      expect(
+        within(screen.getByRole('navigation', { name: 'Administração' })).getByRole('link', {
+          name: 'Consumo',
+        }),
+      ).toHaveAttribute('aria-current', 'page')
+    })
+
+    it('hides the administration from regular users and sends direct visits back to the chat', async () => {
+      renderApp({ auth: new FakeAuthGateway(REGULAR), path: '/admin/manuais' })
 
       expect(await screen.findByRole('textbox', { name: /sua pergunta/i })).toBeInTheDocument()
-      expect(within(nav()).queryByRole('link', { name: 'Manuais' })).not.toBeInTheDocument()
+      expect(within(nav()).queryByRole('link', { name: 'Administração' })).not.toBeInTheDocument()
     })
 
     it('lets local users change their own password', async () => {

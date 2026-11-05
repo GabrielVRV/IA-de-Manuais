@@ -96,7 +96,7 @@ export function UsageReport() {
               <p className={ui.alert} data-tone="warning" role="status">
                 Sem preço cadastrado: <strong>{data.unpricedModels.join(', ')}</strong>.{' '}
                 {showCost ? 'O custo abaixo não inclui esse consumo.' : 'O custo não é exibido.'}{' '}
-                <Link to="/configuracoes">Cadastrar o preço em Configurações</Link>.
+                <Link to="/admin/configuracoes">Cadastrar o preço em Configurações</Link>.
               </p>
             )}
 

@@ -8,7 +8,7 @@ import { formatUsd } from './format-usd'
 
 describe('<UsageReport />', () => {
   it('shows the totals and ranks who used the assistant the most', async () => {
-    renderApp({ path: '/consumo' })
+    renderApp({ path: '/admin/consumo' })
 
     const table = await screen.findByRole('table', { name: 'Consumo por usuário' })
     const rows = within(table).getAllByRole('row').slice(1)
@@ -22,7 +22,7 @@ describe('<UsageReport />', () => {
 
   it('reloads the report when the period changes', async () => {
     const usage = fakeUsageGateway()
-    renderApp({ path: '/consumo', usage })
+    renderApp({ path: '/admin/consumo', usage })
     await screen.findByText('Quem mais usou')
 
     await userEvent.setup().selectOptions(screen.getByRole('combobox'), 'Últimos 7 dias')
@@ -41,18 +41,18 @@ describe('<UsageReport />', () => {
         },
       ],
     })
-    renderApp({ path: '/consumo', usage: fakeUsageGateway(report) })
+    renderApp({ path: '/admin/consumo', usage: fakeUsageGateway(report) })
 
     const warning = (await screen.findByText(/Sem preço cadastrado/)).closest('p')
     if (!warning) throw new Error('aviso não encontrado')
 
     expect(warning).toHaveTextContent('Sem preço cadastrado: gpt-4.1-mini')
-    expect(within(warning).getByRole('link')).toHaveAttribute('href', '/configuracoes')
+    expect(within(warning).getByRole('link')).toHaveAttribute('href', '/admin/configuracoes')
     expect(screen.queryByText('Custo estimado')).not.toBeInTheDocument()
   })
 
   it('draws one bar per day of the period', async () => {
-    renderApp({ path: '/consumo' })
+    renderApp({ path: '/admin/consumo' })
 
     const bars = await screen.findByRole('list', { name: 'Tokens por dia' })
 
@@ -61,7 +61,7 @@ describe('<UsageReport />', () => {
   })
 
   it('is only reachable by admins', async () => {
-    renderApp({ path: '/consumo', auth: new FakeAuthGateway(REGULAR) })
+    renderApp({ path: '/admin/consumo', auth: new FakeAuthGateway(REGULAR) })
 
     await screen.findByRole('textbox')
     expect(screen.queryByRole('link', { name: 'Consumo' })).not.toBeInTheDocument()

@@ -85,7 +85,7 @@ export function SyncScheduleForm() {
         void save()
       }}
     >
-      <div className={ui.row}>
+      <div className={cx(ui.row, styles.scheduleRow)}>
         <label className={styles.checkbox}>
           <input
             type="checkbox"
@@ -98,7 +98,7 @@ export function SyncScheduleForm() {
           Sincronizar automaticamente todo dia às
         </label>
         <input
-          className={ui.input}
+          className={cx(ui.input, styles.timeInput)}
           type="time"
           aria-label="Horário da sincronização"
           value={time}

@@ -25,7 +25,7 @@ describe('<ManualsAdmin />', () => {
         failureReason: 'PDF protegido por senha',
       }),
     ])
-    renderApp({ manuals, path: '/manuais' })
+    renderApp({ manuals, path: '/admin/manuais' })
 
     const list = await screen.findByRole('list', { name: 'Manuais cadastrados' })
     expect(within(list).getByText('Compressor CX-500')).toBeInTheDocument()
@@ -46,7 +46,7 @@ describe('<ManualsAdmin />', () => {
     manuals.upload.mockRejectedValueOnce(
       new HttpError(422, { detail: 'O arquivo enviado não é um PDF' }),
     )
-    renderApp({ manuals, path: '/manuais' })
+    renderApp({ manuals, path: '/admin/manuais' })
 
     await user.upload(await screen.findByLabelText('Escolher PDFs'), [
       pdf('ruim.pdf'),
@@ -64,7 +64,7 @@ describe('<ManualsAdmin />', () => {
     const user = userEvent.setup()
     const manuals = fakeManualsGateway([manual()])
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
-    renderApp({ manuals, path: '/manuais' })
+    renderApp({ manuals, path: '/admin/manuais' })
 
     await user.click(await screen.findByRole('button', { name: 'Reprocessar' }))
     expect(manuals.reindex).toHaveBeenCalledWith('m1')
@@ -78,7 +78,7 @@ describe('<ManualsAdmin />', () => {
     const user = userEvent.setup()
     const manuals = fakeManualsGateway([manual()])
     vi.spyOn(window, 'confirm').mockReturnValue(false)
-    renderApp({ manuals, path: '/manuais' })
+    renderApp({ manuals, path: '/admin/manuais' })
 
     await user.click(await screen.findByRole('button', { name: 'Excluir' }))
 
@@ -89,7 +89,7 @@ describe('<ManualsAdmin />', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     try {
       const manuals = fakeManualsGateway([manual({ status: 'processing' })])
-      renderApp({ manuals, path: '/manuais' })
+      renderApp({ manuals, path: '/admin/manuais' })
       expect(await screen.findByText('Indexando…')).toBeInTheDocument()
 
       manuals.state.manuals = [manual({ status: 'indexed' })]
@@ -108,7 +108,7 @@ describe('<ManualsAdmin />', () => {
         running: false,
         lastRun: null,
       })
-      renderApp({ manuals, path: '/manuais' })
+      renderApp({ manuals, path: '/admin/manuais' })
 
       await screen.findByRole('list', { name: 'Manuais cadastrados' })
       expect(screen.queryByRole('button', { name: 'Verificar' })).not.toBeInTheDocument()
@@ -118,7 +118,7 @@ describe('<ManualsAdmin />', () => {
       const user = userEvent.setup()
       const manuals = fakeManualsGateway()
       const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
-      renderApp({ manuals, path: '/manuais' })
+      renderApp({ manuals, path: '/admin/manuais' })
 
       await user.click(await screen.findByRole('button', { name: 'Verificar' }))
 
@@ -140,7 +140,7 @@ describe('<ManualsAdmin />', () => {
       const user = userEvent.setup()
       const manuals = fakeManualsGateway()
       vi.spyOn(window, 'confirm').mockReturnValue(false)
-      renderApp({ manuals, path: '/manuais' })
+      renderApp({ manuals, path: '/admin/manuais' })
 
       await user.click(await screen.findByRole('button', { name: 'Verificar' }))
       await user.click(await screen.findByRole('button', { name: 'Sincronizar' }))
@@ -158,7 +158,7 @@ describe('<ManualsAdmin />', () => {
           items: [],
         }),
       )
-      renderApp({ manuals, path: '/manuais' })
+      renderApp({ manuals, path: '/admin/manuais' })
 
       await user.click(await screen.findByRole('button', { name: 'Verificar' }))
 
@@ -172,7 +172,7 @@ describe('<ManualsAdmin />', () => {
       manuals.checkSync.mockRejectedValueOnce(
         new HttpError(503, { detail: 'A pasta de manuais está vazia ou não pôde ser lida.' }),
       )
-      renderApp({ manuals, path: '/manuais' })
+      renderApp({ manuals, path: '/admin/manuais' })
 
       await user.click(await screen.findByRole('button', { name: 'Verificar' }))
 
@@ -187,7 +187,7 @@ describe('<ManualsAdmin />', () => {
           running: true,
           lastRun: syncRun({ total: 2, done: 1, succeeded: 1 }),
         })
-        renderApp({ manuals, path: '/manuais' })
+        renderApp({ manuals, path: '/admin/manuais' })
         expect(await screen.findByText(/Sincronizando… 1 de 2/)).toBeInTheDocument()
 
         manuals.state.manuals = [manual()]
@@ -221,7 +221,7 @@ describe('<ManualsAdmin />', () => {
     it('turns on the daily sync and shows the next run in the company time', async () => {
       const manuals = fakeManualsGateway()
       const user = userEvent.setup()
-      renderApp({ manuals, path: '/manuais' })
+      renderApp({ manuals, path: '/admin/manuais' })
       const form = await screen.findByRole('form', { name: 'Sincronização automática' })
       const save = within(form).getByRole('button', { name: 'Salvar agendamento' })
       expect(save).toBeDisabled()
@@ -239,7 +239,7 @@ describe('<ManualsAdmin />', () => {
     it('changes the time of an enabled schedule', async () => {
       const manuals = fakeManualsGateway(undefined, undefined, syncSchedule({ enabled: true }))
       const user = userEvent.setup()
-      renderApp({ manuals, path: '/manuais' })
+      renderApp({ manuals, path: '/admin/manuais' })
       const time = await screen.findByLabelText('Horário da sincronização')
 
       await user.clear(time)
@@ -259,7 +259,7 @@ describe('<ManualsAdmin />', () => {
           lastTriggerError: 'A pasta de manuais está vazia ou não pôde ser lida.',
         }),
       )
-      renderApp({ manuals, path: '/manuais' })
+      renderApp({ manuals, path: '/admin/manuais' })
 
       expect(
         await screen.findByText(/A sincronização agendada de 05\/11\/2026,? 00:00 não começou/),
@@ -274,7 +274,7 @@ describe('<ManualsAdmin />', () => {
         }),
       )
       const user = userEvent.setup()
-      renderApp({ manuals, path: '/manuais' })
+      renderApp({ manuals, path: '/admin/manuais' })
       const form = await screen.findByRole('form', { name: 'Sincronização automática' })
 
       await user.click(within(form).getByRole('checkbox'))

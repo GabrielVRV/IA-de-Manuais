@@ -14,8 +14,12 @@ import { cx } from '@/shared/cx'
 import { ThemeToggle } from '@/shared/theme/ThemeToggle'
 import ui from '@/styles/ui.module.css'
 
+import { AdminLayout } from './AdminLayout'
 import styles from './App.module.css'
 import { Layout } from './Layout'
+
+/** Endereços de antes da área de administração, mantidos para favoritos antigos. */
+const LEGACY_ADMIN_PATHS = ['manuais', 'usuarios', 'consumo', 'configuracoes'] as const
 
 export function App() {
   return (
@@ -35,7 +39,7 @@ function AuthenticatedApp() {
     <Layout
       nav={<MainNav admin={admin} />}
       actions={<HeaderActions />}
-      fullWidth={isChatPath(pathname)}
+      fullWidth={isChatPath(pathname) || isAdminPath(pathname)}
     >
       <Routes>
         {/* Uma rota só para o chat: trocar de conversa não recria a tela (nem o histórico). */}
@@ -43,14 +47,21 @@ function AuthenticatedApp() {
           <Route path="c/:conversationId" element={null} />
         </Route>
         {managesPasswordHere(user) && <Route path="/senha" element={<PasswordPage />} />}
-        {/* Usuários comuns que tentarem abrir uma tela de administração voltam ao chat. */}
-        <Route path="/manuais" element={admin ? <ManualsAdmin /> : <Navigate to="/" replace />} />
-        <Route path="/usuarios" element={admin ? <UsersAdmin /> : <Navigate to="/" replace />} />
-        <Route path="/consumo" element={admin ? <UsageReport /> : <Navigate to="/" replace />} />
-        <Route
-          path="/configuracoes"
-          element={admin ? <SettingsAdmin /> : <Navigate to="/" replace />}
-        />
+        {/* Usuários comuns que tentarem abrir a administração voltam ao chat. */}
+        <Route path="/admin" element={admin ? <AdminLayout /> : <Navigate to="/" replace />}>
+          <Route index element={<Navigate to="usuarios" replace />} />
+          <Route path="usuarios" element={<UsersAdmin />} />
+          <Route path="consumo" element={<UsageReport />} />
+          <Route path="configuracoes" element={<SettingsAdmin />} />
+          <Route path="manuais" element={<ManualsAdmin />} />
+        </Route>
+        {LEGACY_ADMIN_PATHS.map((page) => (
+          <Route
+            key={page}
+            path={`/${page}`}
+            element={<Navigate to={`/admin/${page}`} replace />}
+          />
+        ))}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
@@ -60,6 +71,11 @@ function AuthenticatedApp() {
 /** O chat ocupa a tela inteira (histórico + conversa); as demais telas ficam centralizadas. */
 function isChatPath(pathname: string): boolean {
   return pathname === '/' || pathname.startsWith('/c/')
+}
+
+/** A administração tem o próprio menu lateral e controla a própria largura. */
+function isAdminPath(pathname: string): boolean {
+  return pathname === '/admin' || pathname.startsWith('/admin/')
 }
 
 function MainNav({ admin }: { readonly admin: boolean }) {
@@ -72,20 +88,9 @@ function MainNav({ admin }: { readonly admin: boolean }) {
         Chat
       </NavLink>
       {admin && (
-        <>
-          <NavLink to="/manuais" className={link}>
-            Manuais
-          </NavLink>
-          <NavLink to="/usuarios" className={link}>
-            Usuários
-          </NavLink>
-          <NavLink to="/consumo" className={link}>
-            Consumo
-          </NavLink>
-          <NavLink to="/configuracoes" className={link}>
-            Configurações
-          </NavLink>
-        </>
+        <NavLink to="/admin" className={link}>
+          Administração
+        </NavLink>
       )}
     </nav>
   )
