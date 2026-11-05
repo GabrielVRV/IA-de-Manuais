@@ -25,7 +25,8 @@ export function Layout({ children, nav, actions, fullWidth = false }: LayoutProp
   return (
     <div className={styles.shell}>
       <header className={styles.header}>
-        <div className={cx(styles.inner, styles.headerContent, fullWidth && styles.full)}>
+        {/* O cabeçalho ocupa a largura toda em todas as telas: o menu não muda de lugar. */}
+        <div className={cx(styles.inner, styles.headerContent, styles.full)}>
           <div className={styles.start}>
             <h1 className={styles.brand}>
               <span className={styles.brandIcon} aria-hidden="true">

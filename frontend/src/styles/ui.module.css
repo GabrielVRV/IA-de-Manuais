@@ -97,10 +97,15 @@
 }
 
 .primary {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
+  border-color: var(--color-primary-fill);
+  background: var(--color-primary-fill);
   color: var(--color-on-primary);
   font-weight: 600;
+}
+
+.primary:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: color-mix(in oklab, var(--color-primary-fill) 88%, #ffffff);
 }
 
 .danger {

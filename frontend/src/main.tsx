@@ -29,8 +29,11 @@ import { UsersGatewayContext } from '@/features/users/presentation/users-gateway
 import { applyBrand, loadBrand } from '@/shared/brand/brand'
 import { BrandContext } from '@/shared/brand/brand-context'
 import { HttpClient } from '@/shared/http/http-client'
+import { applyThemePreference, readThemePreference } from '@/shared/theme/theme'
 
 async function bootstrap(): Promise<void> {
+  // Antes de qualquer tela: quem escolheu o tema não vê a outra cor piscar.
+  applyThemePreference(readThemePreference())
   const container = document.getElementById('root')
   if (!container) throw new Error('Elemento #root não encontrado no index.html')
   const root = createRoot(container)

@@ -17,7 +17,10 @@
   --color-border: color-mix(in oklch, var(--brand-primary) 16%, oklch(0.99 0 none));
   --color-text: color-mix(in oklch, var(--brand-primary) 36%, oklch(0.087 0 none));
   --color-text-muted: color-mix(in oklch, var(--brand-primary) 31%, oklch(0.517 0 none));
+  /* Texto, links e contornos na cor da marca (no escuro, clareada para ter contraste). */
   --color-primary: var(--brand-primary);
+  /* Preenchimento (botão principal): a cor da marca exata, nos dois temas. */
+  --color-primary-fill: var(--brand-primary);
   --color-accent: var(--brand-accent);
   --color-on-primary: #ffffff;
   --color-neutral: #8a96a5;
@@ -48,20 +51,43 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/*
+ * Tema: segue o sistema, a não ser que o usuário escolha no cabeçalho
+ * (data-theme="light" ou "dark" no <html>, ver shared/theme). Os dois blocos
+ * escuros abaixo precisam ficar iguais.
+ */
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
     --color-bg: color-mix(in oklch, var(--brand-primary) 29%, oklch(0.051 0 none));
     --color-surface: color-mix(in oklch, var(--brand-primary) 41%, oklch(0.052 0 none));
     --color-border: color-mix(in oklch, var(--brand-primary) 52%, oklch(0.145 0 none));
     --color-text: color-mix(in oklch, var(--brand-primary) 11%, oklch(1 0 none));
     --color-text-muted: color-mix(in oklch, var(--brand-primary) 34%, oklch(0.839 0 none));
     --color-primary: color-mix(in oklab, var(--brand-primary) 50%, #ffffff);
-    --color-on-primary: color-mix(in oklch, var(--brand-primary) 36%, oklch(0.025 0 none));
     --color-neutral: #6c7887;
     --color-success: #3ccf7f;
     --color-warning: #f0b041;
     --color-danger: #ff6b6b;
   }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-bg: color-mix(in oklch, var(--brand-primary) 29%, oklch(0.051 0 none));
+  --color-surface: color-mix(in oklch, var(--brand-primary) 41%, oklch(0.052 0 none));
+  --color-border: color-mix(in oklch, var(--brand-primary) 52%, oklch(0.145 0 none));
+  --color-text: color-mix(in oklch, var(--brand-primary) 11%, oklch(1 0 none));
+  --color-text-muted: color-mix(in oklch, var(--brand-primary) 34%, oklch(0.839 0 none));
+  --color-primary: color-mix(in oklab, var(--brand-primary) 50%, #ffffff);
+  --color-neutral: #6c7887;
+  --color-success: #3ccf7f;
+  --color-warning: #f0b041;
+  --color-danger: #ff6b6b;
 }
 
 *,

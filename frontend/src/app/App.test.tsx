@@ -94,6 +94,30 @@ describe('<App />', () => {
       expect(screen.getByRole('status')).toHaveTextContent('Sua sessão expirou')
     })
 
+    it('switches between light, dark and system theme and remembers the choice', async () => {
+      const user = userEvent.setup()
+      renderApp()
+      const theme = await screen.findByRole('group', { name: 'Tema' })
+      expect(within(theme).getByRole('button', { name: 'Tema do sistema' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      )
+
+      await user.click(within(theme).getByRole('button', { name: 'Tema escuro' }))
+
+      expect(document.documentElement.dataset.theme).toBe('dark')
+      expect(localStorage.getItem('ma-theme')).toBe('dark')
+      expect(within(theme).getByRole('button', { name: 'Tema escuro' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      )
+
+      await user.click(within(theme).getByRole('button', { name: 'Tema do sistema' }))
+
+      expect(document.documentElement.dataset.theme).toBeUndefined()
+      expect(localStorage.getItem('ma-theme')).toBeNull()
+    })
+
     it('logs out', async () => {
       const user = userEvent.setup()
       const { auth } = renderApp()

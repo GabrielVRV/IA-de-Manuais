@@ -11,6 +11,7 @@ import { SettingsAdmin } from '@/features/settings/presentation/SettingsAdmin'
 import { UsageReport } from '@/features/usage/presentation/UsageReport'
 import { UsersAdmin } from '@/features/users/presentation/UsersAdmin'
 import { cx } from '@/shared/cx'
+import { ThemeToggle } from '@/shared/theme/ThemeToggle'
 import ui from '@/styles/ui.module.css'
 
 import styles from './App.module.css'
@@ -95,6 +96,7 @@ function HeaderActions() {
   const { logout } = useSession()
   return (
     <div className={styles.actions}>
+      <ThemeToggle />
       <ApiStatus />
       {managesPasswordHere(user) ? (
         <NavLink to="/senha" className={styles.userName} title="Trocar minha senha">
