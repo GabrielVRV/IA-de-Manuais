@@ -21,10 +21,29 @@ def test_admin_reads_and_changes_the_usage_retention() -> None:
     assert client.get(URL).json()["usage_retention_months"] == 6
 
 
+def test_admin_changes_the_question_limits_and_they_apply_right_away() -> None:
+    backend = FakeBackend()
+    client = backend.client_logged_in_as("admin")
+
+    response = client.patch(URL, json={"questions_per_minute": 1, "questions_per_day": 0})
+    first = client.post("/api/v1/questions", json={"question": "Primeira pergunta"})
+    second = client.post("/api/v1/questions", json={"question": "Segunda pergunta"})
+
+    assert response.status_code == 200, response.text
+    assert (response.json()["questions_per_minute"], response.json()["questions_per_day"]) == (
+        1,
+        0,
+    )
+    assert first.status_code == 200, first.text
+    assert second.status_code == 429
+    assert "limite de 1 pergunta(s) em 1 minuto" in second.json()["detail"]
+
+
 def test_rejects_an_invalid_retention() -> None:
     client = FakeBackend().client_logged_in_as("admin")
 
     assert client.patch(URL, json={"usage_retention_months": -1}).status_code == 422
+    assert client.patch(URL, json={"questions_per_day": -1}).status_code == 422
 
 
 def test_lists_models_already_used_so_the_admin_can_price_them() -> None:

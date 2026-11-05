@@ -194,6 +194,7 @@ def create_app(
                 min_score=settings.rag_min_score,
             ),
             usage=usage,
+            settings=system_settings,
         ),
         list_conversations=ListConversationsUseCase(conversations),
         get_conversation=GetConversationUseCase(conversations),

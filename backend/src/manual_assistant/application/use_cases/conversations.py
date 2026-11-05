@@ -9,8 +9,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from manual_assistant.application.clock import Clock, utc_now
-from manual_assistant.application.errors import ConversationNotFoundError
+from manual_assistant.application.errors import (
+    ConversationNotFoundError,
+    QuestionLimitExceededError,
+)
 from manual_assistant.application.ports.conversation_repository import ConversationRepository
+from manual_assistant.application.ports.settings_repository import SystemSettingsRepository
 from manual_assistant.application.ports.usage_repository import UsageRepository
 from manual_assistant.application.use_cases.ask_question import AskQuestionUseCase
 from manual_assistant.domain.conversation import (
@@ -52,6 +56,9 @@ class ChatUseCase:
     Sem ``conversation_id``, começa uma conversa nova. Nada é gravado se a resposta
     falhar: o histórico só tem perguntas que foram respondidas. O consumo do modelo
     (sem o texto da pergunta) é registrado à parte, para o controle de custos.
+
+    Antes de chamar o modelo, confere o limite de perguntas por usuário definido na tela
+    de configurações: acima dele, a pergunta é recusada sem gastar tokens.
     """
 
     def __init__(
@@ -60,16 +67,24 @@ class ChatUseCase:
         conversations: ConversationRepository,
         ask_question: AskQuestionUseCase,
         usage: UsageRepository,
+        settings: SystemSettingsRepository,
         clock: Clock = utc_now,
     ) -> None:
         self._conversations = conversations
         self._ask_question = ask_question
         self._usage = usage
+        self._settings = settings
         self._clock = clock
 
     async def execute(
         self, actor: User, question: Question, conversation_id: ConversationId | None = None
     ) -> ChatReply:
+        """
+        Raises:
+            QuestionLimitExceededError: se o usuário passou do limite de perguntas.
+            ConversationNotFoundError: se a conversa não existe ou é de outro usuário.
+        """
+        await self._check_question_limits(actor)
         if conversation_id is None:
             conversation, is_new = Conversation.start(actor.id, question, self._clock()), True
         else:
@@ -97,6 +112,20 @@ class ChatUseCase:
         else:
             await self._conversations.append(conversation, exchange)
         return ChatReply(conversation, exchange)
+
+    async def _check_question_limits(self, actor: User) -> None:
+        settings = await self._settings.get()
+        now = self._clock()
+        for limit in settings.question_limits:
+            asked = await self._usage.count_since(actor.id, now - limit.window)
+            if asked >= limit.max_questions:
+                logger.info(
+                    "Pergunta recusada: %s atingiu %d pergunta(s) em %s",
+                    actor.username,
+                    limit.max_questions,
+                    limit.description,
+                )
+                raise QuestionLimitExceededError(limit.message())
 
 
 class ListConversationsUseCase:

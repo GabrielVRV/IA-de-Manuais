@@ -2,7 +2,11 @@ from datetime import timedelta
 
 import pytest
 
-from manual_assistant.application.errors import ConversationNotFoundError, ExternalServiceError
+from manual_assistant.application.errors import (
+    ConversationNotFoundError,
+    ExternalServiceError,
+    QuestionLimitExceededError,
+)
 from manual_assistant.application.use_cases.ask_question import AskQuestionUseCase
 from manual_assistant.application.use_cases.conversations import (
     CONTEXT_EXCHANGES,
@@ -17,12 +21,14 @@ from manual_assistant.domain.chunk import ScoredChunk
 from manual_assistant.domain.conversation import ConversationId, RetentionPolicy
 from manual_assistant.domain.pages import PageRange
 from manual_assistant.domain.question import Question
+from manual_assistant.domain.system_settings import SystemSettings
 from manual_assistant.domain.user import User
 from tests.factories import FIXED_NOW, make_chunk, make_manual
 from tests.fakes import (
     FakeEmbeddingProvider,
     FakeLanguageModel,
     InMemoryConversationRepository,
+    InMemorySystemSettingsRepository,
     InMemoryUsageRepository,
     InMemoryVectorStore,
 )
@@ -40,6 +46,7 @@ class Context:
         self.embeddings = FakeEmbeddingProvider()
         self.language_model = FakeLanguageModel(answer="A pressão máxima é 180 bar [1].")
         self.usage = InMemoryUsageRepository()
+        self.settings = InMemorySystemSettingsRepository()
         self.chat = ChatUseCase(
             conversations=self.conversations,
             ask_question=AskQuestionUseCase(
@@ -55,6 +62,7 @@ class Context:
                 language_model=self.language_model,
             ),
             usage=self.usage,
+            settings=self.settings,
             clock=lambda: self.now,
         )
         self.maria = make_user("maria")
@@ -142,6 +150,7 @@ class TestChat:
                 language_model=ctx.language_model,
             ),
             usage=ctx.usage,
+            settings=ctx.settings,
             clock=lambda: ctx.now,
         )
 
@@ -166,6 +175,65 @@ class TestChat:
 
         with pytest.raises(ConversationNotFoundError):
             await ctx.ask("E a mínima?", conversation_id, as_=ctx.joao)
+
+
+class TestQuestionLimits:
+    def limit(self, ctx: Context, *, per_minute: int = 0, per_day: int = 0) -> None:
+        ctx.settings.settings = SystemSettings(
+            questions_per_minute=per_minute, questions_per_day=per_day
+        )
+
+    async def test_refuses_questions_over_the_per_minute_limit_without_calling_the_model(
+        self,
+    ) -> None:
+        ctx = Context()
+        self.limit(ctx, per_minute=2)
+        await ctx.ask("Pergunta 1", as_=ctx.maria)
+        await ctx.ask("Pergunta 2", as_=ctx.maria)
+
+        with pytest.raises(QuestionLimitExceededError, match="2 pergunta\\(s\\) em 1 minuto"):
+            await ctx.ask("Pergunta 3", as_=ctx.maria)
+
+        assert len(ctx.language_model.requests) == 2
+        assert len(ctx.usage.records) == 2
+
+    async def test_the_limit_frees_up_when_the_window_passes(self) -> None:
+        ctx = Context()
+        self.limit(ctx, per_minute=1)
+        await ctx.ask("Pergunta 1", as_=ctx.maria)
+        ctx.now += timedelta(minutes=1, seconds=1)
+
+        await ctx.ask("Pergunta 2", as_=ctx.maria)
+
+        assert len(ctx.usage.records) == 2
+
+    async def test_refuses_questions_over_the_daily_limit(self) -> None:
+        ctx = Context()
+        self.limit(ctx, per_day=2)
+        await ctx.ask("Pergunta 1", as_=ctx.maria)
+        ctx.now += timedelta(hours=12)
+        await ctx.ask("Pergunta 2", as_=ctx.maria)
+        ctx.now += timedelta(hours=11)
+
+        with pytest.raises(QuestionLimitExceededError, match="24 horas"):
+            await ctx.ask("Pergunta 3", as_=ctx.maria)
+
+    async def test_each_user_has_their_own_limit(self) -> None:
+        ctx = Context()
+        self.limit(ctx, per_minute=1)
+        await ctx.ask("Pergunta da Maria", as_=ctx.maria)
+
+        await ctx.ask("Pergunta do João", as_=ctx.joao)
+
+        assert len(ctx.usage.records) == 2
+
+    async def test_zero_means_no_limit(self) -> None:
+        ctx = Context()
+        self.limit(ctx)
+        for n in range(30):
+            await ctx.ask(f"Pergunta {n}", as_=ctx.maria)
+
+        assert len(ctx.usage.records) == 30
 
 
 class TestHistory:

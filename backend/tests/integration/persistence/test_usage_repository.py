@@ -82,6 +82,21 @@ class TestUsageRepository:
 
         assert [row.questions for row in rows] == [1]
 
+    async def test_counts_the_questions_of_one_user_since_a_moment(
+        self,
+        usage: SqlAlchemyUsageRepository,
+        session_factory: async_sessionmaker[AsyncSession],
+    ) -> None:
+        maria = await saved_user(session_factory, "maria")
+        joao = await saved_user(session_factory, "joao")
+        await usage.add(QuestionUsage(maria.id, FIXED_NOW - timedelta(minutes=5), None))
+        await usage.add(QuestionUsage(maria.id, FIXED_NOW - timedelta(seconds=30), None))
+        await usage.add(QuestionUsage(maria.id, FIXED_NOW, "gpt-4.1-mini", 1, 1))
+        await usage.add(QuestionUsage(joao.id, FIXED_NOW, "gpt-4.1-mini", 1, 1))
+
+        assert await usage.count_since(maria.id, FIXED_NOW - timedelta(minutes=1)) == 2
+        assert await usage.count_since(maria.id, FIXED_NOW - timedelta(hours=1)) == 3
+
     async def test_lists_the_models_already_used(
         self,
         usage: SqlAlchemyUsageRepository,
@@ -122,7 +137,13 @@ class TestSystemSettingsRepository:
 
         assert await repository.get() == SystemSettings()
 
-        saved = SystemSettings(usage_retention_months=6, updated_at=FIXED_NOW, updated_by="Admin")
+        saved = SystemSettings(
+            usage_retention_months=6,
+            questions_per_minute=3,
+            questions_per_day=0,
+            updated_at=FIXED_NOW,
+            updated_by="Admin",
+        )
         await repository.save(saved)
         await repository.save(saved)  # salvar de novo atualiza a mesma linha
 

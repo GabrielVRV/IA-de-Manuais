@@ -13,6 +13,7 @@ router = APIRouter(prefix="/questions", tags=["questions"])
 
 RESPONSES: dict[int | str, dict[str, Any]] = {
     status.HTTP_404_NOT_FOUND: {"model": ErrorResponse},
+    status.HTTP_429_TOO_MANY_REQUESTS: {"model": ErrorResponse},
     status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ErrorResponse},
 }
 

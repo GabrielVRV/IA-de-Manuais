@@ -367,6 +367,9 @@ class InMemoryUsageRepository:
             for (user_id, model, day), items in groups.items()
         ]
 
+    async def count_since(self, user_id: UserId, since: datetime) -> int:
+        return sum(1 for u in self.records if u.user_id == user_id and u.asked_at >= since)
+
     async def models(self) -> Sequence[str]:
         return sorted({u.model for u in self.records if u.model is not None})
 

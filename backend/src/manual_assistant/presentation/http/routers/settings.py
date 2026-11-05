@@ -25,7 +25,10 @@ async def update_settings(
     request: UpdateSystemSettingsRequest, admin: AdminUser, use_cases: UseCasesDep
 ) -> SystemSettingsResponse:
     settings = await use_cases.update_settings.execute(
-        admin, usage_retention_months=request.usage_retention_months
+        admin,
+        usage_retention_months=request.usage_retention_months,
+        questions_per_minute=request.questions_per_minute,
+        questions_per_day=request.questions_per_day,
     )
     return SystemSettingsResponse.from_entity(settings)
 

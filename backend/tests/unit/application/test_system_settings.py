@@ -47,6 +47,16 @@ class TestSettings:
         assert (updated.updated_at, updated.updated_by) == (FIXED_NOW, admin.display_name)
         assert repository.settings == updated
 
+    async def test_admin_changes_the_question_limits(self) -> None:
+        repository = InMemorySystemSettingsRepository()
+
+        updated = await UpdateSystemSettingsUseCase(repository).execute(
+            admin, questions_per_minute=5, questions_per_day=0
+        )
+
+        assert (updated.questions_per_minute, updated.questions_per_day) == (5, 0)
+        assert updated.usage_retention_months == SystemSettings().usage_retention_months
+
     async def test_fields_not_sent_stay_as_they_are(self) -> None:
         repository = InMemorySystemSettingsRepository(SystemSettings(usage_retention_months=3))
 

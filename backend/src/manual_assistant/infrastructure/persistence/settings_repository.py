@@ -30,6 +30,8 @@ class SqlAlchemySystemSettingsRepository:
             return SystemSettings()
         return SystemSettings(
             usage_retention_months=record.usage_retention_months,
+            questions_per_minute=record.questions_per_minute,
+            questions_per_day=record.questions_per_day,
             updated_at=record.updated_at,
             updated_by=record.updated_by,
         )
@@ -37,6 +39,8 @@ class SqlAlchemySystemSettingsRepository:
     async def save(self, settings: SystemSettings) -> None:
         values: dict[str, Any] = {
             "usage_retention_months": settings.usage_retention_months,
+            "questions_per_minute": settings.questions_per_minute,
+            "questions_per_day": settings.questions_per_day,
             "updated_at": settings.updated_at,
             "updated_by": settings.updated_by,
         }

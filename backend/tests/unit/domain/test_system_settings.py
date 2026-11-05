@@ -1,10 +1,11 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from manual_assistant.domain.errors import InvalidValueError
 from manual_assistant.domain.system_settings import (
     DEFAULT_USAGE_RETENTION_MONTHS,
+    QUESTION_LIMIT_MAX,
     USAGE_RETENTION_MAX_MONTHS,
     SystemSettings,
     months_before,
@@ -29,6 +30,33 @@ class TestUsageRetention:
     def test_rejects_retention_out_of_range(self, months: int) -> None:
         with pytest.raises(InvalidValueError):
             SystemSettings(usage_retention_months=months)
+
+
+class TestQuestionLimits:
+    def test_limits_questions_per_minute_and_per_day_by_default(self) -> None:
+        limits = SystemSettings().question_limits
+
+        assert [(limit.max_questions, limit.window) for limit in limits] == [
+            (10, timedelta(minutes=1)),
+            (200, timedelta(hours=24)),
+        ]
+
+    def test_zero_turns_a_limit_off(self) -> None:
+        settings = SystemSettings(questions_per_minute=0, questions_per_day=50)
+
+        assert [limit.max_questions for limit in settings.question_limits] == [50]
+        assert SystemSettings(questions_per_minute=0, questions_per_day=0).question_limits == ()
+
+    def test_message_tells_the_limit_and_the_window(self) -> None:
+        (_, per_day) = SystemSettings().question_limits
+
+        assert per_day.message().startswith("Você atingiu o limite de 200 pergunta(s) em 24 horas")
+
+    @pytest.mark.parametrize("field", ["questions_per_minute", "questions_per_day"])
+    @pytest.mark.parametrize("value", [-1, QUESTION_LIMIT_MAX + 1])
+    def test_rejects_limits_out_of_range(self, field: str, value: int) -> None:
+        with pytest.raises(InvalidValueError):
+            SystemSettings(**{field: value})  # type: ignore[arg-type]
 
 
 class TestMonthsBefore:

@@ -152,6 +152,7 @@ class FakeBackend:
                     language_model=self.language_model,
                 ),
                 usage=self.usage,
+                settings=self.system_settings,
             ),
             list_conversations=ListConversationsUseCase(self.conversations),
             get_conversation=GetConversationUseCase(self.conversations),

@@ -42,23 +42,30 @@ class UpdateSystemSettingsUseCase:
         self._clock = clock
 
     async def execute(
-        self, actor: User, *, usage_retention_months: int | None = None
+        self,
+        actor: User,
+        *,
+        usage_retention_months: int | None = None,
+        questions_per_minute: int | None = None,
+        questions_per_day: int | None = None,
     ) -> SystemSettings:
         """Só os campos informados mudam; os demais ficam como estão."""
         _require_admin(actor)
         current = await self._settings.get()
         updated = SystemSettings(
-            usage_retention_months=(
-                current.usage_retention_months
-                if usage_retention_months is None
-                else usage_retention_months
-            ),
+            usage_retention_months=_or(usage_retention_months, current.usage_retention_months),
+            questions_per_minute=_or(questions_per_minute, current.questions_per_minute),
+            questions_per_day=_or(questions_per_day, current.questions_per_day),
             updated_at=self._clock(),
             updated_by=actor.display_name or actor.username,
         )
         await self._settings.save(updated)
         logger.info("Configurações alteradas por %s", actor.username)
         return updated
+
+
+def _or(value: int | None, current: int) -> int:
+    return current if value is None else value
 
 
 @dataclass(frozen=True, slots=True)

@@ -35,6 +35,10 @@ class UsageRepository(Protocol):
         modelo e dia; o dia é o do relógio em ``timezone``."""
         ...
 
+    async def count_since(self, user_id: UserId, since: datetime) -> int:
+        """Perguntas do usuário registradas a partir de ``since``."""
+        ...
+
     async def models(self) -> Sequence[str]:
         """Modelos que já aparecem no consumo, em ordem alfabética."""
         ...

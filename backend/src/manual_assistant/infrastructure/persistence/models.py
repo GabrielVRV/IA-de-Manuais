@@ -201,6 +201,8 @@ class SystemSettingsRecord(Base):
 
     id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=False)
     usage_retention_months: Mapped[int]
+    questions_per_minute: Mapped[int]
+    questions_per_day: Mapped[int]
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     updated_by: Mapped[str | None] = mapped_column(String(100))
 

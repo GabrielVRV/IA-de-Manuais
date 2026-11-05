@@ -86,6 +86,10 @@ class DirectoryAccessDeniedError(PermissionDeniedError):
         )
 
 
+class QuestionLimitExceededError(ApplicationError):
+    """O usuário fez mais perguntas que o limite configurado pelos administradores."""
+
+
 class ConversationNotFoundError(ApplicationError):
     """Também para a conversa de outro usuário: não revela que ela existe."""
 

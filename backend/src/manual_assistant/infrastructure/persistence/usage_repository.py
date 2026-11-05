@@ -72,6 +72,16 @@ class SqlAlchemyUsageRepository:
             for user_id, model, day, questions, input_tokens, output_tokens in result
         ]
 
+    async def count_since(self, user_id: UserId, since: datetime) -> int:
+        statement = select(func.count()).where(
+            QuestionUsageRecord.user_id == user_id, QuestionUsageRecord.asked_at >= since
+        )
+        async with (
+            translate_database_errors("contar as perguntas do usuário"),
+            self._session_factory() as db,
+        ):
+            return int(await db.scalar(statement) or 0)
+
     async def models(self) -> Sequence[str]:
         statement = (
             select(QuestionUsageRecord.model)
