@@ -5,6 +5,8 @@
 - **Substitui:** o item 1 da [ADR 0008](0008-login-pelo-totvs-e-sessoes-no-banco.md) (login
   pelo TOTVS). O resto da ADR 0008 continua valendo: sessões no banco, perfil "aguardando
   liberação", usuários locais e bloqueio por tentativas.
+- **Alterada por:** a [ADR 0013](0013-acesso-por-assistente.md), que acaba com o perfil
+  "aguardando liberação": o primeiro login pelo AD já entra como usuário comum.
 
 ## Contexto
 

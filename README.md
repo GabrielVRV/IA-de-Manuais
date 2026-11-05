@@ -54,8 +54,10 @@ configurável), e só os trechos relevantes dos manuais são enviados a cada per
   indexação em segundo plano.
 - 🔄 **Sincronização com a pasta da Engenharia** — os manuais são lidos da pasta oficial
   (somente leitura), mantendo o acervo atualizado.
-- 🔐 **Autenticação corporativa** — login com o usuário de rede (AD), liberação de acesso pelo
-  administrador, sessões no banco e cookies `HttpOnly`.
+- 🔐 **Autenticação corporativa** — login com o usuário de rede (AD), sessões no banco e
+  cookies `HttpOnly`.
+- 🔑 **Acesso por assistente** — cada assistente do chat é liberado para todos ou só para
+  quem for liberado, com exceções por usuário e instruções de como pedir acesso.
 - 🛠️ **Administração** — telas para gerenciar usuários e acompanhar o status dos manuais.
 - 📊 **Consumo e custo** — tokens gastos por dia, por usuário e por modelo, com custo
   estimado a partir do preço de cada modelo informado na tela.
@@ -206,7 +208,9 @@ Todo push e pull request passa por pipelines no GitHub Actions:
 | 10a | Sincronização com a pasta de manuais da Engenharia (`sync-manuals`)                  | ✅ |
 | 10b | Sincronização diária agendada pela tela de administração                             | ✅ |
 | 11a | Consumo de tokens e custo por usuário, limite de perguntas, configurações pela tela   | ✅ |
-| 11b | Observabilidade: logs estruturados e feedback 👍/👎 nas respostas                       | ⏳ |
+| 11b | Acesso por assistente (padrão + exceções por usuário), sem liberação manual          | ✅ |
+| 11c | Observabilidade: logs estruturados e feedback 👍/👎 nas respostas                       | ⏳ |
+| 12  | Assistente da TI (ajuda o usuário e abre chamado) e escolha do assistente no chat     | ⏳ |
 
 ## Convenções
 

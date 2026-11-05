@@ -179,24 +179,39 @@ Para trocar a porta, defina `WEB_PUBLISHED_PORT` no `.env` da raiz e rode
 
 ## 6. Usar o sistema
 
+As telas de administração ficam no botão **Administração**, no topo, com um menu ao lado:
+**Usuários**, **Acessos**, **Consumo** e **Configurações** (gerais) e **Manuais** (do
+Assistente de Engenharia).
+
 1. **Entre** com o administrador criado no passo 4.
 2. **Manuais:** arraste os PDFs para a área tracejada, ou clique em **Escolher PDFs**. Cada
    manual aparece como *Na fila* → *Indexando…* → **Disponível**. A tela se atualiza sozinha.
 3. **Chat:** faça perguntas. As fontes no fim de cada resposta abrem o PDF na página citada.
 4. **Usuários:** os colegas entram com o **usuário e a senha de rede** (os do Windows). No primeiro
-   acesso, eles veem uma tela "Aguardando liberação" e aparecem no topo da aba
-   **Usuários**, com um aviso. Clique em **Liberar** (ou escolha o perfil):
-   - **Usuário:** só usa o chat.
-   - **Administrador:** também gerencia manuais e usuários.
+   acesso eles já aparecem na tela **Usuários** e usam os assistentes liberados para todos
+   (veja **Acessos**, abaixo). O perfil define o que mais a pessoa pode fazer:
+   - **Usuário:** usa o chat.
+   - **Administrador:** também acessa a Administração e usa todos os assistentes.
 
-   Para recusar alguém, clique em **Desativar**. Quem não tem usuário de rede pode ser criado na
+   Na coluna **Acesso**, cada pessoa pode seguir o **padrão** do assistente, ficar
+   **liberada** ou ficar **bloqueada**. Para tirar alguém do sistema inteiro, clique em
+   **Desativar**. Para limitar quem entra, use o grupo do AD (`APP_AD_REQUIRED_GROUP_DN`).
+   Quem não tem usuário de rede pode ser criado na Quem não tem usuário de rede pode ser criado na
    própria tela, como **usuário local**: uma **senha provisória** é gerada e mostrada
    **uma única vez**, e a pessoa a troca no primeiro acesso.
 
    A sessão fica aberta: só pede login de novo depois de **7 dias sem uso**, ou **30 dias**
    depois do último login. Senha trocada ou usuário bloqueado no AD só valem no próximo
    login. Para cortar o acesso na hora, desative o usuário aqui.
-5. **Configurações** (administrador), sem mexer no `.env` nem reiniciar:
+5. **Acessos** (administrador): para cada assistente do chat, escolha o acesso padrão:
+   - **Liberado para todos:** é o padrão, e todo usuário ativo usa.
+   - **Só para quem for liberado:** só administradores e quem for liberado na tela
+     Usuários.
+
+   Em **Como pedir acesso**, escreva o que fazer (ex.: "Abra um chamado no GLPI pedindo
+   acesso ao Assistente de Engenharia."). Quem não tem acesso vê esse texto no lugar do
+   chat. Antes de restringir, libere na tela Usuários quem precisa continuar usando.
+6. **Configurações** (administrador), sem mexer no `.env` nem reiniciar:
    - **Limite de perguntas** por usuário, por minuto e em 24 horas (padrão: 10 e 200;
      `0` desliga). Quem passa do limite recebe um aviso no chat, e a pergunta não gasta
      tokens.
@@ -204,7 +219,7 @@ Para trocar a porta, defina `WEB_PUBLISHED_PORT` no `.env` da raiz e rode
      provedor. Os modelos já usados aparecem na lista; sem preço, a tela de Consumo mostra
      só os tokens.
    - **Retenção do consumo** (padrão: 12 meses).
-6. **Consumo** (administrador): perguntas, tokens e custo estimado do período, por dia,
+7. **Consumo** (administrador): perguntas, tokens e custo estimado do período, por dia,
    **por usuário** (quem mais usou primeiro) e por modelo. Só números: as perguntas não
    aparecem. Vale avisar os usuários de que o uso é registrado para controle de custo.
 
@@ -296,6 +311,7 @@ reindexado, e o manual que saiu da pasta é removido do sistema.
 | Entra e **é deslogado em seguida** | Tela aberta por um endereço que não passa pelo container `web` (ex.: XAMPP em outro servidor) | Acesse a tela pela porta 8084 do servidor da API |
 | Manual **"Falhou: serviço externo"** | Limite ou cota do plano gratuito do Gemini | Aguarde a cota renovar (diária) ou use a chave paga, e clique em **Reprocessar** |
 | Manual **"Falhou: ... OCR"** | PDF escaneado (imagem, sem texto) | Ainda não suportado; use a versão digital do PDF |
+| Chat: **"Você ainda não tem acesso a este assistente"** | O assistente está "só para quem for liberado" e a pessoa não foi liberada | Libere a pessoa na coluna **Acesso** da tela **Usuários**, ou mude o padrão em **Acessos** |
 | Chat: **"Você atingiu o limite de N pergunta(s)…"** | Limite de perguntas por usuário | Aguarde, ou ajuste o limite em **Configurações** (`0` desliga) |
 | Sincronização agendada **"não começou"** | Pasta de rede fora do ar ou outra sincronização rodando | Confira a pasta com o passo de verificação acima; ela tenta de novo no horário do dia seguinte |
 | Chat responde **"temporariamente indisponível"** | Gemini sobrecarregado ou sem cota | Tente em instantes; `docker compose logs api` mostra o motivo |
