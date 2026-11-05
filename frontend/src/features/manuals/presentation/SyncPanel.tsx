@@ -3,6 +3,7 @@ import ui from '@/styles/ui.module.css'
 
 import { hasPendingChanges, type SyncAction, type SyncCheck, type SyncRun } from '../domain/manuals'
 import styles from './ManualsAdmin.module.css'
+import { SyncScheduleForm } from './SyncScheduleForm'
 import { useManualSync } from './use-manual-sync'
 
 const dateFormat = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
@@ -65,6 +66,8 @@ export function SyncPanel({ onProgress }: { readonly onProgress: () => void }) {
           {busy === 'checking' ? 'Verificando…' : 'Verificar'}
         </button>
       </div>
+
+      {status && <SyncScheduleForm />}
 
       {error && (
         <p className={ui.alert} data-tone="danger" role="alert">

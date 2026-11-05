@@ -8,6 +8,8 @@ import type {
   ManualSummary,
   SyncCheck,
   SyncRun,
+  SyncSchedule,
+  SyncScheduleChange,
   SyncStatus,
 } from '../domain/manuals'
 
@@ -81,6 +83,37 @@ function parse<T extends z.ZodType>(schema: T, body: unknown): z.infer<T> {
   const result = schema.safeParse(body)
   if (!result.success) throw new InvalidResponseError({ cause: result.error })
   return result.data
+}
+
+const optionalDate = z.iso.datetime({ offset: true }).nullable()
+
+const syncScheduleSchema = z.object({
+  enabled: z.boolean(),
+  time: z.string(),
+  timezone: z.string(),
+  next_run_at: optionalDate,
+  last_triggered_at: optionalDate,
+  last_trigger_error: z.string().nullable(),
+  updated_at: optionalDate,
+  updated_by: z.string().nullable(),
+})
+
+function toDate(value: string | null): Date | null {
+  return value ? new Date(value) : null
+}
+
+function toSyncSchedule(body: unknown): SyncSchedule {
+  const s = parse(syncScheduleSchema, body)
+  return {
+    enabled: s.enabled,
+    time: s.time,
+    timezone: s.timezone,
+    nextRunAt: toDate(s.next_run_at),
+    lastTriggeredAt: toDate(s.last_triggered_at),
+    lastTriggerError: s.last_trigger_error,
+    updatedAt: toDate(s.updated_at),
+    updatedBy: s.updated_by,
+  }
 }
 
 function toSyncRun(run: z.infer<typeof syncRunSchema>): SyncRun {
@@ -165,5 +198,18 @@ export class HttpManualsGateway implements ManualsGateway {
       timeoutMs: SYNC_TIMEOUT_MS,
     })
     return toSyncRun(parse(syncRunSchema, body))
+  }
+
+  async syncSchedule(): Promise<SyncSchedule> {
+    return toSyncSchedule(await this.#http.getJson('/api/v1/sync/schedule'))
+  }
+
+  async updateSyncSchedule(change: SyncScheduleChange): Promise<SyncSchedule> {
+    return toSyncSchedule(
+      await this.#http.putJson('/api/v1/sync/schedule', {
+        enabled: change.enabled,
+        time: change.time,
+      }),
+    )
   }
 }

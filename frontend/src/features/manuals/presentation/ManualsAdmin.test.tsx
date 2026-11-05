@@ -3,7 +3,14 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import { HttpError } from '@/shared/http/errors'
-import { fakeManualsGateway, manual, renderApp, syncCheck, syncRun } from '@/test/fakes'
+import {
+  fakeManualsGateway,
+  manual,
+  renderApp,
+  syncCheck,
+  syncRun,
+  syncSchedule,
+} from '@/test/fakes'
 
 const pdf = (name: string) => new File(['%PDF-1.4'], name, { type: 'application/pdf' })
 
@@ -207,6 +214,73 @@ describe('<ManualsAdmin />', () => {
       } finally {
         vi.useRealTimers()
       }
+    })
+  })
+
+  describe('daily sync schedule', () => {
+    it('turns on the daily sync and shows the next run in the company time', async () => {
+      const manuals = fakeManualsGateway()
+      const user = userEvent.setup()
+      renderApp({ manuals, path: '/manuais' })
+      const form = await screen.findByRole('form', { name: 'Sincronização automática' })
+      const save = within(form).getByRole('button', { name: 'Salvar agendamento' })
+      expect(save).toBeDisabled()
+
+      await user.click(within(form).getByRole('checkbox'))
+      await user.click(save)
+
+      expect(manuals.updateSyncSchedule).toHaveBeenCalledWith({ enabled: true, time: '00:00' })
+      expect(
+        await within(form).findByText(/Próxima sincronização: 06\/11\/2026,? 00:00/),
+      ).toBeInTheDocument()
+      expect(within(form).getByText(/Horário de America\/Sao_Paulo/)).toBeInTheDocument()
+    })
+
+    it('changes the time of an enabled schedule', async () => {
+      const manuals = fakeManualsGateway(undefined, undefined, syncSchedule({ enabled: true }))
+      const user = userEvent.setup()
+      renderApp({ manuals, path: '/manuais' })
+      const time = await screen.findByLabelText('Horário da sincronização')
+
+      await user.clear(time)
+      await user.type(time, '06:30')
+      await user.click(screen.getByRole('button', { name: 'Salvar agendamento' }))
+
+      expect(manuals.updateSyncSchedule).toHaveBeenCalledWith({ enabled: true, time: '06:30' })
+    })
+
+    it('warns when the last scheduled sync did not start', async () => {
+      const manuals = fakeManualsGateway(
+        undefined,
+        undefined,
+        syncSchedule({
+          enabled: true,
+          lastTriggeredAt: new Date('2026-11-05T03:00:00Z'),
+          lastTriggerError: 'A pasta de manuais está vazia ou não pôde ser lida.',
+        }),
+      )
+      renderApp({ manuals, path: '/manuais' })
+
+      expect(
+        await screen.findByText(/A sincronização agendada de 05\/11\/2026,? 00:00 não começou/),
+      ).toHaveTextContent('A pasta de manuais está vazia')
+    })
+
+    it('shows why the schedule could not be saved', async () => {
+      const manuals = fakeManualsGateway()
+      manuals.updateSyncSchedule.mockRejectedValueOnce(
+        new HttpError(409, {
+          detail: 'A pasta de manuais não está configurada (APP_SYNC_SOURCE_DIR).',
+        }),
+      )
+      const user = userEvent.setup()
+      renderApp({ manuals, path: '/manuais' })
+      const form = await screen.findByRole('form', { name: 'Sincronização automática' })
+
+      await user.click(within(form).getByRole('checkbox'))
+      await user.click(within(form).getByRole('button', { name: 'Salvar agendamento' }))
+
+      expect(await within(form).findByRole('alert')).toHaveTextContent('APP_SYNC_SOURCE_DIR')
     })
   })
 })

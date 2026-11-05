@@ -63,6 +63,26 @@ export interface SyncStatus {
   readonly lastRun: SyncRun | null
 }
 
+/** Sincronização automática, uma vez por dia, no horário da empresa. */
+export interface SyncSchedule {
+  readonly enabled: boolean
+  /** "HH:MM" no fuso da empresa (``timezone``). */
+  readonly time: string
+  readonly timezone: string
+  /** Próxima execução; nula quando desligada. */
+  readonly nextRunAt: Date | null
+  readonly lastTriggeredAt: Date | null
+  /** Por que a última execução agendada não começou (ex.: pasta inacessível). */
+  readonly lastTriggerError: string | null
+  readonly updatedAt: Date | null
+  readonly updatedBy: string | null
+}
+
+export interface SyncScheduleChange {
+  readonly enabled: boolean
+  readonly time: string
+}
+
 /** Sincronização com algo para fazer além de deixar como está. */
 export function hasPendingChanges(check: SyncCheck): boolean {
   return check.items.some((item) => item.action !== 'ignore')
@@ -78,4 +98,6 @@ export interface ManualsGateway {
   syncStatus(): Promise<SyncStatus>
   checkSync(): Promise<SyncCheck>
   startSync(): Promise<SyncRun>
+  syncSchedule(): Promise<SyncSchedule>
+  updateSyncSchedule(change: SyncScheduleChange): Promise<SyncSchedule>
 }

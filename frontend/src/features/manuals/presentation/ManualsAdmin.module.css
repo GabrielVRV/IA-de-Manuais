@@ -125,3 +125,15 @@
   padding: 0;
   list-style: none;
 }
+
+.schedule {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.9375rem;
+}

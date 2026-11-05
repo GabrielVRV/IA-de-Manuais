@@ -82,6 +82,39 @@ describe('HttpManualsGateway', () => {
       InvalidResponseError,
     )
   })
+
+  it('reads and saves the daily sync schedule', async () => {
+    const { http, fetchFn } = client({
+      enabled: true,
+      time: '06:30',
+      timezone: 'America/Sao_Paulo',
+      next_run_at: '2026-11-06T09:30:00Z',
+      last_triggered_at: null,
+      last_trigger_error: null,
+      updated_at: '2026-11-05T13:00:00Z',
+      updated_by: 'Ana Admin',
+    })
+
+    const schedule = await new HttpManualsGateway(http).updateSyncSchedule({
+      enabled: true,
+      time: '06:30',
+    })
+
+    expect(fetchFn).toHaveBeenCalledWith(
+      'http://api/api/v1/sync/schedule',
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({ enabled: true, time: '06:30' }),
+      }),
+    )
+    expect(schedule).toMatchObject({
+      enabled: true,
+      time: '06:30',
+      nextRunAt: new Date('2026-11-06T09:30:00Z'),
+      lastTriggeredAt: null,
+      updatedBy: 'Ana Admin',
+    })
+  })
 })
 
 describe('HttpManualsGateway sync', () => {

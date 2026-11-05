@@ -21,6 +21,8 @@ import type {
   ManualSummary,
   SyncCheck,
   SyncRun,
+  SyncSchedule,
+  SyncScheduleChange,
   SyncStatus,
 } from '@/features/manuals/domain/manuals'
 import { ManualsGatewayContext } from '@/features/manuals/presentation/manuals-gateway-context'
@@ -151,11 +153,26 @@ export function syncRun(overrides: Partial<SyncRun> = {}): SyncRun {
   }
 }
 
+export function syncSchedule(overrides: Partial<SyncSchedule> = {}): SyncSchedule {
+  return {
+    enabled: false,
+    time: '00:00',
+    timezone: 'America/Sao_Paulo',
+    nextRunAt: null,
+    lastTriggeredAt: null,
+    lastTriggerError: null,
+    updatedAt: null,
+    updatedBy: null,
+    ...overrides,
+  }
+}
+
 export function fakeManualsGateway(
   initial: ManualSummary[] = [manual()],
   sync: SyncStatus = { enabled: true, running: false, lastRun: null },
+  schedule: SyncSchedule = syncSchedule(),
 ) {
-  const state = { manuals: [...initial], sync }
+  const state = { manuals: [...initial], sync, schedule }
   const gateway = {
     state,
     list: vi.fn(() => Promise.resolve([...state.manuals])),
@@ -181,6 +198,18 @@ export function fakeManualsGateway(
       const run = syncRun()
       state.sync = { ...state.sync, running: true, lastRun: run }
       return Promise.resolve(run)
+    }),
+    syncSchedule: vi.fn(() => Promise.resolve(state.schedule)),
+    updateSyncSchedule: vi.fn((change: SyncScheduleChange) => {
+      state.schedule = {
+        ...state.schedule,
+        ...change,
+        // 00:00 de 06/11 em São Paulo.
+        nextRunAt: change.enabled ? new Date('2026-11-06T03:00:00Z') : null,
+        updatedAt: new Date('2026-11-05T13:00:00Z'),
+        updatedBy: 'Ana Admin',
+      }
+      return Promise.resolve(state.schedule)
     }),
   } satisfies ManualsGateway & { state: typeof state }
   return gateway
