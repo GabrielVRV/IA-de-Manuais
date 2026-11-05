@@ -4,6 +4,14 @@ import { MemoryRouter } from 'react-router'
 import { vi } from 'vitest'
 
 import { App } from '@/app/App'
+import type {
+  AccessPolicy,
+  AccessPolicyChanges,
+  AssistantId,
+  AssistantsGateway,
+  UserAccess,
+} from '@/features/assistants/domain/assistants'
+import { AssistantsGatewayContext } from '@/features/assistants/presentation/assistants-gateway-context'
 import type { AuthGateway, SessionUser } from '@/features/auth/domain/auth'
 import { AuthGatewayContext } from '@/features/auth/presentation/session-context'
 import { SessionProvider } from '@/features/auth/presentation/SessionProvider'
@@ -55,16 +63,6 @@ export const REGULAR: SessionUser = {
   username: 'joao',
   displayName: 'João',
   role: 'user',
-}
-
-/** Primeiro login pelo AD: ainda aguarda um administrador liberar o acesso. */
-export const PENDING: SessionUser = {
-  ...REGULAR,
-  id: 'u-pedro',
-  username: 'pedro',
-  displayName: 'Pedro da Rede',
-  role: 'pending',
-  authSource: 'ad',
 }
 
 export class FakeAuthGateway implements AuthGateway {
@@ -225,6 +223,7 @@ export function managedUser(overrides: Partial<ManagedUser> = {}): ManagedUser {
     isActive: true,
     mustChangePassword: false,
     lastLoginAt: null,
+    assistantAccess: {},
     ...overrides,
   }
 }
@@ -249,11 +248,63 @@ export function fakeUsersGateway(initial: ManagedUser[]) {
       return Promise.resolve(created)
     }),
     resetPassword: vi.fn((id: string) => replace(id, { mustChangePassword: true })),
-    update: vi.fn(
-      (id: string, changes: { isActive?: boolean; role?: 'admin' | 'user' | 'pending' }) =>
-        replace(id, changes),
+    update: vi.fn((id: string, changes: { isActive?: boolean; role?: UserRole }) =>
+      replace(id, changes),
+    ),
+    setAssistantAccess: vi.fn(
+      async (id: string, assistantId: AssistantId, access: UserAccess | null) => {
+        const current = state.users.find((u) => u.id === id)?.assistantAccess ?? {}
+        const others = Object.fromEntries(
+          Object.entries(current).filter(([key]) => key !== assistantId),
+        )
+        await replace(id, {
+          assistantAccess: access ? { ...others, [assistantId]: access } : others,
+        })
+      },
     ),
   } satisfies UsersGateway & { state: typeof state }
+}
+
+export function accessPolicy(overrides: Partial<AccessPolicy> = {}): AccessPolicy {
+  return {
+    assistantId: 'engenharia',
+    name: 'Assistente de Engenharia',
+    defaultAccess: 'open',
+    requestInstructions: null,
+    updatedAt: null,
+    updatedBy: null,
+    ...overrides,
+  }
+}
+
+/** Um assistente só (Engenharia); `allowed` diz se o usuário da sessão pode usá-lo. */
+export function fakeAssistantsGateway(options: { policy?: AccessPolicy; allowed?: boolean } = {}) {
+  const state = { policy: options.policy ?? accessPolicy(), allowed: options.allowed ?? true }
+  return {
+    state,
+    mine: vi.fn(() =>
+      Promise.resolve([
+        {
+          id: state.policy.assistantId,
+          name: state.policy.name,
+          topic: 'Manuais técnicos',
+          allowed: state.allowed,
+          requestInstructions:
+            state.policy.requestInstructions ?? 'Peça o acesso a um administrador do sistema.',
+        },
+      ]),
+    ),
+    policies: vi.fn(() => Promise.resolve([state.policy])),
+    updatePolicy: vi.fn((_id: AssistantId, changes: AccessPolicyChanges) => {
+      state.policy = {
+        ...state.policy,
+        ...changes,
+        updatedAt: new Date('2026-11-05T12:00:00Z'),
+        updatedBy: 'Ana Admin',
+      }
+      return Promise.resolve(state.policy)
+    }),
+  } satisfies AssistantsGateway & { state: typeof state }
 }
 
 export function usageTotals(overrides: Partial<UsageTotals> = {}): UsageTotals {
@@ -447,6 +498,7 @@ interface RenderAppOptions {
   readonly usage?: UsageGateway
   readonly settings?: SettingsGateway
   readonly questions?: QuestionGateway
+  readonly assistants?: AssistantsGateway
   readonly path?: string
 }
 
@@ -464,11 +516,13 @@ export function renderApp(options: RenderAppOptions = {}) {
             <UsersGatewayContext value={options.users ?? fakeUsersGateway([])}>
               <UsageGatewayContext value={options.usage ?? fakeUsageGateway()}>
                 <SettingsGatewayContext value={options.settings ?? fakeSettingsGateway()}>
-                  <SessionProvider>
-                    <MemoryRouter initialEntries={[options.path ?? '/']}>
-                      <App />
-                    </MemoryRouter>
-                  </SessionProvider>
+                  <AssistantsGatewayContext value={options.assistants ?? fakeAssistantsGateway()}>
+                    <SessionProvider>
+                      <MemoryRouter initialEntries={[options.path ?? '/']}>
+                        <App />
+                      </MemoryRouter>
+                    </SessionProvider>
+                  </AssistantsGatewayContext>
                 </SettingsGatewayContext>
               </UsageGatewayContext>
             </UsersGatewayContext>

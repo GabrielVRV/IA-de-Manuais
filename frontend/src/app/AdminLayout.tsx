@@ -24,6 +24,7 @@ const ADMIN_SECTIONS: readonly AdminSection[] = [
     title: 'Geral',
     links: [
       { to: 'usuarios', label: 'Usuários' },
+      { to: 'acessos', label: 'Acessos' },
       { to: 'consumo', label: 'Consumo' },
       { to: 'configuracoes', label: 'Configurações' },
     ],

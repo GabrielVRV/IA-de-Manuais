@@ -1,6 +1,7 @@
 import { Navigate, NavLink, Route, Routes, useLocation } from 'react-router'
 
 import { isAdmin, managesPasswordHere } from '@/features/auth/domain/auth'
+import { AccessAdmin } from '@/features/assistants/presentation/AccessAdmin'
 import { AuthGate } from '@/features/auth/presentation/AuthGate'
 import { ChangePasswordForm } from '@/features/auth/presentation/ChangePasswordForm'
 import { useCurrentUser, useSession } from '@/features/auth/presentation/session-context'
@@ -51,6 +52,7 @@ function AuthenticatedApp() {
         <Route path="/admin" element={admin ? <AdminLayout /> : <Navigate to="/" replace />}>
           <Route index element={<Navigate to="usuarios" replace />} />
           <Route path="usuarios" element={<UsersAdmin />} />
+          <Route path="acessos" element={<AccessAdmin />} />
           <Route path="consumo" element={<UsageReport />} />
           <Route path="configuracoes" element={<SettingsAdmin />} />
           <Route path="manuais" element={<ManualsAdmin />} />

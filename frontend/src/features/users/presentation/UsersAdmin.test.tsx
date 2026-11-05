@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -11,7 +11,6 @@ const pedro = managedUser({
   id: 'u-pedro',
   username: 'pedro',
   displayName: 'Pedro da Rede',
-  role: 'pending',
   authSource: 'ad',
 })
 
@@ -86,20 +85,34 @@ describe('<UsersAdmin />', () => {
     expect(within(row('Ana Admin')).getByLabelText('Perfil de Ana Admin')).toBeDisabled()
   })
 
-  it('highlights AD users awaiting approval and releases them', async () => {
-    const { users, user } = setup()
+  it('shows where each user comes from', async () => {
+    setup()
     await screen.findByRole('table')
 
-    expect(screen.getByText(/1 usuário de rede aguarda liberação/)).toBeInTheDocument()
-    // Quem aguarda aparece no topo da tabela.
-    expect(screen.getAllByRole('row')[1]).toHaveTextContent('Pedro da Rede')
     expect(row('Pedro')).toHaveTextContent('Rede (AD)')
     expect(within(row('Pedro')).queryByRole('button', { name: 'Redefinir senha' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Liberar' })).not.toBeInTheDocument()
+  })
 
-    await user.click(within(row('Pedro')).getByRole('button', { name: 'Liberar' }))
+  it('grants or blocks the assistant for one user and returns them to the default', async () => {
+    const { users, user } = setup()
+    const select = await screen.findByLabelText<HTMLSelectElement>(
+      'Acesso de Pedro da Rede ao Assistente de Engenharia',
+    )
+    expect(select.value).toBe('')
+    expect(
+      within(select).getByRole('option', { name: 'Padrão (liberado para todos)' }),
+    ).toBeInTheDocument()
 
-    expect(users.update).toHaveBeenLastCalledWith('u-pedro', { role: 'user' })
-    expect(await within(row('Pedro')).findByText('Ativo')).toBeInTheDocument()
-    expect(screen.queryByText(/aguarda liberação/)).not.toBeInTheDocument()
+    await user.selectOptions(select, 'Bloqueado')
+    expect(users.setAssistantAccess).toHaveBeenLastCalledWith('u-pedro', 'engenharia', 'denied')
+    await waitFor(() => {
+      expect(select.value).toBe('denied')
+    })
+
+    await user.selectOptions(select, 'Padrão (liberado para todos)')
+    expect(users.setAssistantAccess).toHaveBeenLastCalledWith('u-pedro', 'engenharia', null)
+    // Administradores usam todos os assistentes: não há o que escolher.
+    expect(row('Ana Admin')).toHaveTextContent('Todos (administrador)')
   })
 })

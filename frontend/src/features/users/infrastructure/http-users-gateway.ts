@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import type { AssistantId, UserAccess } from '@/features/assistants/domain/assistants'
+import { assistantIdSchema } from '@/features/assistants/infrastructure/http-assistants-gateway'
 import { InvalidResponseError } from '@/shared/http/errors'
 import type { HttpClient } from '@/shared/http/http-client'
 
@@ -9,11 +11,12 @@ const userSchema = z.object({
   id: z.string(),
   username: z.string(),
   display_name: z.string(),
-  role: z.enum(['admin', 'user', 'pending']),
+  role: z.enum(['admin', 'user']),
   auth_source: z.enum(['local', 'ad']),
   is_active: z.boolean(),
   must_change_password: z.boolean(),
   last_login_at: z.iso.datetime({ offset: true }).nullable(),
+  assistant_access: z.partialRecord(assistantIdSchema, z.enum(['granted', 'denied'])).default({}),
 })
 
 function toUser(body: unknown): ManagedUser {
@@ -29,6 +32,7 @@ function toUser(body: unknown): ManagedUser {
     isActive: u.is_active,
     mustChangePassword: u.must_change_password,
     lastLoginAt: u.last_login_at ? new Date(u.last_login_at) : null,
+    assistantAccess: u.assistant_access,
   }
 }
 
@@ -70,6 +74,17 @@ export class HttpUsersGateway implements UsersGateway {
         is_active: changes.isActive,
         role: changes.role,
       }),
+    )
+  }
+
+  async setAssistantAccess(
+    id: string,
+    assistantId: AssistantId,
+    access: UserAccess | null,
+  ): Promise<void> {
+    await this.#http.putJson(
+      `/api/v1/users/${encodeURIComponent(id)}/assistants/${encodeURIComponent(assistantId)}`,
+      { access },
     )
   }
 }

@@ -2,9 +2,11 @@ import { useCallback, useState } from 'react'
 import { useMatch, useNavigate } from 'react-router'
 
 import type { ConversationRef } from '../domain/chat'
+import { AccessBlocked } from './AccessBlocked'
 import { Chat } from './Chat'
 import styles from './ChatPage.module.css'
 import { HistorySidebar } from './HistorySidebar'
+import { useAssistantAccess } from './use-assistant-access'
 import { useChat } from './use-chat'
 import { useConversations } from './use-conversations'
 
@@ -33,6 +35,15 @@ export function ChatPage({ userName }: { readonly userName: string }) {
 
   const chat = useChat({ conversationId, onSaved })
   const title = history.conversations?.find((c) => c.id === conversationId)?.title ?? null
+  const engineering = useAssistantAccess('engenharia')
+
+  if (engineering && !engineering.allowed) {
+    return (
+      <div className={styles.page}>
+        <AccessBlocked assistant={engineering} />
+      </div>
+    )
+  }
 
   return (
     <div className={styles.page}>

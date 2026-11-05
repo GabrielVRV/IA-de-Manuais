@@ -2,8 +2,8 @@
 export const PASSWORD_MIN_LENGTH = 8
 export const PASSWORD_MAX_LENGTH = 128
 
-/** 'pending': entrou pelo AD e aguarda um administrador liberar o acesso. */
-export type UserRole = 'admin' | 'user' | 'pending'
+/** O acesso a cada assistente do chat é definido à parte (ADR 0013). */
+export type UserRole = 'admin' | 'user'
 
 /** Quem confere a senha: este sistema ('local') ou o AD (usuário de rede). */
 export type AuthSource = 'local' | 'ad'
@@ -19,10 +19,6 @@ export interface SessionUser {
 
 export function isAdmin(user: SessionUser): boolean {
   return user.role === 'admin'
-}
-
-export function isPending(user: SessionUser): boolean {
-  return user.role === 'pending'
 }
 
 /** Só usuários locais trocam a senha aqui; os do AD trocam a senha de rede no Windows. */

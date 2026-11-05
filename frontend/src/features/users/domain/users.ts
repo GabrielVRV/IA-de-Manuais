@@ -1,3 +1,4 @@
+import type { AssistantId, UserAccess } from '@/features/assistants/domain/assistants'
 import type { AuthSource, UserRole } from '@/features/auth/domain/auth'
 
 export type { AuthSource, UserRole }
@@ -11,6 +12,8 @@ export interface ManagedUser {
   readonly isActive: boolean
   readonly mustChangePassword: boolean
   readonly lastLoginAt: Date | null
+  /** Exceções ao acesso padrão; assistente ausente = segue o padrão. */
+  readonly assistantAccess: Partial<Record<AssistantId, UserAccess>>
 }
 
 /** Usuário local. Os do AD são cadastrados sozinhos no primeiro login. */
@@ -27,4 +30,6 @@ export interface UsersGateway {
   create(user: NewUser): Promise<ManagedUser>
   resetPassword(id: string, temporaryPassword: string): Promise<ManagedUser>
   update(id: string, changes: { isActive?: boolean; role?: UserRole }): Promise<ManagedUser>
+  /** Libera ou bloqueia um assistente para o usuário; null = volta ao padrão. */
+  setAssistantAccess(id: string, assistantId: AssistantId, access: UserAccess | null): Promise<void>
 }

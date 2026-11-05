@@ -4,7 +4,8 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { describe, expect, it } from 'vitest'
 
 import { HttpError, NetworkError } from '@/shared/http/errors'
-import { conversation, fakeQuestionGateway } from '@/test/fakes'
+import { AssistantsGatewayContext } from '@/features/assistants/presentation/assistants-gateway-context'
+import { conversation, fakeAssistantsGateway, fakeQuestionGateway } from '@/test/fakes'
 
 import type { Answer, ChatReply } from '../domain/chat'
 import { ChatPage } from './ChatPage'
@@ -23,16 +24,18 @@ function renderChat({
 } = {}) {
   const page = <ChatPage userName={userName} />
   render(
-    <QuestionGatewayContext value={gateway}>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/" element={page}>
-            <Route path="c/:conversationId" element={null} />
-          </Route>
-        </Routes>
-        <Location />
-      </MemoryRouter>
-    </QuestionGatewayContext>,
+    <AssistantsGatewayContext value={fakeAssistantsGateway()}>
+      <QuestionGatewayContext value={gateway}>
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route path="/" element={page}>
+              <Route path="c/:conversationId" element={null} />
+            </Route>
+          </Routes>
+          <Location />
+        </MemoryRouter>
+      </QuestionGatewayContext>
+    </AssistantsGatewayContext>,
   )
   return gateway
 }

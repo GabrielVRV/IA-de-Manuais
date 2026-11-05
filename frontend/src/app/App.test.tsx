@@ -2,7 +2,14 @@ import { act, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 
-import { ADMIN, FakeAuthGateway, PENDING, REGULAR, renderApp } from '@/test/fakes'
+import {
+  accessPolicy,
+  ADMIN,
+  fakeAssistantsGateway,
+  FakeAuthGateway,
+  REGULAR,
+  renderApp,
+} from '@/test/fakes'
 
 const nav = () => screen.getByRole('navigation', { name: 'Navegação principal' })
 
@@ -62,23 +69,25 @@ describe('<App />', () => {
       expect(auth.changePassword).not.toHaveBeenCalled()
     })
 
-    it('keeps AD users awaiting approval out until an administrator releases them', async () => {
-      const user = userEvent.setup()
-      const auth = new FakeAuthGateway(PENDING)
-      renderApp({ auth })
+    it('shows how to ask for access instead of the chat when the assistant is blocked', async () => {
+      renderApp({
+        auth: new FakeAuthGateway(REGULAR),
+        assistants: fakeAssistantsGateway({
+          allowed: false,
+          policy: accessPolicy({
+            defaultAccess: 'restricted',
+            requestInstructions: 'Abra um chamado no GLPI.',
+          }),
+        }),
+      })
 
       expect(
-        await screen.findByRole('heading', { name: 'Aguardando liberação' }),
+        await screen.findByRole('heading', {
+          name: 'Você ainda não tem acesso a este assistente',
+        }),
       ).toBeInTheDocument()
-      expect(screen.getByText('Pedro da Rede')).toBeInTheDocument()
+      expect(screen.getByText('Abra um chamado no GLPI.')).toBeInTheDocument()
       expect(screen.queryByRole('textbox', { name: /sua pergunta/i })).not.toBeInTheDocument()
-
-      await user.click(screen.getByRole('button', { name: 'Verificar novamente' }))
-      expect(await screen.findByRole('status')).toHaveTextContent('ainda não foi liberado')
-
-      auth.user = { ...PENDING, role: 'user' }
-      await user.click(screen.getByRole('button', { name: 'Verificar novamente' }))
-      expect(await screen.findByRole('textbox', { name: /sua pergunta/i })).toBeInTheDocument()
     })
 
     it('returns to the login screen with a notice when the session expires', async () => {

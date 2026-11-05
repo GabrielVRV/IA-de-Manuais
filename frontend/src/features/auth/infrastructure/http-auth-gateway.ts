@@ -9,7 +9,7 @@ const userSchema = z.object({
   id: z.string(),
   username: z.string(),
   display_name: z.string(),
-  role: z.enum(['admin', 'user', 'pending']),
+  role: z.enum(['admin', 'user']),
   auth_source: z.enum(['local', 'ad']),
   must_change_password: z.boolean(),
 })

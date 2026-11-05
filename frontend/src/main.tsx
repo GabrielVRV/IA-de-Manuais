@@ -11,6 +11,8 @@ import { HashRouter } from 'react-router'
 import { App } from '@/app/App'
 import { loadRuntimeConfig } from '@/app/config/runtime-config'
 import { StartupError } from '@/app/StartupError'
+import { HttpAssistantsGateway } from '@/features/assistants/infrastructure/http-assistants-gateway'
+import { AssistantsGatewayContext } from '@/features/assistants/presentation/assistants-gateway-context'
 import { HttpAuthGateway } from '@/features/auth/infrastructure/http-auth-gateway'
 import { AuthGatewayContext } from '@/features/auth/presentation/session-context'
 import { SessionProvider } from '@/features/auth/presentation/SessionProvider'
@@ -54,12 +56,14 @@ async function bootstrap(): Promise<void> {
                   <UsersGatewayContext value={new HttpUsersGateway(http)}>
                     <UsageGatewayContext value={new HttpUsageGateway(http)}>
                       <SettingsGatewayContext value={new HttpSettingsGateway(http)}>
-                        <SessionProvider>
-                          {/* Rotas por "#": funcionam em qualquer subpasta do XAMPP sem reescrita. */}
-                          <HashRouter>
-                            <App />
-                          </HashRouter>
-                        </SessionProvider>
+                        <AssistantsGatewayContext value={new HttpAssistantsGateway(http)}>
+                          <SessionProvider>
+                            {/* Rotas por "#": funcionam em qualquer subpasta do XAMPP sem reescrita. */}
+                            <HashRouter>
+                              <App />
+                            </HashRouter>
+                          </SessionProvider>
+                        </AssistantsGatewayContext>
                       </SettingsGatewayContext>
                     </UsageGatewayContext>
                   </UsersGatewayContext>

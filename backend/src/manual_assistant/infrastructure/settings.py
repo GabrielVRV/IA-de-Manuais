@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     ad_server_urls: Annotated[list[str], NoDecode] = Field(default_factory=list)
     ad_domain: str | None = None  # ex.: empresa.local; o login vira "usuario@empresa.local"
     ad_base_dn: str | None = None  # ex.: DC=empresa,DC=local
-    # Só quem está neste grupo entra. Vazio = qualquer usuário do AD (ainda aguarda liberação).
+    # Só quem está neste grupo entra. Vazio = qualquer usuário do AD (ADR 0013).
     ad_required_group_dn: str | None = None
     ad_start_tls: bool = False  # só para ldap:// (porta 389)
     ad_ca_cert_file: Path | None = None  # CA interna, em PEM; vazio = as do sistema

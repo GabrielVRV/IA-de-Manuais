@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 
+import {
+  type AccessPolicy,
+  DEFAULT_ACCESS_LABELS,
+  type UserAccess,
+} from '@/features/assistants/domain/assistants'
+import { useAssistantsGateway } from '@/features/assistants/presentation/assistants-gateway-context'
 import { useCurrentUser } from '@/features/auth/presentation/session-context'
 import { cx } from '@/shared/cx'
 import { describeError } from '@/shared/http/describe-error'
@@ -12,11 +18,6 @@ import styles from './UsersAdmin.module.css'
 
 const dateFormat = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 
-/** Quem aguarda liberação aparece primeiro; o resto mantém a ordem da API (por nome). */
-function pendingFirst(users: readonly ManagedUser[]): ManagedUser[] {
-  return [...users].sort((a, b) => Number(b.role === 'pending') - Number(a.role === 'pending'))
-}
-
 /** Senha provisória a entregar ao usuário (mostrada uma única vez). */
 interface Handover {
   readonly username: string
@@ -26,8 +27,10 @@ interface Handover {
 
 export function UsersAdmin() {
   const gateway = useUsersGateway()
+  const assistants = useAssistantsGateway()
   const me = useCurrentUser()
   const [users, setUsers] = useState<ManagedUser[] | null>(null)
+  const [policies, setPolicies] = useState<AccessPolicy[]>([])
   const [error, setError] = useState<string | null>(null)
   const [handover, setHandover] = useState<Handover | null>(null)
 
@@ -42,9 +45,11 @@ export function UsersAdmin() {
   // Carga inicial: o estado só muda nos callbacks da promessa, nunca no corpo do efeito.
   useEffect(() => {
     let active = true
-    gateway.list().then(
-      (list) => {
-        if (active) setUsers(list)
+    Promise.all([gateway.list(), assistants.policies()]).then(
+      ([list, loaded]) => {
+        if (!active) return
+        setUsers(list)
+        setPolicies(loaded)
       },
       (caught: unknown) => {
         if (active) setError(describeError(caught))
@@ -53,7 +58,7 @@ export function UsersAdmin() {
     return () => {
       active = false
     }
-  }, [gateway])
+  }, [gateway, assistants])
 
   const run = async (action: () => Promise<unknown>) => {
     setError(null)
@@ -66,8 +71,6 @@ export function UsersAdmin() {
       return false
     }
   }
-
-  const pendingCount = users?.filter((u) => u.isActive && u.role === 'pending').length ?? 0
 
   const resetPassword = (user: ManagedUser) => {
     if (!window.confirm(`Gerar uma nova senha provisória para ${user.displayName}?`)) return
@@ -88,15 +91,6 @@ export function UsersAdmin() {
       </header>
 
       <div className={ui.stack}>
-        {pendingCount > 0 && (
-          <p className={ui.alert} data-tone="warning" role="status">
-            {pendingCount === 1
-              ? '1 usuário de rede aguarda liberação.'
-              : `${String(pendingCount)} usuários de rede aguardam liberação.`}{' '}
-            Clique em <strong>Liberar</strong> ou escolha o perfil para dar acesso.
-          </p>
-        )}
-
         <CreateUserForm
           onCreate={async (user) =>
             run(async () => {
@@ -144,8 +138,8 @@ export function UsersAdmin() {
                 <tr>
                   <th>Nome</th>
                   <th>Login</th>
-                  <th>Origem</th>
                   <th>Perfil</th>
+                  {policies.length > 0 && <th>Acesso</th>}
                   <th>Situação</th>
                   <th>Último acesso</th>
                   <th>
@@ -154,18 +148,19 @@ export function UsersAdmin() {
                 </tr>
               </thead>
               <tbody>
-                {pendingFirst(users).map((user) => {
+                {users.map((user) => {
                   const isMe = user.id === me.id
-                  const pending = user.role === 'pending'
                   return (
                     <tr key={user.id} className={cx(!user.isActive && styles.inactive)}>
                       <td className={styles.name}>
                         {user.displayName}
                         {isMe && <span className={ui.muted}> (você)</span>}
                       </td>
-                      <td data-label="Login">{user.username}</td>
-                      <td className={styles.nowrap} data-label="Origem">
-                        {user.authSource === 'ad' ? 'Rede (AD)' : 'Local'}
+                      <td data-label="Login">
+                        {user.username}
+                        <span className={styles.subtle}>
+                          {user.authSource === 'ad' ? 'Rede (AD)' : 'Local'}
+                        </span>
                       </td>
                       <td data-label="Perfil">
                         <select
@@ -179,19 +174,33 @@ export function UsersAdmin() {
                             )
                           }}
                         >
-                          {pending && <option value="pending">Aguardando liberação</option>}
                           <option value="user">Usuário</option>
                           <option value="admin">Administrador</option>
                         </select>
                       </td>
+                      {policies.length > 0 && (
+                        <td data-label="Acesso">
+                          <div className={styles.access}>
+                            {policies.map((policy) => (
+                              <AssistantAccessSelect
+                                key={policy.assistantId}
+                                user={user}
+                                policy={policy}
+                                showName={policies.length > 1}
+                                onChange={(access) => {
+                                  void run(() =>
+                                    gateway.setAssistantAccess(user.id, policy.assistantId, access),
+                                  )
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </td>
+                      )}
                       <td data-label="Situação">
                         {!user.isActive ? (
                           <span className={ui.badge} data-tone="danger">
                             Inativo
-                          </span>
-                        ) : pending ? (
-                          <span className={ui.badge} data-tone="warning">
-                            Aguardando liberação
                           </span>
                         ) : user.mustChangePassword ? (
                           <span className={ui.badge} data-tone="warning">
@@ -208,17 +217,6 @@ export function UsersAdmin() {
                       </td>
                       <td className={styles.actionsCell}>
                         <div className={styles.actions}>
-                          {pending && user.isActive && (
-                            <button
-                              type="button"
-                              className={cx(ui.button, ui.primary)}
-                              onClick={() => {
-                                void run(() => gateway.update(user.id, { role: 'user' }))
-                              }}
-                            >
-                              Liberar
-                            </button>
-                          )}
                           {user.authSource === 'local' && (
                             <button
                               type="button"
@@ -292,8 +290,8 @@ function CreateUserForm({
     >
       <strong>Novo usuário local</strong>
       <span className={ui.hint}>
-        Usuários de rede (AD) não precisam ser criados: eles aparecem aqui no primeiro login,
-        aguardando liberação. Crie aqui só quem não tem usuário de rede.
+        Usuários de rede (AD) não precisam ser criados: eles aparecem aqui no primeiro login e já
+        usam os assistentes liberados para todos. Crie aqui só quem não tem usuário de rede.
       </span>
       <div className={ui.row}>
         <label className={cx(ui.field, ui.grow)}>
@@ -364,5 +362,50 @@ function CreateUserForm({
         Login: 3 a 50 caracteres (letras minúsculas, números, ponto, hífen ou sublinhado).
       </span>
     </form>
+  )
+}
+
+const ACCESS_OPTIONS: readonly { value: UserAccess; label: string }[] = [
+  { value: 'granted', label: 'Liberado' },
+  { value: 'denied', label: 'Bloqueado' },
+]
+
+/** Exceção do usuário ao acesso padrão de um assistente; administradores usam todos. */
+function AssistantAccessSelect({
+  user,
+  policy,
+  showName,
+  onChange,
+}: {
+  readonly user: ManagedUser
+  readonly policy: AccessPolicy
+  readonly showName: boolean
+  readonly onChange: (access: UserAccess | null) => void
+}) {
+  const label = `Acesso de ${user.displayName} ao ${policy.name}`
+  if (user.role === 'admin') {
+    return <span className={ui.muted}>Todos (administrador)</span>
+  }
+  return (
+    <label className={styles.accessField}>
+      {showName && <span className={styles.subtle}>{policy.name}</span>}
+      <select
+        className={ui.select}
+        aria-label={label}
+        value={user.assistantAccess[policy.assistantId] ?? ''}
+        onChange={(event) => {
+          onChange(event.target.value === '' ? null : (event.target.value as UserAccess))
+        }}
+      >
+        <option value="">
+          Padrão ({DEFAULT_ACCESS_LABELS[policy.defaultAccess].toLowerCase()})
+        </option>
+        {ACCESS_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
   )
 }

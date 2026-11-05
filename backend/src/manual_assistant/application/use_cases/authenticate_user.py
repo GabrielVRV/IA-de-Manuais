@@ -46,7 +46,8 @@ class _Verification:
 class AuthenticateUserUseCase:
     """Login. Usuários locais têm a senha conferida aqui; os demais, no AD.
 
-    Um login do AD que ainda não existe aqui é cadastrado como "aguardando liberação".
+    Um login do AD que ainda não existe aqui é cadastrado como usuário comum; o que ele
+    pode usar depende do acesso de cada assistente (ADR 0013).
     """
 
     def __init__(
