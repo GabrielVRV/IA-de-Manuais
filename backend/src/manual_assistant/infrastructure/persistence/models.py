@@ -1,7 +1,7 @@
 """Modelos ORM: o formato das tabelas. Ficam separados das entidades de domínio
 de propósito, para que o domínio não dependa do SQLAlchemy."""
 
-from datetime import datetime
+from datetime import datetime, time
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -20,6 +20,7 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
+    Time,
     UniqueConstraint,
     func,
 )
@@ -216,3 +217,19 @@ class ModelPriceRecord(Base):
     # Dólares por milhão de tokens.
     input_per_million: Mapped[Decimal] = mapped_column(Numeric(12, 6))
     output_per_million: Mapped[Decimal] = mapped_column(Numeric(12, 6))
+
+
+class SyncScheduleRecord(Base):
+    """Uma linha só (id = 1): o agendamento da sincronização com a pasta da Engenharia."""
+
+    __tablename__ = "sync_schedule"
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=False)
+    enabled: Mapped[bool] = mapped_column(Boolean)
+    time_of_day: Mapped[time] = mapped_column(Time())  # no relógio da empresa (APP_TIMEZONE)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_by: Mapped[str | None] = mapped_column(String(100))
+    last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_trigger_error: Mapped[str | None] = mapped_column(String(500))
+
+    __table_args__ = (CheckConstraint("id = 1", name="single_row"),)

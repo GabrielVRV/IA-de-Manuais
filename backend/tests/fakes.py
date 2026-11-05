@@ -36,6 +36,7 @@ from manual_assistant.domain.login_attempts import LoginAttempts
 from manual_assistant.domain.manual import Manual, ManualId
 from manual_assistant.domain.pages import Page, PageRange
 from manual_assistant.domain.session import Session
+from manual_assistant.domain.sync_schedule import SyncSchedule
 from manual_assistant.domain.system_settings import SystemSettings
 from manual_assistant.domain.usage import ModelPrice, QuestionUsage
 from manual_assistant.domain.user import User, UserId
@@ -389,6 +390,17 @@ class InMemorySystemSettingsRepository:
 
     async def save(self, settings: SystemSettings) -> None:
         self.settings = replace(settings)
+
+
+@dataclass
+class InMemorySyncScheduleRepository:
+    schedule: SyncSchedule = field(default_factory=SyncSchedule)
+
+    async def get(self) -> SyncSchedule:
+        return replace(self.schedule)
+
+    async def save(self, schedule: SyncSchedule) -> None:
+        self.schedule = replace(schedule)
 
 
 @dataclass

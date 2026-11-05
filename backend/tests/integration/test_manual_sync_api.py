@@ -94,3 +94,47 @@ def test_only_admins(backend: FakeBackend) -> None:
     assert client.get(URL).status_code == 403
     assert client.post(f"{URL}/check").status_code == 403
     assert client.post(f"{URL}/run").status_code == 403
+
+
+class TestSchedule:
+    URL = "/api/v1/sync/schedule"
+
+    def test_admin_schedules_the_daily_sync(self) -> None:
+        backend = FakeBackend()
+        client = backend.client_logged_in_as("admin")
+
+        assert client.get(self.URL).json()["enabled"] is False
+
+        response = client.put(self.URL, json={"enabled": True, "time": "00:00"})
+
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert (body["enabled"], body["time"], body["timezone"]) == (
+            True,
+            "00:00",
+            "America/Sao_Paulo",
+        )
+        assert body["next_run_at"] is not None
+        assert body["updated_by"]
+        assert client.get(self.URL).json()["enabled"] is True
+
+    def test_rejects_an_invalid_time(self) -> None:
+        client = FakeBackend().client_logged_in_as("admin")
+
+        for invalid in ["24:00", "7:00", "00:00:00", ""]:
+            response = client.put(self.URL, json={"enabled": True, "time": invalid})
+            assert response.status_code == 422, invalid
+
+    def test_cannot_turn_on_without_the_folder_configured(self) -> None:
+        client = FakeBackend(manual_source=None).client_logged_in_as("admin")
+
+        response = client.put(self.URL, json={"enabled": True, "time": "00:00"})
+
+        assert response.status_code == 409
+        assert "APP_SYNC_SOURCE_DIR" in response.json()["detail"]
+
+    def test_only_admins_reach_the_schedule(self) -> None:
+        client = FakeBackend().client_logged_in_as("maria", role=UserRole.USER)
+
+        assert client.get(self.URL).status_code == 403
+        assert client.put(self.URL, json={"enabled": True, "time": "00:00"}).status_code == 403

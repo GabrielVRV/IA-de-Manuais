@@ -10,7 +10,9 @@ from manual_assistant.presentation.http.dependencies import (
 from manual_assistant.presentation.http.schemas.manual_sync import (
     SyncCheckResponse,
     SyncRunResponse,
+    SyncScheduleResponse,
     SyncStatusResponse,
+    UpdateSyncScheduleRequest,
 )
 from manual_assistant.presentation.http.schemas.manuals import ErrorResponse
 
@@ -52,3 +54,22 @@ async def check_sync(use_cases: UseCasesDep) -> SyncCheckResponse:
 async def run_sync(use_cases: UseCasesDep, admin: AdminUser) -> SyncRunResponse:
     run = await use_cases.manual_sync.start(started_by=admin.display_name or admin.username)
     return SyncRunResponse.from_run(run)
+
+
+@router.get("/schedule", summary="Agendamento diário da sincronização")
+async def get_sync_schedule(use_cases: UseCasesDep, admin: AdminUser) -> SyncScheduleResponse:
+    return SyncScheduleResponse.from_view(await use_cases.get_sync_schedule.execute(admin))
+
+
+@router.put(
+    "/schedule",
+    responses=UNAVAILABLE,
+    summary="Liga, desliga ou muda o horário da sincronização diária",
+)
+async def update_sync_schedule(
+    request: UpdateSyncScheduleRequest, use_cases: UseCasesDep, admin: AdminUser
+) -> SyncScheduleResponse:
+    view = await use_cases.update_sync_schedule.execute(
+        admin, enabled=request.enabled, time_of_day=request.time
+    )
+    return SyncScheduleResponse.from_view(view)

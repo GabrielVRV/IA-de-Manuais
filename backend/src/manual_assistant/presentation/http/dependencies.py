@@ -36,6 +36,10 @@ from manual_assistant.application.use_cases.resolve_session import (
     ResolveSessionUseCase,
 )
 from manual_assistant.application.use_cases.sync_manuals import ManualSyncService
+from manual_assistant.application.use_cases.sync_schedule import (
+    GetSyncScheduleUseCase,
+    UpdateSyncScheduleUseCase,
+)
 from manual_assistant.application.use_cases.system_settings import (
     DeleteModelPriceUseCase,
     GetSystemSettingsUseCase,
@@ -61,6 +65,8 @@ class UseCases:
     get_manual_file: GetManualFileUseCase
     delete_manual: DeleteManualUseCase
     manual_sync: ManualSyncService
+    get_sync_schedule: GetSyncScheduleUseCase
+    update_sync_schedule: UpdateSyncScheduleUseCase
     chat: ChatUseCase
     list_conversations: ListConversationsUseCase
     get_conversation: GetConversationUseCase

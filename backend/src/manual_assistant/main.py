@@ -52,6 +52,11 @@ from manual_assistant.application.use_cases.sync_manuals import (
     ManualSyncService,
     PlanManualSyncUseCase,
 )
+from manual_assistant.application.use_cases.sync_schedule import (
+    GetSyncScheduleUseCase,
+    RunScheduledSyncUseCase,
+    UpdateSyncScheduleUseCase,
+)
 from manual_assistant.application.use_cases.system_settings import (
     DeleteModelPriceUseCase,
     GetSystemSettingsUseCase,
@@ -92,6 +97,9 @@ from manual_assistant.infrastructure.persistence.settings_repository import (
     SqlAlchemyModelPriceRepository,
     SqlAlchemySystemSettingsRepository,
 )
+from manual_assistant.infrastructure.persistence.sync_schedule_repository import (
+    SqlAlchemySyncScheduleRepository,
+)
 from manual_assistant.infrastructure.persistence.usage_repository import SqlAlchemyUsageRepository
 from manual_assistant.infrastructure.persistence.user_repository import SqlAlchemyUserRepository
 from manual_assistant.infrastructure.persistence.vector_store import PgVectorStore
@@ -106,6 +114,8 @@ logger = logging.getLogger(__name__)
 
 # De quanto em quanto tempo as conversas e o consumo além do prazo de retenção são apagados.
 PURGE_INTERVAL = timedelta(hours=6)
+# De quanto em quanto tempo o agendamento da sincronização é conferido.
+SCHEDULE_CHECK_INTERVAL = timedelta(minutes=1)
 
 
 def create_app(
@@ -175,6 +185,7 @@ def create_app(
             ),
         )
 
+    schedules = SqlAlchemySyncScheduleRepository(session_factory)
     use_cases = UseCases(
         check_health=CheckHealthUseCase(indicators=[DatabaseHealthIndicator(engine)]),
         register_manual=register_manual,
@@ -184,6 +195,12 @@ def create_app(
         get_manual_file=GetManualFileUseCase(repository, storage),
         delete_manual=delete_manual,
         manual_sync=manual_sync,
+        get_sync_schedule=GetSyncScheduleUseCase(
+            schedules=schedules, sync=manual_sync, timezone=settings.zone
+        ),
+        update_sync_schedule=UpdateSyncScheduleUseCase(
+            schedules=schedules, sync=manual_sync, timezone=settings.zone
+        ),
         chat=ChatUseCase(
             conversations=conversations,
             ask_question=AskQuestionUseCase(
@@ -232,6 +249,9 @@ def create_app(
         RetentionPolicy(timedelta(days=retention_days) if retention_days else None),
     )
     purge_usage = PurgeOldUsageUseCase(usage=usage, settings=system_settings)
+    run_scheduled_sync = RunScheduledSyncUseCase(
+        schedules=schedules, sync=manual_sync, timezone=settings.zone
+    )
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -240,12 +260,17 @@ def create_app(
         except ExternalServiceError:
             # Banco fora do ar na partida: a API sobe mesmo assim e o health check acusa.
             logger.warning("Não foi possível verificar indexações interrompidas", exc_info=True)
-        purge_task = asyncio.create_task(_purge_periodically(purge_conversations, purge_usage))
+        tasks = [
+            asyncio.create_task(_purge_periodically(purge_conversations, purge_usage)),
+            asyncio.create_task(_run_scheduled_sync_periodically(run_scheduled_sync)),
+        ]
         yield
+        for task in tasks:
+            task.cancel()
+        for task in tasks:
+            with suppress(asyncio.CancelledError):
+                await task
         await manual_sync.stop()
-        purge_task.cancel()
-        with suppress(asyncio.CancelledError):
-            await purge_task
         await engine.dispose()
 
     return create_http_app(
@@ -272,6 +297,16 @@ async def _purge_periodically(
         except ExternalServiceError:
             logger.warning("Não foi possível apagar o consumo antigo", exc_info=True)
         await asyncio.sleep(PURGE_INTERVAL.total_seconds())
+
+
+async def _run_scheduled_sync_periodically(run: RunScheduledSyncUseCase) -> None:
+    """Confere o agendamento da sincronização a cada intervalo."""
+    while True:
+        try:
+            await run.execute()
+        except ExternalServiceError:
+            logger.warning("Não foi possível conferir a sincronização agendada", exc_info=True)
+        await asyncio.sleep(SCHEDULE_CHECK_INTERVAL.total_seconds())
 
 
 def _build_directory(settings: Settings) -> CredentialVerifier | None:

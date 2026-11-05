@@ -40,6 +40,10 @@ from manual_assistant.application.use_cases.sync_manuals import (
     ManualSyncService,
     PlanManualSyncUseCase,
 )
+from manual_assistant.application.use_cases.sync_schedule import (
+    GetSyncScheduleUseCase,
+    UpdateSyncScheduleUseCase,
+)
 from manual_assistant.application.use_cases.system_settings import (
     DeleteModelPriceUseCase,
     GetSystemSettingsUseCase,
@@ -64,6 +68,7 @@ from tests.fakes import (
     InMemoryManualRepository,
     InMemoryModelPriceRepository,
     InMemorySessionRepository,
+    InMemorySyncScheduleRepository,
     InMemorySystemSettingsRepository,
     InMemoryUsageRepository,
     InMemoryUserRepository,
@@ -98,6 +103,9 @@ class FakeBackend:
         default_factory=InMemorySystemSettingsRepository
     )
     model_prices: InMemoryModelPriceRepository = field(default_factory=InMemoryModelPriceRepository)
+    sync_schedule: InMemorySyncScheduleRepository = field(
+        default_factory=InMemorySyncScheduleRepository
+    )
     health_indicators: list[HealthIndicator] = field(default_factory=list)
     max_upload_bytes: int = 1024 * 1024
     # None = pasta de manuais não configurada (sincronização desligada).
@@ -144,6 +152,12 @@ class FakeBackend:
             get_manual_file=GetManualFileUseCase(self.repository, self.storage),
             delete_manual=delete_manual,
             manual_sync=self.manual_sync,
+            get_sync_schedule=GetSyncScheduleUseCase(
+                schedules=self.sync_schedule, sync=self.manual_sync, timezone=TIMEZONE
+            ),
+            update_sync_schedule=UpdateSyncScheduleUseCase(
+                schedules=self.sync_schedule, sync=self.manual_sync, timezone=TIMEZONE
+            ),
             chat=ChatUseCase(
                 conversations=self.conversations,
                 ask_question=AskQuestionUseCase(

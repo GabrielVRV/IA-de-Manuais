@@ -9,6 +9,7 @@ from manual_assistant.application.use_cases.sync_manuals import (
     SyncPlan,
     SyncRun,
 )
+from manual_assistant.application.use_cases.sync_schedule import SyncScheduleView
 
 
 class SyncPlanItemResponse(BaseModel):
@@ -86,3 +87,35 @@ class SyncStatusResponse(BaseModel):
     last_run: SyncRunResponse | None = Field(
         description="A sincronização em andamento ou a última (some ao reiniciar a API)"
     )
+
+
+class SyncScheduleResponse(BaseModel):
+    enabled: bool
+    time: str = Field(description="HH:MM no fuso da empresa", examples=["00:00"])
+    timezone: str = Field(examples=["America/Sao_Paulo"])
+    next_run_at: datetime | None = Field(description="Próxima execução; nulo se desligado")
+    last_triggered_at: datetime | None
+    last_trigger_error: str | None = Field(
+        description="Por que a última execução agendada não começou"
+    )
+    updated_at: datetime | None
+    updated_by: str | None
+
+    @classmethod
+    def from_view(cls, view: SyncScheduleView) -> Self:
+        schedule = view.schedule
+        return cls(
+            enabled=schedule.enabled,
+            time=schedule.time_of_day.strftime("%H:%M"),
+            timezone=view.timezone,
+            next_run_at=view.next_run,
+            last_triggered_at=schedule.last_triggered_at,
+            last_trigger_error=schedule.last_trigger_error,
+            updated_at=schedule.updated_at,
+            updated_by=schedule.updated_by,
+        )
+
+
+class UpdateSyncScheduleRequest(BaseModel):
+    enabled: bool
+    time: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$", examples=["00:00"])
