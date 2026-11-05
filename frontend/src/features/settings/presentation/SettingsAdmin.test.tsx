@@ -26,11 +26,35 @@ describe('<SettingsAdmin />', () => {
 
     await user.clear(months)
     await user.type(months, '6')
-    await user.click(screen.getByRole('button', { name: 'Salvar' }))
+    await user.click(screen.getByRole('button', { name: 'Salvar retenção' }))
 
     expect(settings.update).toHaveBeenCalledWith({ usageRetentionMonths: 6 })
     expect(await screen.findByText('Retenção do consumo salva.')).toBeInTheDocument()
     expect(screen.getByText(/Alterado por Ana Admin/)).toBeInTheDocument()
+  })
+
+  it('changes the question limits per user', async () => {
+    const { settings, user } = setup()
+    const perMinute = await screen.findByLabelText('Por minuto')
+    expect(perMinute).toHaveValue(10)
+    expect(screen.getByLabelText('Em 24 horas')).toHaveValue(200)
+
+    await user.clear(perMinute)
+    await user.type(perMinute, '0')
+    await user.click(screen.getByRole('button', { name: 'Salvar limites' }))
+
+    expect(settings.update).toHaveBeenCalledWith({ questionsPerMinute: 0, questionsPerDay: 200 })
+    expect(await screen.findByText('Limites de perguntas salvos.')).toBeInTheDocument()
+  })
+
+  it('does not save a negative limit', async () => {
+    const { user } = setup()
+    const perDay = await screen.findByLabelText('Em 24 horas')
+
+    await user.clear(perDay)
+    await user.type(perDay, '-5')
+
+    expect(screen.getByRole('button', { name: 'Salvar limites' })).toBeDisabled()
   })
 
   it('prices a model already used, accepting a comma as decimal separator', async () => {

@@ -24,6 +24,8 @@ describe('HttpSettingsGateway', () => {
   it('maps the settings and sends only the changed fields', async () => {
     const { http, fetchFn } = client({
       usage_retention_months: 6,
+      questions_per_minute: 10,
+      questions_per_day: 200,
       updated_at: '2026-11-05T12:00:00Z',
       updated_by: 'Ana Admin',
     })
@@ -32,6 +34,8 @@ describe('HttpSettingsGateway', () => {
 
     expect(settings).toEqual({
       usageRetentionMonths: 6,
+      questionsPerMinute: 10,
+      questionsPerDay: 200,
       updatedAt: new Date('2026-11-05T12:00:00Z'),
       updatedBy: 'Ana Admin',
     })

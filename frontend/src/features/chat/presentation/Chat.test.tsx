@@ -171,6 +171,23 @@ describe('<ChatPage />', () => {
     expect(gateway.ask).toHaveBeenCalledTimes(2)
   })
 
+  it('explains when the user reached the question limit', async () => {
+    const gateway = fakeQuestionGateway()
+    gateway.ask.mockRejectedValueOnce(
+      new HttpError(429, {
+        detail: 'Você atingiu o limite de 10 pergunta(s) em 1 minuto. Tente novamente mais tarde.',
+      }),
+    )
+    const user = userEvent.setup()
+    renderChat({ gateway })
+
+    await user.type(input(), 'Qual a pressão?{Enter}')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Você atingiu o limite de 10 pergunta(s) em 1 minuto',
+    )
+  })
+
   it('opens a conversation from the history', async () => {
     const user = userEvent.setup()
     const gateway = renderChat({

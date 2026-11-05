@@ -6,6 +6,7 @@ import ui from '@/styles/ui.module.css'
 
 import {
   type ModelPrice,
+  QUESTION_LIMIT_MAX,
   type SystemSettings,
   USAGE_RETENTION_MAX_MONTHS,
 } from '../domain/settings'
@@ -61,6 +62,12 @@ export function SettingsAdmin() {
     <div className={ui.page}>
       <header className={ui.pageHeader}>
         <h2 className={ui.pageTitle}>Configurações</h2>
+        {settings?.updatedAt && (
+          <span className={ui.muted}>
+            Alterado por {settings.updatedBy ?? 'um administrador'} em{' '}
+            {dateFormat.format(settings.updatedAt)}
+          </span>
+        )}
       </header>
 
       <div className={ui.stack}>
@@ -76,6 +83,17 @@ export function SettingsAdmin() {
         )}
 
         {!settings && !error && <p className={ui.muted}>Carregando configurações…</p>}
+
+        {settings && (
+          <QuestionLimitsForm
+            settings={settings}
+            onSave={(changes) =>
+              run(async () => {
+                setSettings(await gateway.update(changes))
+              }, 'Limites de perguntas salvos.')
+            }
+          />
+        )}
 
         {settings && (
           <RetentionForm
@@ -153,6 +171,93 @@ export function SettingsAdmin() {
   )
 }
 
+/** Inteiro de 0 a ``max`` digitado num campo; null quando inválido. */
+function wholeNumber(text: string, max: number): number | null {
+  if (!/^\d+$/.test(text.trim())) return null
+  const value = Number(text)
+  return value <= max ? value : null
+}
+
+function QuestionLimitsForm({
+  settings,
+  onSave,
+}: {
+  readonly settings: SystemSettings
+  readonly onSave: (changes: {
+    questionsPerMinute: number
+    questionsPerDay: number
+  }) => Promise<boolean>
+}) {
+  const [perMinute, setPerMinute] = useState(String(settings.questionsPerMinute))
+  const [perDay, setPerDay] = useState(String(settings.questionsPerDay))
+  const [saving, setSaving] = useState(false)
+  const minuteValue = wholeNumber(perMinute, QUESTION_LIMIT_MAX)
+  const dayValue = wholeNumber(perDay, QUESTION_LIMIT_MAX)
+
+  return (
+    <form
+      className={cx(ui.card, ui.stack)}
+      aria-labelledby="question-limits"
+      onSubmit={(event) => {
+        event.preventDefault()
+        if (minuteValue === null || dayValue === null) return
+        setSaving(true)
+        void onSave({ questionsPerMinute: minuteValue, questionsPerDay: dayValue }).finally(() => {
+          setSaving(false)
+        })
+      }}
+    >
+      <h3 id="question-limits" className={styles.sectionTitle}>
+        Limite de perguntas
+      </h3>
+      <span className={ui.hint}>
+        Quantas perguntas cada usuário pode fazer, para proteger a cota da API de IA (vale também
+        para administradores). Acima do limite, o chat avisa e a pergunta não é enviada ao modelo.
+        Use 0 para não limitar.
+      </span>
+      <div className={ui.row}>
+        <label className={ui.field}>
+          <span className={ui.label}>Por minuto</span>
+          <input
+            className={ui.input}
+            type="number"
+            min={0}
+            max={QUESTION_LIMIT_MAX}
+            step={1}
+            value={perMinute}
+            onChange={(e) => {
+              setPerMinute(e.target.value)
+            }}
+            required
+          />
+        </label>
+        <label className={ui.field}>
+          <span className={ui.label}>Em 24 horas</span>
+          <input
+            className={ui.input}
+            type="number"
+            min={0}
+            max={QUESTION_LIMIT_MAX}
+            step={1}
+            value={perDay}
+            onChange={(e) => {
+              setPerDay(e.target.value)
+            }}
+            required
+          />
+        </label>
+        <button
+          type="submit"
+          className={cx(ui.button, ui.primary)}
+          disabled={minuteValue === null || dayValue === null || saving}
+        >
+          {saving ? 'Salvando…' : 'Salvar limites'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
 function RetentionForm({
   settings,
   onSave,
@@ -162,8 +267,7 @@ function RetentionForm({
 }) {
   const [months, setMonths] = useState(String(settings.usageRetentionMonths))
   const [saving, setSaving] = useState(false)
-  const value = Number(months)
-  const valid = months.trim() !== '' && Number.isInteger(value) && value >= 0
+  const value = wholeNumber(months, USAGE_RETENTION_MAX_MONTHS)
 
   return (
     <form
@@ -171,6 +275,7 @@ function RetentionForm({
       aria-labelledby="usage-retention"
       onSubmit={(event) => {
         event.preventDefault()
+        if (value === null) return
         setSaving(true)
         void onSave(value).finally(() => {
           setSaving(false)
@@ -200,16 +305,14 @@ function RetentionForm({
             required
           />
         </label>
-        <button type="submit" className={cx(ui.button, ui.primary)} disabled={!valid || saving}>
-          {saving ? 'Salvando…' : 'Salvar'}
+        <button
+          type="submit"
+          className={cx(ui.button, ui.primary)}
+          disabled={value === null || saving}
+        >
+          {saving ? 'Salvando…' : 'Salvar retenção'}
         </button>
       </div>
-      {settings.updatedAt && (
-        <span className={ui.hint}>
-          Alterado por {settings.updatedBy ?? 'um administrador'} em{' '}
-          {dateFormat.format(settings.updatedAt)}.
-        </span>
-      )}
     </form>
   )
 }

@@ -293,6 +293,8 @@ export function fakeSettingsGateway(
   initialPrices: ModelPrice[] = [],
   initialSettings: SystemSettings = {
     usageRetentionMonths: 12,
+    questionsPerMinute: 10,
+    questionsPerDay: 200,
     updatedAt: null,
     updatedBy: null,
   },

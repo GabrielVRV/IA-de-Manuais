@@ -13,6 +13,8 @@ import type {
 
 const settingsSchema = z.object({
   usage_retention_months: z.number(),
+  questions_per_minute: z.number(),
+  questions_per_day: z.number(),
   updated_at: z.iso.datetime({ offset: true }).nullable(),
   updated_by: z.string().nullable(),
 })
@@ -34,6 +36,8 @@ function toSettings(body: unknown): SystemSettings {
   const s = parse(settingsSchema, body)
   return {
     usageRetentionMonths: s.usage_retention_months,
+    questionsPerMinute: s.questions_per_minute,
+    questionsPerDay: s.questions_per_day,
     updatedAt: s.updated_at ? new Date(s.updated_at) : null,
     updatedBy: s.updated_by,
   }
@@ -66,6 +70,8 @@ export class HttpSettingsGateway implements SettingsGateway {
     return toSettings(
       await this.#http.patchJson('/api/v1/settings', {
         usage_retention_months: changes.usageRetentionMonths,
+        questions_per_minute: changes.questionsPerMinute,
+        questions_per_day: changes.questionsPerDay,
       }),
     )
   }
