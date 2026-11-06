@@ -56,7 +56,8 @@ class Settings(BaseSettings):
 
     # Arquivos dos manuais
     storage_dir: Path = Path("data/manuals")
-    max_upload_mb: int = Field(default=50, gt=0)
+    # Os maiores manuais da pasta da Engenharia têm perto de 100 MB (desenhos digitalizados).
+    max_upload_mb: int = Field(default=100, gt=0)
 
     # Sincronização com a pasta de manuais da Engenharia (ADR 0009). Só leitura.
     # Vazio = desligada. No Docker, a pasta de rede montada com :ro.

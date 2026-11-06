@@ -312,6 +312,7 @@ reindexado, e o manual que saiu da pasta é removido do sistema.
 | Entra e **é deslogado em seguida** | Tela aberta por um endereço que não passa pelo container `web` (ex.: XAMPP em outro servidor) | Acesse a tela pela porta 8084 do servidor da API |
 | Manual **"Falhou: serviço externo"** | Limite ou cota do plano gratuito do Gemini | Aguarde a cota renovar (diária) ou use a chave paga, e clique em **Reprocessar** |
 | Manual **"Falhou: ... OCR"** | PDF escaneado (imagem, sem texto) | Ainda não suportado; use a versão digital do PDF |
+| Sincronização: **"O arquivo excede o limite de N MB"** | PDF maior que `APP_MAX_UPLOAD_MB` | Aumente `APP_MAX_UPLOAD_MB` em `backend/.env` (os maiores manuais têm ~96 MB; o padrão é 100) e sincronize de novo |
 | Chat: **"Você ainda não tem acesso a este assistente"** | O assistente está "só para quem for liberado" e a pessoa não foi liberada | Na tela **Usuários**, clique em **Gerenciar** na linha da pessoa e libere o assistente, ou mude o padrão em **Acessos** |
 | Chat: **"Você atingiu o limite de N pergunta(s)…"** | Limite de perguntas por usuário | Aguarde, ou ajuste o limite em **Configurações** (`0` desliga) |
 | Sincronização agendada **"não começou"** | Pasta de rede fora do ar ou outra sincronização rodando | Confira a pasta com o passo de verificação acima; ela tenta de novo no horário do dia seguinte |
