@@ -237,7 +237,10 @@
 }
 
 .markdown table {
-  width: 100%;
+  /* Tabela larga (vários modelos e tensões) rola de lado em vez de estourar a tela. */
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
   margin: var(--space-3) 0;
   border-collapse: collapse;
   font-size: 0.875rem;

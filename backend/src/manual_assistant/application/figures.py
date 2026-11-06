@@ -26,8 +26,10 @@ NO_FIGURES_MARKER = "SEM_FIGURAS"
 PAGE_TEXT_MAX_CHARS = 3000
 # Páginas renderizadas por vez: limita a memória com manuais de centenas de páginas.
 RENDER_BATCH_SIZE = 4
-# Uma página escaneada precisa ter o texto todo transcrito.
-MAX_OUTPUT_TOKENS = 2048
+# Uma página escaneada precisa ter o texto todo transcrito: uma lista de peças densa passa
+# de 2.000 tokens. É teto, não meta: só o que o modelo escreve é cobrado. Em modelos de
+# raciocínio o raciocínio também conta neste limite (por isso ``light_reasoning``).
+MAX_OUTPUT_TOKENS = 8192
 
 FIGURE_SYSTEM_INSTRUCTION = f"""\
 Você descreve páginas de manuais técnicos de equipamentos industriais para um sistema \
@@ -134,6 +136,7 @@ class FigureDescriber:
                 prompt=_prompt(title, number, text),
                 max_output_tokens=MAX_OUTPUT_TOKENS,
                 images=(image,),
+                light_reasoning=True,
             )
         )
         answer = completion.text.strip()

@@ -3,10 +3,11 @@
 import base64
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
+from typing import Literal
 
 import httpx2
 import openai
-from openai import AsyncOpenAI, omit
+from openai import AsyncOpenAI, Omit, omit
 from openai.types.chat import ChatCompletionContentPartParam
 
 from manual_assistant.application.errors import ExternalServiceError
@@ -103,9 +104,10 @@ class OpenAILanguageModel:
 
     async def complete(self, request: CompletionRequest) -> Completion:
         # Modelos de raciocínio recusam temperature: nesses casos o parâmetro é omitido.
-        temperature = (
-            omit if self._model.startswith(_REASONING_MODEL_PREFIXES) else request.temperature
-        )
+        reasoning = self._model.startswith(_REASONING_MODEL_PREFIXES)
+        temperature = omit if reasoning else request.temperature
+        # "low" vale em todos os modelos de raciocínio da OpenAI (o1 em diante, gpt-5.x).
+        effort: Literal["low"] | Omit = "low" if reasoning and request.light_reasoning else omit
         async with _translate_errors("gerar a resposta"):
             response = await self._client.chat.completions.create(
                 model=self._model,
@@ -115,6 +117,7 @@ class OpenAILanguageModel:
                 ],
                 max_completion_tokens=request.max_output_tokens,
                 temperature=temperature,
+                reasoning_effort=effort,
             )
 
         choice = response.choices[0] if response.choices else None

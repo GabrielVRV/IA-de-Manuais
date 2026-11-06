@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Markdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 import { copyText } from '@/shared/copy-text'
 import { cx } from '@/shared/cx'
@@ -16,6 +17,7 @@ interface MessageProps {
   readonly retryDisabled: boolean
 }
 
+const REMARK_PLUGINS = [remarkGfm]
 const STILL = { x: 0, y: 0.2 }
 
 export function Message({ message, onRetry, retryDisabled }: MessageProps) {
@@ -72,7 +74,8 @@ function AssistantMessage({ answer, fresh }: { readonly answer: Answer; readonly
         )}
         {/* react-markdown não interpreta HTML: o texto do modelo não injeta código na página. */}
         <div className={styles.markdown}>
-          <Markdown>{answer.text}</Markdown>
+          {/* remark-gfm: tabelas (a IA usa para comparar modelos e listar códigos). */}
+          <Markdown remarkPlugins={REMARK_PLUGINS}>{answer.text}</Markdown>
         </div>
         {answer.citations.length > 0 && (
           <footer className={styles.sources}>

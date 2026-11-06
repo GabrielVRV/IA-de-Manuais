@@ -126,6 +126,28 @@ async def test_omits_temperature_for_reasoning_models(api: FakeOpenAIApi, model:
     assert "temperature" not in api.requests[0][1]
 
 
+async def test_asks_for_low_reasoning_when_the_task_needs_little_thought(
+    api: FakeOpenAIApi,
+) -> None:
+    """Descrevendo figuras, o raciocínio do gpt-5 gastava todo o limite e a resposta vinha
+    vazia ("motivo: length")."""
+    model = OpenAILanguageModel(api.client(), model="gpt-5.4-mini")
+
+    await model.complete(replace(REQUEST, light_reasoning=True))
+    await model.complete(REQUEST)
+
+    assert api.requests[0][1]["reasoning_effort"] == "low"
+    assert "reasoning_effort" not in api.requests[1][1]
+
+
+async def test_regular_models_never_receive_a_reasoning_effort(api: FakeOpenAIApi) -> None:
+    await OpenAILanguageModel(api.client(), model="gpt-4.1-mini").complete(
+        replace(REQUEST, light_reasoning=True)
+    )
+
+    assert "reasoning_effort" not in api.requests[0][1]
+
+
 async def test_fails_when_no_text_is_returned(api: FakeOpenAIApi) -> None:
     api.content = None
 

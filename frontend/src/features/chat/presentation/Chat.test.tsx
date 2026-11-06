@@ -175,6 +175,23 @@ describe('<ChatPage />', () => {
     expect(screen.queryByText('Fontes')).not.toBeInTheDocument()
   })
 
+  it('renders markdown tables in the answer', async () => {
+    const gateway = fakeQuestionGateway()
+    gateway.state.answer = {
+      text: '| Modelo | Código |\n|---|---|\n| Siloflex 55 | 20.400.300 |',
+      found: true,
+      citations: [],
+    }
+    const user = userEvent.setup()
+    renderChat({ gateway })
+
+    await user.type(input(), 'Quais os códigos?{Enter}')
+
+    expect(await screen.findByRole('table')).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Modelo' })).toBeInTheDocument()
+    expect(screen.getByRole('cell', { name: '20.400.300' })).toBeInTheDocument()
+  })
+
   it('explains failures and retries without repeating the question', async () => {
     const gateway = fakeQuestionGateway()
     gateway.ask.mockRejectedValueOnce(new HttpError(503, { detail: 'Cota excedida' }))

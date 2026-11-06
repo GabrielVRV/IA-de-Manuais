@@ -19,6 +19,10 @@ class CompletionRequest:
     max_output_tokens: int = 1024
     # Só para modelos com visão; as imagens vão antes do texto do prompt.
     images: tuple[ImageInput, ...] = ()
+    # Tarefas de transcrever/descrever não precisam "pensar": em modelos de raciocínio
+    # (gpt-5, o3...), o raciocínio gasta o mesmo limite de tokens da resposta e pode não
+    # sobrar nada para o texto (finish_reason "length" com resposta vazia).
+    light_reasoning: bool = False
 
 
 @dataclass(frozen=True, slots=True)
