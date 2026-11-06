@@ -3,10 +3,16 @@ import pytest
 from manual_assistant.application.rag_prompt import NOT_FOUND_MESSAGE, SYSTEM_INSTRUCTION
 from manual_assistant.application.use_cases.ask_question import AskQuestionUseCase
 from manual_assistant.domain.chunk import ScoredChunk
+from manual_assistant.domain.manual import Manual
 from manual_assistant.domain.pages import PageRange
 from manual_assistant.domain.question import Question
 from tests.factories import make_chunk, make_manual
-from tests.fakes import FakeEmbeddingProvider, FakeLanguageModel, InMemoryVectorStore
+from tests.fakes import (
+    FakeEmbeddingProvider,
+    FakeLanguageModel,
+    InMemoryManualRepository,
+    InMemoryVectorStore,
+)
 
 pytestmark = pytest.mark.anyio
 
@@ -91,3 +97,79 @@ async def test_reports_no_model_and_no_tokens_when_nothing_is_found() -> None:
 
     assert result.model is None
     assert result.usage.total_tokens == 0
+
+
+# --------------------------------------------------------------------------- #
+# Modelo de equipamento citado na pergunta
+# --------------------------------------------------------------------------- #
+
+
+def _indexed(title: str) -> Manual:
+    manual = make_manual(title)
+    manual.start_processing()
+    manual.mark_indexed(page_count=10, chunk_count=3)
+    return manual
+
+
+async def test_prioritizes_the_manuals_of_the_equipment_model_in_the_question() -> None:
+    """ "o óleo do s70" perdia para trechos de outros equipamentos que falam mais de óleo:
+    o embedding dá pouco peso ao "s70". Os manuais do modelo citado vêm primeiro."""
+    s70 = _indexed("MANUAL MONTAGEM COMEDOURO DE CORRENTE S-70")
+    siloflex = _indexed("Distribuidor automático Siloflex 55")
+    manuals = InMemoryManualRepository()
+    for manual in (s70, siloflex):
+        await manuals.save(manual)
+    other = [
+        ScoredChunk(make_chunk(siloflex, text=f"Óleo do motoredutor {n}.", position=n), 0.55)
+        for n in range(3)
+    ]
+    oil = ScoredChunk(make_chunk(s70, text="Óleo mineral ISO 460.", position=9), 0.53)
+    vector_store = InMemoryVectorStore(search_results=[*other, oil])
+    language_model = FakeLanguageModel(answer="Óleo mineral ISO 460 [1].")
+    use_case = AskQuestionUseCase(
+        embeddings=FakeEmbeddingProvider(),
+        vector_store=vector_store,
+        language_model=language_model,
+        top_k=2,
+        manuals=manuals,
+    )
+
+    result = await use_case.execute(Question("qual oleo utilizado no motorredutor do s70"))
+
+    assert vector_store.searched_manual_ids == [None, {s70.id}]
+    prompt = language_model.requests[0].prompt
+    assert prompt.index("Óleo mineral ISO 460.") < prompt.index("Óleo do motoredutor 0.")
+    assert "Óleo do motoredutor 1." not in prompt  # o modelo citado ocupou a vaga
+    assert result.answer.citations[0].manual_title == s70.title
+
+
+async def test_searches_everything_when_no_manual_matches_the_model() -> None:
+    manuals = InMemoryManualRepository()
+    await manuals.save(_indexed("Manual da Prensa P-200"))
+    vector_store = InMemoryVectorStore(search_results=list(RESULTS))
+    use_case = AskQuestionUseCase(
+        embeddings=FakeEmbeddingProvider(),
+        vector_store=vector_store,
+        language_model=FakeLanguageModel(),
+        manuals=manuals,
+    )
+
+    await use_case.execute(Question("Qual o óleo do C-220?"))
+
+    assert vector_store.searched_manual_ids == [None]
+
+
+async def test_ignores_manuals_that_are_not_indexed_yet() -> None:
+    manuals = InMemoryManualRepository()
+    await manuals.save(make_manual("COMEDOURO S-70"))  # pendente
+    vector_store = InMemoryVectorStore(search_results=list(RESULTS))
+    use_case = AskQuestionUseCase(
+        embeddings=FakeEmbeddingProvider(),
+        vector_store=vector_store,
+        language_model=FakeLanguageModel(),
+        manuals=manuals,
+    )
+
+    await use_case.execute(Question("Qual o óleo do s70?"))
+
+    assert vector_store.searched_manual_ids == [None]

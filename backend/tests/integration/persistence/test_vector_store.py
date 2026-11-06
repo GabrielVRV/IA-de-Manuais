@@ -104,6 +104,24 @@ async def test_ignores_manuals_that_are_not_indexed(
     assert [r.chunk.manual_title for r in results] == ["Pronto"]
 
 
+async def test_searches_only_the_given_manuals(
+    store: PgVectorStore, repository: SqlAlchemyManualRepository
+) -> None:
+    s70 = await indexed_manual(repository, "Comedouro S-70")
+    siloflex = await indexed_manual(repository, "Siloflex 55")
+    await store.upsert(
+        [
+            EmbeddedChunk(make_chunk(siloflex, text="mais parecido"), vector(a=1)),
+            EmbeddedChunk(make_chunk(s70, text="do s70"), vector(a=1, b=1)),
+        ]
+    )
+
+    results = await store.search(vector(a=1), limit=10, manual_ids={s70.id})
+
+    assert [r.chunk.text for r in results] == ["do s70"]
+    assert await store.search(vector(a=1), limit=10, manual_ids=set()) == []
+
+
 async def test_upsert_replaces_an_existing_chunk(
     store: PgVectorStore, repository: SqlAlchemyManualRepository
 ) -> None:

@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -28,10 +28,12 @@ class VectorStore(Protocol):
         *,
         limit: int,
         min_score: float = 0.0,
+        manual_ids: Collection[ManualId] | None = None,
     ) -> Sequence[ScoredChunk]:
         """Trechos mais parecidos com a consulta, do mais para o menos relevante.
 
-        Retorna apenas trechos de manuais indexados (``Manual.is_searchable``).
+        Retorna apenas trechos de manuais indexados (``Manual.is_searchable``). Com
+        ``manual_ids``, só trechos desses manuais.
         """
         ...
 

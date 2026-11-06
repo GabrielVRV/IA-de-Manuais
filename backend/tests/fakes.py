@@ -5,7 +5,7 @@ O mypy garante que cada fake segue o contrato da porta que substitui.
 
 import asyncio
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
@@ -147,15 +147,26 @@ class FakeEmbeddingProvider:
 class InMemoryVectorStore:
     items: dict[ManualId, list[EmbeddedChunk]] = field(default_factory=dict)
     search_results: list[ScoredChunk] = field(default_factory=list)
+    searched_manual_ids: list[set[ManualId] | None] = field(default_factory=list)
 
     async def upsert(self, items: Sequence[EmbeddedChunk]) -> None:
         for item in items:
             self.items.setdefault(item.chunk.manual_id, []).append(item)
 
     async def search(
-        self, query: Embedding, *, limit: int, min_score: float = 0.0
+        self,
+        query: Embedding,
+        *,
+        limit: int,
+        min_score: float = 0.0,
+        manual_ids: Collection[ManualId] | None = None,
     ) -> Sequence[ScoredChunk]:
-        return [r for r in self.search_results if r.score >= min_score][:limit]
+        self.searched_manual_ids.append(None if manual_ids is None else set(manual_ids))
+        return [
+            r
+            for r in self.search_results
+            if r.score >= min_score and (manual_ids is None or r.chunk.manual_id in manual_ids)
+        ][:limit]
 
     async def delete_by_manual(self, manual_id: ManualId, *, kind: ChunkKind | None = None) -> None:
         if kind is None:

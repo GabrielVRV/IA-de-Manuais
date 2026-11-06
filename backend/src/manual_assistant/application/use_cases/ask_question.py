@@ -2,12 +2,13 @@ import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from manual_assistant.application.ports.embedding_provider import EmbeddingProvider
+from manual_assistant.application.ports.embedding_provider import Embedding, EmbeddingProvider
 from manual_assistant.application.ports.language_model import (
     CompletionRequest,
     LanguageModel,
     TokenUsage,
 )
+from manual_assistant.application.ports.manual_repository import ManualRepository
 from manual_assistant.application.ports.vector_store import VectorStore
 from manual_assistant.application.rag_prompt import (
     NOT_FOUND_MESSAGE,
@@ -17,7 +18,10 @@ from manual_assistant.application.rag_prompt import (
     retrieval_query,
 )
 from manual_assistant.domain.answer import Answer
+from manual_assistant.domain.chunk import ScoredChunk
 from manual_assistant.domain.conversation import Exchange
+from manual_assistant.domain.equipment import equipment_models
+from manual_assistant.domain.manual import ManualId
 from manual_assistant.domain.question import Question
 
 logger = logging.getLogger(__name__)
@@ -45,8 +49,10 @@ class AskQuestionUseCase:
         language_model: LanguageModel,
         top_k: int = DEFAULT_TOP_K,
         min_score: float = 0.0,
+        manuals: ManualRepository | None = None,
     ) -> None:
         self._embeddings = embeddings
+        self._manuals = manuals
         self._vector_store = vector_store
         self._language_model = language_model
         self._top_k = top_k
@@ -56,10 +62,9 @@ class AskQuestionUseCase:
 
     async def execute(self, question: Question, history: Sequence[Exchange] = ()) -> QuestionResult:
         """``history``: últimas trocas da conversa, para entender perguntas de continuação."""
-        query = await self._embeddings.embed_query(retrieval_query(question, history))
-        results = await self._vector_store.search(
-            query, limit=self._top_k, min_score=self._min_score
-        )
+        text = retrieval_query(question, history)
+        query = await self._embeddings.embed_query(text)
+        results = await self._search(query, await self._manuals_of_models_in(text))
         if not results:
             # Nada indexado (ou nada acima do corte): não gasta tokens do modelo.
             return QuestionResult(Answer(NOT_FOUND_MESSAGE), model=None)
@@ -85,3 +90,28 @@ class AskQuestionUseCase:
             len(history),
         )
         return QuestionResult(answer, model=completion.model, usage=completion.usage)
+
+    async def _search(self, query: Embedding, focus: frozenset[ManualId]) -> Sequence[ScoredChunk]:
+        """Com um modelo citado, os trechos dos manuais dele vêm primeiro; a busca geral
+        completa as vagas. Sem isso, "o óleo do s70" perde para trechos de outros
+        equipamentos que falam mais de óleo, porque o embedding dá pouco peso ao "s70"."""
+        found = await self._vector_store.search(query, limit=self._top_k, min_score=self._min_score)
+        if not focus:
+            return found
+        focused = await self._vector_store.search(
+            query, limit=self._top_k, min_score=self._min_score, manual_ids=focus
+        )
+        chosen = {result.chunk.id for result in focused}
+        others = [result for result in found if result.chunk.id not in chosen]
+        return [*focused, *others][: self._top_k]
+
+    async def _manuals_of_models_in(self, text: str) -> frozenset[ManualId]:
+        """Manuais indexados cujo título cita um modelo citado no texto (ex.: "s70")."""
+        models = equipment_models(text)
+        if not models or self._manuals is None:
+            return frozenset()
+        return frozenset(
+            manual.id
+            for manual in await self._manuals.list_all()
+            if manual.is_searchable and models & equipment_models(manual.title)
+        )

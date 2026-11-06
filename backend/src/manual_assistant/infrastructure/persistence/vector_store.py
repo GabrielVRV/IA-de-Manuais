@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 
 from sqlalchemy import ColumnElement, Float, delete, select
 from sqlalchemy.dialects.postgresql import insert
@@ -52,10 +52,13 @@ class PgVectorStore:
         *,
         limit: int,
         min_score: float = 0.0,
+        manual_ids: Collection[ManualId] | None = None,
     ) -> Sequence[ScoredChunk]:
         if limit < 1:
             raise ValueError("O limite de resultados deve ser ao menos 1")
         self._ensure_dimensions(query)
+        if manual_ids is not None and not manual_ids:
+            return []
 
         distance = _cosine_distance(query)
         statement = (
@@ -77,6 +80,8 @@ class PgVectorStore:
             .order_by(distance)
             .limit(limit)
         )
+        if manual_ids is not None:
+            statement = statement.where(ChunkRecord.manual_id.in_(list(manual_ids)))
         async with translate_database_errors("buscar trechos"), self._session_factory() as session:
             rows = (await session.execute(statement)).all()
 

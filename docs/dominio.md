@@ -62,7 +62,12 @@ PENDENTE ──▶ PROCESSANDO ──▶ INDEXADO
 ## Como uma pergunta é respondida
 
 1. A pergunta vira um embedding e os `APP_RAG_TOP_K` trechos mais parecidos são buscados
-   (só de manuais indexados).
+   (só de manuais indexados). Se a pergunta cita um **modelo de equipamento** que aparece no
+   título de algum manual ("o óleo do **s70**" → "COMEDOURO DE CORRENTE **S-70**"; escrito
+   como `s70`, `S-70` ou `s 70`), os trechos desses manuais vêm primeiro, e a busca geral
+   completa as vagas. O embedding dá pouco peso ao modelo citado: sem isso, trechos de
+   outros equipamentos que falam mais do assunto (ex.: o óleo do motoredutor do Siloflex 55)
+   ocupavam as vagas.
 2. Os trechos vão numerados no prompt (`<trecho id="1" manual="..." paginas="12-13">`), com
    regras fixas: responder **somente** com base neles, citar o número de cada informação e
    responder `NAO_ENCONTRADO` quando a resposta não estiver lá.

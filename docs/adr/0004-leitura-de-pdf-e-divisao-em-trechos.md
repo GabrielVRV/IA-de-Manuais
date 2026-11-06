@@ -23,6 +23,21 @@ página na resposta) e dividido em trechos do tamanho certo para a busca semânt
   do event loop (`asyncio.to_thread`), para não travar a API.
 - PDFs sem texto selecionável (escaneados) são recusados com uma mensagem explicativa.
   OCR fica para uma evolução futura.
+- **Fontes sem ToUnicode** (2026-11-06). Alguns PDFs, como os gerados pelo Word, embutem
+  a fonte com codificação Identity e sem a tabela ToUnicode. O PDFium então devolve o
+  número do glifo no lugar da letra: "Óleo mineral ISO 460" vira `ÏOHRPLQHUDO,62`, e
+  espaços e dígitos viram caracteres de controle, que eram descartados. A busca não acha
+  nada e o assistente responde "não encontrei". Isso aconteceu no manual do comedouro
+  S-70 (95.007.008). O parser reconhece essas fontes de dois jeitos: o texto tem caracteres
+  de controle (exceto o U+0002, que o PDFium usa para marcar hifenização), ou o PDFium não
+  consegue voltar de caractere para glifo (todo caractere cai no `.notdef`). Uma fonte com
+  mais espaços de verdade (U+0020) que glifos de espaço nunca é traduzida. Para essas
+  fontes, o texto da página é refeito caractere a caractere, traduzindo glifo → caractere
+  pela tabela `cmap` da própria fonte embutida. Só fontes TrueType são traduzidas, e só
+  quando a `cmap` cobre pelo menos 90% dos códigos usados. Validação na pasta da
+  Engenharia (357 PDFs): 84 manuais ficaram com o texto corrigido (46 deles em versão
+  vigente), nenhum piorou, e a leitura ficou ~20% mais lenta. Manuais indexados antes
+  da correção precisam ser **reprocessados**.
 
 ### Divisão: por linhas, com sobreposição
 

@@ -4,7 +4,7 @@ import pytest
 
 from manual_assistant.application.errors import UnreadableDocumentError
 from manual_assistant.infrastructure.documents.pdf_parser import PdfiumDocumentParser
-from tests.pdf_builder import build_pdf
+from tests.pdf_builder import build_glyph_coded_pdf, build_pdf
 
 pytestmark = pytest.mark.anyio
 
@@ -20,6 +20,30 @@ async def test_extracts_text_page_by_page_with_accents() -> None:
     assert pages[0].text == "Manual da Prensa P-200\nPressão máxima: 180 bar"
     assert pages[1].is_blank
     assert pages[2].text == "Manutenção"
+
+
+# Acentos na ordem padrão de glifos do TrueType (a da Arial).
+_ACCENTS = {"Ó": 207, "ó": 121, "ã": 109, "ç": 111}
+
+
+async def test_translates_fonts_without_tounicode_by_the_embedded_cmap() -> None:
+    """Sem ToUnicode o PDFium devolveria "ÏOHRPLQHUDO,62": glifos no lugar de letras e
+    espaços/dígitos como caracteres de controle (o caso do manual do comedouro S-70)."""
+    pdf = build_glyph_coded_pdf("1.1) Óleo mineral ISO 460; 0,8 litro.", _ACCENTS)
+
+    pages = await parser.parse(pdf)
+
+    assert pages[0].text == "1.1) Óleo mineral ISO 460; 0,8 litro."
+
+
+async def test_translates_fonts_without_tounicode_even_without_spaces_or_digits() -> None:
+    """Sem espaço nem dígito não há caractere de controle que denuncie a fonte; ela é
+    reconhecida por não conseguir voltar de caractere para glifo."""
+    pdf = build_glyph_coded_pdf("Motornãoliga", _ACCENTS)
+
+    pages = await parser.parse(pdf)
+
+    assert pages[0].text == "Motornãoliga"
 
 
 async def test_rejects_files_that_are_not_pdfs() -> None:

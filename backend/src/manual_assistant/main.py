@@ -239,6 +239,7 @@ def create_app(
                 language_model=ai.language_model,
                 top_k=settings.rag_top_k,
                 min_score=settings.rag_min_score,
+                manuals=repository,
             ),
             usage=usage,
             settings=system_settings,
