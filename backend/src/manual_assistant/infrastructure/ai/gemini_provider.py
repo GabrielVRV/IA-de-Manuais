@@ -136,10 +136,11 @@ class GeminiEmbeddingProvider:
         return vector
 
     async def _embed(self, texts: Sequence[str], *, task_type: str) -> list[Embedding]:
+        contents: list[types.PartUnion] = list(texts)
         async with _translate_errors("gerar embeddings"):
             response = await self._client.aio.models.embed_content(
                 model=self._model,
-                contents=list(texts),
+                contents=contents,
                 config=types.EmbedContentConfig(
                     task_type=task_type,
                     output_dimensionality=self._dimensions,
@@ -174,7 +175,7 @@ class GeminiLanguageModel:
         async with _translate_errors("gerar a resposta"):
             response = await self._client.aio.models.generate_content(
                 model=self._model,
-                contents=request.prompt,
+                contents=_contents(request),
                 config=types.GenerateContentConfig(
                     system_instruction=request.system_instruction,
                     temperature=request.temperature,
@@ -200,3 +201,16 @@ class GeminiLanguageModel:
             model=response.model_version or self._model,
             usage=TokenUsage(input_tokens=input_tokens, output_tokens=output_tokens),
         )
+
+
+def _contents(request: CompletionRequest) -> types.ContentListUnion:
+    if not request.images:
+        return request.prompt
+    parts: list[types.PartUnion] = [
+        *(
+            types.Part.from_bytes(data=image.data, mime_type=image.mime_type)
+            for image in request.images
+        ),
+        types.Part.from_text(text=request.prompt),
+    ]
+    return parts

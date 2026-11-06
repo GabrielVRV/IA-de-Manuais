@@ -65,7 +65,9 @@ class GetSyncScheduleUseCase(_ScheduleUseCase):
 
 
 class UpdateSyncScheduleUseCase(_ScheduleUseCase):
-    async def execute(self, actor: User, *, enabled: bool, time_of_day: str) -> SyncScheduleView:
+    async def execute(
+        self, actor: User, *, enabled: bool, time_of_day: str, describe_figures: bool = False
+    ) -> SyncScheduleView:
         """
         Raises:
             SyncNotConfiguredError: ao ligar sem a pasta de manuais configurada.
@@ -80,6 +82,7 @@ class UpdateSyncScheduleUseCase(_ScheduleUseCase):
             time_of_day=parse_time_of_day(time_of_day),
             now=self._clock(),
             author=actor.display_name or actor.username,
+            describe_figures=describe_figures,
         )
         await self._schedules.save(updated)
         logger.info(
@@ -104,7 +107,9 @@ class RunScheduledSyncUseCase(_ScheduleUseCase):
         if not schedule.is_due(now, self._timezone):
             return False
         try:
-            await self._sync.start(started_by=SCHEDULED_BY)
+            await self._sync.start(
+                started_by=SCHEDULED_BY, describe_figures=schedule.describe_figures
+            )
         except ApplicationError as error:
             logger.warning("A sincronização agendada não começou: %s", error)
             await self._schedules.save(schedule.triggered(now, error=str(error)))

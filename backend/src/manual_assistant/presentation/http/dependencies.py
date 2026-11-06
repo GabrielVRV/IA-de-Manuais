@@ -26,6 +26,7 @@ from manual_assistant.application.use_cases.conversations import (
     RenameConversationUseCase,
 )
 from manual_assistant.application.use_cases.delete_manual import DeleteManualUseCase
+from manual_assistant.application.use_cases.describe_figures import FigureDescriptionService
 from manual_assistant.application.use_cases.get_manual import GetManualUseCase
 from manual_assistant.application.use_cases.get_manual_file import GetManualFileUseCase
 from manual_assistant.application.use_cases.index_manual import IndexManualUseCase
@@ -71,6 +72,7 @@ class UseCases:
     get_manual_file: GetManualFileUseCase
     delete_manual: DeleteManualUseCase
     manual_sync: ManualSyncService
+    figure_descriptions: FigureDescriptionService
     get_sync_schedule: GetSyncScheduleUseCase
     update_sync_schedule: UpdateSyncScheduleUseCase
     chat: ChatUseCase

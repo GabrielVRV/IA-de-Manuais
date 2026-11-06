@@ -11,7 +11,7 @@ from manual_assistant.domain.pages import Page
 _CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f￾￿]")
 
 # O PDFium não é thread-safe: duas leituras simultâneas podem derrubar o processo.
-_PDFIUM_LOCK = threading.Lock()
+PDFIUM_LOCK = threading.Lock()
 
 
 class PdfiumDocumentParser:
@@ -23,7 +23,7 @@ class PdfiumDocumentParser:
 
     @staticmethod
     def _parse(content: bytes) -> list[Page]:
-        with _PDFIUM_LOCK:
+        with PDFIUM_LOCK:
             try:
                 document = pdfium.PdfDocument(content)
             except pdfium.PdfiumError as error:
@@ -38,11 +38,8 @@ class PdfiumDocumentParser:
             finally:
                 document.close()
 
-        if all(page.is_blank for page in pages):
-            raise UnreadableDocumentError(
-                "O PDF não contém texto selecionável. Se for um documento escaneado, "
-                "ele precisa passar por OCR antes de ser cadastrado"
-            )
+        # Páginas sem texto (escaneadas) voltam em branco: quem decide se o manual é
+        # aproveitável é a indexação, que pode descrever as páginas como imagem.
         return pages
 
 

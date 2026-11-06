@@ -1,5 +1,6 @@
 import math
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import NewType, Self
 from uuid import UUID, uuid4
 
@@ -8,6 +9,13 @@ from manual_assistant.domain.manual import Manual, ManualId
 from manual_assistant.domain.pages import PageRange
 
 ChunkId = NewType("ChunkId", UUID)
+
+
+class ChunkKind(StrEnum):
+    """De onde veio o texto do trecho."""
+
+    TEXT = "text"  # texto extraído do PDF
+    FIGURE = "figure"  # descrição, gerada por IA, das figuras e desenhos de uma página
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)
@@ -20,7 +28,8 @@ class Chunk:
     manual_title: str
     text: str
     pages: PageRange
-    position: int  # ordem do trecho dentro do manual, a partir de 0
+    position: int  # ordem do trecho dentro do manual (e do tipo), a partir de 0
+    kind: ChunkKind = ChunkKind.TEXT
 
     def __post_init__(self) -> None:
         if not self.text.strip():
@@ -29,7 +38,15 @@ class Chunk:
             raise InvalidValueError("A posição do trecho não pode ser negativa")
 
     @classmethod
-    def create(cls, *, manual: Manual, text: str, pages: PageRange, position: int) -> Self:
+    def create(
+        cls,
+        *,
+        manual: Manual,
+        text: str,
+        pages: PageRange,
+        position: int,
+        kind: ChunkKind = ChunkKind.TEXT,
+    ) -> Self:
         return cls(
             id=ChunkId(uuid4()),
             manual_id=manual.id,
@@ -37,6 +54,7 @@ class Chunk:
             text=text,
             pages=pages,
             position=position,
+            kind=kind,
         )
 
 

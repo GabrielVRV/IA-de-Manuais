@@ -20,6 +20,10 @@ from manual_assistant.application.errors import (
     UserAlreadyExistsError,
     UserNotFoundError,
 )
+from manual_assistant.application.use_cases.describe_figures import (
+    FiguresAlreadyRunningError,
+    ManualNotIndexedError,
+)
 from manual_assistant.application.use_cases.sync_manuals import (
     EmptyManualSourceError,
     SyncAlreadyRunningError,
@@ -45,6 +49,8 @@ _STATUS_BY_ERROR: dict[type[Exception], int] = {
     InvalidValueError: status.HTTP_422_UNPROCESSABLE_CONTENT,
     InvalidStateTransitionError: status.HTTP_409_CONFLICT,
     SyncNotConfiguredError: status.HTTP_409_CONFLICT,
+    ManualNotIndexedError: status.HTTP_409_CONFLICT,
+    FiguresAlreadyRunningError: status.HTTP_409_CONFLICT,
     SyncAlreadyRunningError: status.HTTP_409_CONFLICT,
     EmptyManualSourceError: status.HTTP_503_SERVICE_UNAVAILABLE,
     ExternalServiceError: status.HTTP_503_SERVICE_UNAVAILABLE,

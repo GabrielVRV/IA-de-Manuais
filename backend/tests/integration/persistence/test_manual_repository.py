@@ -55,13 +55,13 @@ async def test_saving_again_updates_the_manual(repository: SqlAlchemyManualRepos
     await repository.save(manual)
 
     manual.start_processing()
-    manual.mark_indexed(page_count=42, chunk_count=130)
+    manual.mark_indexed(page_count=42, chunk_count=130, figure_count=17)
     await repository.save(manual)
 
     restored = await repository.get(manual.id)
     assert restored is not None
     assert restored.status is ManualStatus.INDEXED
-    assert (restored.page_count, restored.chunk_count) == (42, 130)
+    assert (restored.page_count, restored.chunk_count, restored.figure_count) == (42, 130, 17)
 
 
 async def test_returns_none_for_unknown_manual(repository: SqlAlchemyManualRepository) -> None:

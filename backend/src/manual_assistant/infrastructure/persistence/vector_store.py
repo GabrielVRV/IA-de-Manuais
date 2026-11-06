@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from manual_assistant.application.ports.embedding_provider import Embedding
 from manual_assistant.application.ports.vector_store import EmbeddedChunk
-from manual_assistant.domain.chunk import Chunk, ChunkId, ScoredChunk
+from manual_assistant.domain.chunk import Chunk, ChunkId, ChunkKind, ScoredChunk
 from manual_assistant.domain.manual import ManualId, ManualStatus
 from manual_assistant.domain.pages import PageRange
 from manual_assistant.infrastructure.persistence.database import translate_database_errors
@@ -16,7 +16,7 @@ from manual_assistant.infrastructure.persistence.models import (
     ManualRecord,
 )
 
-_UPDATABLE_COLUMNS = ("position", "text", "page_start", "page_end", "embedding")
+_UPDATABLE_COLUMNS = ("position", "kind", "text", "page_start", "page_end", "embedding")
 
 
 class PgVectorStore:
@@ -66,6 +66,7 @@ class PgVectorStore:
                 ChunkRecord.text,
                 ChunkRecord.page_start,
                 ChunkRecord.page_end,
+                ChunkRecord.kind,
                 ManualRecord.title,
                 distance.label("distance"),
             )
@@ -88,14 +89,17 @@ class PgVectorStore:
                     text=row.text,
                     pages=PageRange(row.page_start, row.page_end),
                     position=row.position,
+                    kind=ChunkKind(row.kind),
                 ),
                 score=_similarity(row.distance),
             )
             for row in rows
         ]
 
-    async def delete_by_manual(self, manual_id: ManualId) -> None:
+    async def delete_by_manual(self, manual_id: ManualId, *, kind: ChunkKind | None = None) -> None:
         statement = delete(ChunkRecord).where(ChunkRecord.manual_id == manual_id)
+        if kind is not None:
+            statement = statement.where(ChunkRecord.kind == kind.value)
         async with (
             translate_database_errors("remover os trechos do manual"),
             self._session_factory.begin() as session,
@@ -109,6 +113,7 @@ class PgVectorStore:
             "id": chunk.id,
             "manual_id": chunk.manual_id,
             "position": chunk.position,
+            "kind": chunk.kind.value,
             "text": chunk.text,
             "page_start": chunk.pages.start,
             "page_end": chunk.pages.end,

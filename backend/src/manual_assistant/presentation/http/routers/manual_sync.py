@@ -1,6 +1,6 @@
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from manual_assistant.presentation.http.dependencies import (
     AdminUser,
@@ -51,8 +51,17 @@ async def check_sync(use_cases: UseCasesDep) -> SyncCheckResponse:
     responses=UNAVAILABLE,
     summary="Sincroniza com a pasta; a indexação continua em segundo plano",
 )
-async def run_sync(use_cases: UseCasesDep, admin: AdminUser) -> SyncRunResponse:
-    run = await use_cases.manual_sync.start(started_by=admin.display_name or admin.username)
+async def run_sync(
+    use_cases: UseCasesDep,
+    admin: AdminUser,
+    describe_figures: Annotated[
+        bool,
+        Query(description="Também descreve por IA as figuras dos manuais (re)indexados"),
+    ] = False,
+) -> SyncRunResponse:
+    run = await use_cases.manual_sync.start(
+        started_by=admin.display_name or admin.username, describe_figures=describe_figures
+    )
     return SyncRunResponse.from_run(run)
 
 
@@ -70,6 +79,9 @@ async def update_sync_schedule(
     request: UpdateSyncScheduleRequest, use_cases: UseCasesDep, admin: AdminUser
 ) -> SyncScheduleResponse:
     view = await use_cases.update_sync_schedule.execute(
-        admin, enabled=request.enabled, time_of_day=request.time
+        admin,
+        enabled=request.enabled,
+        time_of_day=request.time,
+        describe_figures=request.describe_figures,
     )
     return SyncScheduleResponse.from_view(view)

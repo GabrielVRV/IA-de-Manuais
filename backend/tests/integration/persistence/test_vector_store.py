@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from manual_assistant.application.ports.embedding_provider import Embedding
 from manual_assistant.application.ports.vector_store import EmbeddedChunk
+from manual_assistant.domain.chunk import ChunkKind
 from manual_assistant.domain.manual import Manual
 from manual_assistant.domain.pages import PageRange
 from manual_assistant.infrastructure.persistence.manual_repository import (
@@ -150,3 +151,21 @@ async def test_rejects_invalid_limit(store: PgVectorStore) -> None:
 
 async def test_upserting_nothing_is_a_no_op(store: PgVectorStore) -> None:
     await store.upsert([])
+
+
+async def test_text_and_figure_chunks_share_positions_and_are_removed_by_kind(
+    store: PgVectorStore, repository: SqlAlchemyManualRepository
+) -> None:
+    manual = await indexed_manual(repository, "Manual da Prensa")
+    text = make_chunk(manual, text="texto", position=0)
+    figure = make_chunk(manual, text="figura", position=0, kind=ChunkKind.FIGURE)
+    await store.upsert([EmbeddedChunk(text, vector(a=1)), EmbeddedChunk(figure, vector(a=1))])
+
+    found = await store.search(vector(a=1), limit=10)
+    assert {(r.chunk.text, r.chunk.kind) for r in found} == {
+        ("texto", ChunkKind.TEXT),
+        ("figura", ChunkKind.FIGURE),
+    }
+
+    await store.delete_by_manual(manual.id, kind=ChunkKind.FIGURE)
+    assert [r.chunk.text for r in await store.search(vector(a=1), limit=10)] == ["texto"]

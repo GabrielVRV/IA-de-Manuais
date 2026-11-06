@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from manual_assistant.application.ports.embedding_provider import Embedding
-from manual_assistant.domain.chunk import Chunk, ScoredChunk
+from manual_assistant.domain.chunk import Chunk, ChunkKind, ScoredChunk
 from manual_assistant.domain.manual import ManualId
 
 
@@ -35,4 +35,6 @@ class VectorStore(Protocol):
         """
         ...
 
-    async def delete_by_manual(self, manual_id: ManualId) -> None: ...
+    async def delete_by_manual(self, manual_id: ManualId, *, kind: ChunkKind | None = None) -> None:
+        """Apaga os trechos do manual; com ``kind``, só os desse tipo."""
+        ...

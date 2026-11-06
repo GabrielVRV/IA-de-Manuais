@@ -1,14 +1,16 @@
 """Testa o adaptador do Gemini interceptando o HTTP do SDK (sem rede e sem gastar cota)."""
 
+import base64
 import json
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Any
 
 import httpx
 import pytest
 
 from manual_assistant.application.errors import ExternalServiceError
-from manual_assistant.application.ports.language_model import CompletionRequest
+from manual_assistant.application.ports.language_model import CompletionRequest, ImageInput
 from manual_assistant.infrastructure.ai.gemini_provider import (
     MAX_QUOTA_WAITS_PER_BATCH,
     GeminiEmbeddingProvider,
@@ -204,6 +206,18 @@ class TestLanguageModel:
         assert config["temperature"] == 0.2
         assert config["maxOutputTokens"] == 512
         assert config["thinkingConfig"]["thinking_budget"] == 0
+
+    async def test_sends_images_before_the_prompt(self, api: FakeGeminiApi) -> None:
+        model = GeminiLanguageModel(api.client(), model="gemini-3.5-flash")
+        image = ImageInput(data=b"jpeg-bytes", mime_type="image/jpeg")
+
+        await model.complete(replace(self.REQUEST, images=(image,)))
+
+        parts = api.requests[0][1]["contents"][0]["parts"]
+        inline = parts[0]["inlineData"]
+        assert inline["data"] == base64.b64encode(b"jpeg-bytes").decode()
+        assert "image/jpeg" in inline.values()  # o nome do campo é decisão do SDK
+        assert parts[1]["text"] == "Qual a pressão máxima?"
 
     async def test_omits_thinking_config_when_budget_is_none(self, api: FakeGeminiApi) -> None:
         model = GeminiLanguageModel(

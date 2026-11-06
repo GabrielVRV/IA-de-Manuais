@@ -3,7 +3,17 @@ from typing import Annotated, Any
 from urllib.parse import quote
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 
 from manual_assistant.domain.manual import TITLE_MAX_LENGTH, ManualId
 from manual_assistant.presentation.http.dependencies import (
@@ -12,7 +22,11 @@ from manual_assistant.presentation.http.dependencies import (
     get_admin_user,
     get_current_user,
 )
-from manual_assistant.presentation.http.schemas.manuals import ErrorResponse, ManualResponse
+from manual_assistant.presentation.http.schemas.manuals import (
+    ErrorResponse,
+    FigurePlanResponse,
+    ManualResponse,
+)
 
 # Consultar exige login; alterar (enviar, reprocessar, excluir) exige administrador.
 router = APIRouter(prefix="/manuals", tags=["manuals"], dependencies=[Depends(get_current_user)])
@@ -23,6 +37,10 @@ Responses = dict[int | str, dict[str, Any]]
 NOT_FOUND: Responses = {status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}}
 INVALID: Responses = {status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": ErrorResponse}}
 CONFLICT: Responses = {status.HTTP_409_CONFLICT: {"model": ErrorResponse}}
+
+_DESCRIBE_FIGURES = (
+    "Também descreve por IA as figuras das páginas (uma chamada por página com figuras)"
+)
 
 
 @router.post(
@@ -40,6 +58,7 @@ async def upload_manual(
         str | None,
         Form(max_length=TITLE_MAX_LENGTH, description="Padrão: nome do arquivo"),
     ] = None,
+    describe_figures: Annotated[bool, Form(description=_DESCRIBE_FIGURES)] = False,
 ) -> ManualResponse:
     register, index = use_cases.register_manual, use_cases.index_manual
     # Lê no máximo 1 byte além do limite: suficiente para recusar, sem carregar tudo.
@@ -50,18 +69,23 @@ async def upload_manual(
     )
 
     manual = await index.prepare(manual.id)
-    background.add_task(index.run, manual)
+    background.add_task(index.run, manual, describe_figures=describe_figures)
     return ManualResponse.from_entity(manual)
 
 
 @router.get("", summary="Lista os manuais, do mais recente para o mais antigo")
 async def list_manuals(use_cases: UseCasesDep) -> list[ManualResponse]:
-    return [ManualResponse.from_entity(m) for m in await use_cases.list_manuals.execute()]
+    figures = use_cases.figure_descriptions
+    return [
+        ManualResponse.from_entity(m, figures.job(m.id))
+        for m in await use_cases.list_manuals.execute()
+    ]
 
 
 @router.get("/{manual_id}", responses=NOT_FOUND, summary="Consulta um manual e seu status")
 async def get_manual(manual_id: UUID, use_cases: UseCasesDep) -> ManualResponse:
-    return ManualResponse.from_entity(await use_cases.get_manual.execute(ManualId(manual_id)))
+    manual = await use_cases.get_manual.execute(ManualId(manual_id))
+    return ManualResponse.from_entity(manual, use_cases.figure_descriptions.job(manual.id))
 
 
 @router.get(
@@ -90,12 +114,39 @@ async def get_manual_file(manual_id: UUID, user: CurrentUser, use_cases: UseCase
     summary="Reprocessa um manual (ex.: após uma falha ou troca de provedor de IA)",
 )
 async def reindex_manual(
-    manual_id: UUID, use_cases: UseCasesDep, background: BackgroundTasks
+    manual_id: UUID,
+    use_cases: UseCasesDep,
+    background: BackgroundTasks,
+    describe_figures: Annotated[bool, Query(description=_DESCRIBE_FIGURES)] = False,
 ) -> ManualResponse:
     index = use_cases.index_manual
     manual = await index.prepare(ManualId(manual_id))
-    background.add_task(index.run, manual)
+    background.add_task(index.run, manual, describe_figures=describe_figures)
     return ManualResponse.from_entity(manual)
+
+
+@router.get(
+    "/{manual_id}/figures",
+    responses=NOT_FOUND,
+    dependencies=ADMIN_ONLY,
+    summary="Quantas páginas têm figuras e quantas faltam descrever (não chama a IA)",
+)
+async def get_figure_plan(manual_id: UUID, use_cases: UseCasesDep) -> FigurePlanResponse:
+    plan = await use_cases.figure_descriptions.plan(ManualId(manual_id))
+    return FigurePlanResponse.from_plan(plan)
+
+
+@router.post(
+    "/{manual_id}/figures",
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={**NOT_FOUND, **CONFLICT},
+    dependencies=ADMIN_ONLY,
+    summary="Descreve por IA as figuras de um manual indexado, sem refazer o texto",
+)
+async def describe_figures(manual_id: UUID, use_cases: UseCasesDep) -> ManualResponse:
+    figures = use_cases.figure_descriptions
+    manual = await figures.start(ManualId(manual_id))
+    return ManualResponse.from_entity(manual, figures.job(manual.id))
 
 
 @router.delete(

@@ -3,12 +3,22 @@ from typing import Protocol
 
 
 @dataclass(frozen=True, slots=True)
+class ImageInput:
+    """Imagem enviada junto com o prompt (ex.: uma página do manual renderizada)."""
+
+    data: bytes
+    mime_type: str = "image/jpeg"
+
+
+@dataclass(frozen=True, slots=True)
 class CompletionRequest:
     system_instruction: str
     prompt: str
     # Temperatura baixa: respostas técnicas precisam ser fiéis ao manual, não criativas.
     temperature: float = 0.2
     max_output_tokens: int = 1024
+    # Só para modelos com visão; as imagens vão antes do texto do prompt.
+    images: tuple[ImageInput, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from manual_assistant import __version__
+from manual_assistant.application.figures import FigureDescriber
 from manual_assistant.application.ports.health_indicator import HealthIndicator
 from manual_assistant.application.use_cases.ask_question import AskQuestionUseCase
 from manual_assistant.application.use_cases.assistant_access import (
@@ -27,6 +28,10 @@ from manual_assistant.application.use_cases.conversations import (
     RenameConversationUseCase,
 )
 from manual_assistant.application.use_cases.delete_manual import DeleteManualUseCase
+from manual_assistant.application.use_cases.describe_figures import (
+    DescribeFiguresUseCase,
+    FigureDescriptionService,
+)
 from manual_assistant.application.use_cases.get_manual import GetManualUseCase
 from manual_assistant.application.use_cases.get_manual_file import GetManualFileUseCase
 from manual_assistant.application.use_cases.index_manual import IndexManualUseCase
@@ -69,8 +74,10 @@ from tests.fakes import (
     FakeEmbeddingProvider,
     FakeLanguageModel,
     FakeManualSource,
+    FakePageRenderer,
     InMemoryAssistantAccessRepository,
     InMemoryConversationRepository,
+    InMemoryFigureDescriptionRepository,
     InMemoryFileStorage,
     InMemoryLoginAttemptRepository,
     InMemoryManualRepository,
@@ -122,11 +129,25 @@ class FakeBackend:
     # None = pasta de manuais não configurada (sincronização desligada).
     manual_source: FakeManualSource | None = field(default_factory=FakeManualSource)
     manual_sync: ManualSyncService | None = None  # montado em build_app
+    # Descrição das figuras (ADR 0014): páginas com figuras e modelo com visão simulados.
+    figure_renderer: FakePageRenderer = field(default_factory=FakePageRenderer)
+    figure_model: FakeLanguageModel = field(
+        default_factory=lambda: FakeLanguageModel(answer="Motor M1 com polia de 200 mm.")
+    )
+    figure_repository: InMemoryFigureDescriptionRepository = field(
+        default_factory=InMemoryFigureDescriptionRepository
+    )
+    figure_descriptions: FigureDescriptionService | None = None  # montado em build_app
 
     def build_app(self) -> FastAPI:
         hasher, sessions = fast_hasher(), session_manager(self.sessions)
         register_manual = RegisterManualUseCase(
             self.repository, self.storage, max_bytes=self.max_upload_bytes
+        )
+        figures = FigureDescriber(
+            renderer=self.figure_renderer,
+            model=self.figure_model,
+            repository=self.figure_repository,
         )
         index_manual = IndexManualUseCase(
             repository=self.repository,
@@ -135,6 +156,18 @@ class FakeBackend:
             chunker=LineChunker(),
             embeddings=self.embeddings,
             vector_store=self.vector_store,
+            figures=figures,
+        )
+        self.figure_descriptions = FigureDescriptionService(
+            use_case=DescribeFiguresUseCase(
+                repository=self.repository,
+                storage=self.storage,
+                parser=PdfiumDocumentParser(),
+                figures=figures,
+                embeddings=self.embeddings,
+                vector_store=self.vector_store,
+            ),
+            repository=self.repository,
         )
         delete_manual = DeleteManualUseCase(
             repository=self.repository, vector_store=self.vector_store, storage=self.storage
@@ -165,6 +198,7 @@ class FakeBackend:
             ),
             delete_manual=delete_manual,
             manual_sync=self.manual_sync,
+            figure_descriptions=self.figure_descriptions,
             get_sync_schedule=GetSyncScheduleUseCase(
                 schedules=self.sync_schedule, sync=self.manual_sync, timezone=TIMEZONE
             ),

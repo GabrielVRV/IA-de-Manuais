@@ -120,6 +120,21 @@ class TestRunScheduledSync:
         ctx.now = local(6, 0, 1)
         assert not await ctx.run.execute()
 
+    async def test_the_scheduled_sync_follows_the_figure_option(self) -> None:
+        ctx = Context()
+        ctx.folder.source.put("ARMAZENAGEM/95000001-00P.pdf")
+        await ctx.update.execute(admin, enabled=True, time_of_day="00:00", describe_figures=True)
+        assert ctx.schedules.schedule.describe_figures
+
+        ctx.now = local(6, 0)
+        assert await ctx.run.execute()
+        await ctx.sync.wait()
+
+        assert ctx.sync.last_run is not None
+        assert ctx.sync.last_run.describe_figures
+        # Registrar a execução não pode apagar a opção.
+        assert ctx.schedules.schedule.describe_figures
+
     async def test_does_nothing_while_disabled(self) -> None:
         ctx = Context()
         ctx.schedules.schedule = SyncSchedule(enabled=False)

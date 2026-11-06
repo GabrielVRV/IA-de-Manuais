@@ -15,6 +15,12 @@ Sincronizar com a pasta de manuais da Engenharia (a pasta só é lida, nunca alt
     python -m manual_assistant.cli sync-manuals --dry-run      # só mostra o plano
     python -m manual_assistant.cli sync-manuals --limit 3      # indexa no máximo 3
     python -m manual_assistant.cli sync-manuals --folder "J:\engpub_consulta\Manuais"
+    python -m manual_assistant.cli sync-manuals --figures      # descreve também as figuras
+
+Descrever as figuras dos manuais já indexados, sem refazer o texto (ADR 0014). Gasta
+uma chamada de IA por página com figuras; o que já foi descrito nunca é pago de novo:
+    python -m manual_assistant.cli describe-figures --dry-run  # só conta as páginas
+    python -m manual_assistant.cli describe-figures --limit 3  # no máximo 3 manuais
 """
 
 import argparse
@@ -26,6 +32,10 @@ from pathlib import Path
 
 from manual_assistant.application.errors import ApplicationError
 from manual_assistant.application.use_cases.delete_manual import DeleteManualUseCase
+from manual_assistant.application.use_cases.describe_figures import (
+    DescribeFiguresUseCase,
+    FigurePlanItem,
+)
 from manual_assistant.application.use_cases.index_manual import IndexManualUseCase
 from manual_assistant.application.use_cases.manage_users import (
     CreateUserUseCase,
@@ -39,11 +49,14 @@ from manual_assistant.application.use_cases.sync_manuals import (
     SyncOutcome,
     SyncPlan,
 )
-from manual_assistant.domain.errors import InvalidValueError
+from manual_assistant.domain.errors import DomainError, InvalidValueError
+from manual_assistant.domain.figures import FigureDescription
+from manual_assistant.domain.manual import ManualStatus
 from manual_assistant.domain.user import UserRole
 from manual_assistant.infrastructure.ai.factory import build_ai_providers
 from manual_assistant.infrastructure.documents.line_chunker import LineChunker
 from manual_assistant.infrastructure.documents.pdf_parser import PdfiumDocumentParser
+from manual_assistant.infrastructure.figures import build_figure_describer
 from manual_assistant.infrastructure.persistence.database import (
     create_database_engine,
     create_session_factory,
@@ -95,7 +108,14 @@ async def use_ad(settings: Settings, username: str, ad_login: str | None) -> Non
 
 
 async def sync_manuals(
-    settings: Settings, folder: Path, *, dry_run: bool, limit: int | None, verbose: bool, yes: bool
+    settings: Settings,
+    folder: Path,
+    *,
+    dry_run: bool,
+    limit: int | None,
+    verbose: bool,
+    yes: bool,
+    describe_figures: bool = False,
 ) -> int:
     engine = create_database_engine(settings.database_url)
     try:
@@ -119,7 +139,11 @@ async def sync_manuals(
         to_index = sum(item.costs_indexing for item in pending)
         if limit is not None:
             to_index = min(to_index, limit)
-        question = f"\nAplicar o plano e indexar {to_index} manual(is) (gasta API de IA)? [s/N] "
+        figures_note = " descrevendo as figuras" if describe_figures else ""
+        question = (
+            f"\nAplicar o plano e indexar {to_index} manual(is){figures_note} "
+            "(gasta API de IA)? [s/N] "
+        )
         if not yes and input(question).strip().lower() != "s":
             print("Cancelado: nada foi alterado.")
             return 0
@@ -142,18 +166,93 @@ async def sync_manuals(
                 chunker=LineChunker(),
                 embeddings=ai.embeddings,
                 vector_store=vector_store,
+                figures=build_figure_describer(settings, session_factory, ai),
             ),
             delete_manual=DeleteManualUseCase(
                 repository=repository, vector_store=vector_store, storage=storage
             ),
         )
-        outcomes = await apply.execute(plan, limit=limit, on_progress=_print_outcome)
+        outcomes = await apply.execute(
+            plan, limit=limit, on_progress=_print_outcome, describe_figures=describe_figures
+        )
     finally:
         await engine.dispose()
 
     failures = sum(not outcome.ok for outcome in outcomes)
     print(f"\nConcluído: {len(outcomes) - failures} ok, {failures} com falha ou adiado(s).")
     return 1 if failures else 0
+
+
+async def describe_figures(
+    settings: Settings, *, dry_run: bool, limit: int | None, yes: bool
+) -> int:
+    engine = create_database_engine(settings.database_url)
+    try:
+        session_factory = create_session_factory(engine)
+        repository = SqlAlchemyManualRepository(session_factory)
+        ai = build_ai_providers(settings, embedding_dimensions=EMBEDDING_DIMENSIONS)
+        use_case = DescribeFiguresUseCase(
+            repository=repository,
+            storage=LocalFileStorage(settings.storage_dir),
+            parser=PdfiumDocumentParser(),
+            figures=build_figure_describer(settings, session_factory, ai),
+            embeddings=ai.embeddings,
+            vector_store=PgVectorStore(session_factory, dimensions=EMBEDDING_DIMENSIONS),
+        )
+        manuals = [m for m in await repository.list_all() if m.status is ManualStatus.INDEXED]
+        print(f"Procurando figuras em {len(manuals)} manual(is) indexado(s)...")
+        plan: list[FigurePlanItem] = []
+        for manual in manuals:
+            try:
+                plan.append(await use_case.plan(manual))
+            except (ApplicationError, DomainError) as error:
+                print(f"  [FALHA] {manual.file_name}: {error}")
+        pending = [item for item in plan if item.pending]
+        if limit is not None:
+            pending = pending[:limit]
+        for item in pending:
+            print(
+                f"  {item.pending:4d} de {item.with_figures:4d} página(s) com figuras: "
+                f"{item.manual.file_name} ({item.manual.title})"
+            )
+        pages = sum(item.pending for item in pending)
+        print(
+            f"\n{sum(i.with_figures for i in plan)} página(s) com figuras; "
+            f"{pages} a descrever em {len(pending)} manual(is)."
+        )
+        if dry_run or not pending:
+            print("Simulação: nada foi alterado." if dry_run else "Tudo em dia.")
+            return 0
+        question = f"\nDescrever {pages} página(s) (uma chamada de IA por página)? [s/N] "
+        if not yes and input(question).strip().lower() != "s":
+            print("Cancelado: nada foi alterado.")
+            return 0
+
+        failures = input_tokens = output_tokens = 0
+        for item in pending:
+            print(f"\n{item.manual.file_name}: {item.pending} página(s)")
+            try:
+                result = await use_case.execute(item.manual, on_page=_print_figure)
+            except (ApplicationError, DomainError) as error:
+                failures += 1
+                print(f"  [FALHA] {error} (o que já foi descrito fica guardado)")
+                continue
+            input_tokens += result.input_tokens
+            output_tokens += result.output_tokens
+            print(f"  [ok] {result.figure_count} página(s) com figuras no índice")
+    finally:
+        await engine.dispose()
+
+    print(
+        f"\nConcluído: {len(pending) - failures} ok, {failures} com falha. "
+        f"Tokens: {input_tokens} de entrada, {output_tokens} de saída."
+    )
+    return 1 if failures else 0
+
+
+def _print_figure(description: FigureDescription) -> None:
+    summary = "descrita" if description.has_content else "sem conteúdo técnico"
+    print(f"    p. {description.page}: {summary}")
 
 
 def _print_plan(plan: SyncPlan, *, verbose: bool) -> None:
@@ -202,9 +301,26 @@ def main(argv: list[str] | None = None) -> int:
     sync.add_argument("--limit", type=int, help="Máximo de manuais (re)indexados nesta execução")
     sync.add_argument("--verbose", action="store_true", help="Lista também os ignorados")
     sync.add_argument("--yes", action="store_true", help="Não pede confirmação")
+    sync.add_argument(
+        "--figures",
+        action="store_true",
+        help="Também descreve por IA as figuras (uma chamada por página com figuras)",
+    )
+    figures = commands.add_parser(
+        "describe-figures", help="Descreve por IA as figuras dos manuais já indexados"
+    )
+    figures.add_argument(
+        "--dry-run", action="store_true", help="Só conta as páginas, sem chamar a IA"
+    )
+    figures.add_argument("--limit", type=int, help="Máximo de manuais nesta execução")
+    figures.add_argument("--yes", action="store_true", help="Não pede confirmação")
     args = parser.parse_args(argv)
 
     try:
+        if args.command == "describe-figures":
+            return asyncio.run(
+                describe_figures(Settings(), dry_run=args.dry_run, limit=args.limit, yes=args.yes)
+            )
         if args.command == "sync-manuals":
             settings = Settings()
             folder = args.folder or settings.sync_source_dir
@@ -218,6 +334,7 @@ def main(argv: list[str] | None = None) -> int:
                     limit=args.limit,
                     verbose=args.verbose,
                     yes=args.yes,
+                    describe_figures=args.figures,
                 )
             )
         if args.command == "use-ad":

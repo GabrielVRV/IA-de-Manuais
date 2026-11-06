@@ -55,6 +55,7 @@ class SyncRunResponse(BaseModel):
     finished_at: datetime | None
     running: bool
     total: int
+    describe_figures: bool = Field(description="As figuras dos manuais vão para a IA")
     done: int
     succeeded: int
     failures: list[SyncFailureResponse]
@@ -69,6 +70,7 @@ class SyncRunResponse(BaseModel):
             finished_at=run.finished_at,
             running=run.running,
             total=run.total,
+            describe_figures=run.describe_figures,
             done=len(run.outcomes),
             succeeded=len(run.outcomes) - len(failures),
             failures=[
@@ -92,6 +94,7 @@ class SyncStatusResponse(BaseModel):
 class SyncScheduleResponse(BaseModel):
     enabled: bool
     time: str = Field(description="HH:MM no fuso da empresa", examples=["00:00"])
+    describe_figures: bool = Field(description="Também descreve as figuras por IA")
     timezone: str = Field(examples=["America/Sao_Paulo"])
     next_run_at: datetime | None = Field(description="Próxima execução; nulo se desligado")
     last_triggered_at: datetime | None
@@ -107,6 +110,7 @@ class SyncScheduleResponse(BaseModel):
         return cls(
             enabled=schedule.enabled,
             time=schedule.time_of_day.strftime("%H:%M"),
+            describe_figures=schedule.describe_figures,
             timezone=view.timezone,
             next_run_at=view.next_run,
             last_triggered_at=schedule.last_triggered_at,
@@ -119,3 +123,4 @@ class SyncScheduleResponse(BaseModel):
 class UpdateSyncScheduleRequest(BaseModel):
     enabled: bool
     time: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$", examples=["00:00"])
+    describe_figures: bool = False

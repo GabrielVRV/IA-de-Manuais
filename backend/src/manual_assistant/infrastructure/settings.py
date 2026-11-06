@@ -67,6 +67,12 @@ class Settings(BaseSettings):
     # Idiomas importados, pela letra no fim do nome (P = português, E = inglês...).
     sync_languages: Annotated[list[str], NoDecode] = Field(default_factory=lambda: ["P"])
 
+    # Descrição das figuras por IA (ADR 0014): ligada por quem importa, na tela (ou com
+    # --figures / describe-figures no CLI). Uma chamada ao modelo por página com figuras.
+    # Fração mínima da página coberta por imagens; ícones e logotipos ficam abaixo disso.
+    figure_min_image_area: float = Field(default=0.05, gt=0, le=1)
+    figure_render_dpi: int = Field(default=150, ge=72, le=300)
+
     # Histórico de conversas (ADR 0010): apagadas após esse tempo sem uso. 0 = guardar sempre.
     conversation_retention_days: int = Field(default=90, ge=0)
 
@@ -89,10 +95,13 @@ class Settings(BaseSettings):
     gemini_quota_wait_seconds: float = Field(default=0, ge=0)
     # 0 desliga o raciocínio; "none" não envia o parâmetro (obrigatório nos modelos *-lite).
     gemini_thinking_budget: int | None = Field(default=0, ge=0)
+    # Modelo que descreve as figuras; vazio = o mesmo das respostas (precisa aceitar imagens).
+    gemini_figure_model: str | None = None
 
     openai_api_key: SecretStr | None = None
     openai_chat_model: str = "gpt-4.1-mini"
     openai_embedding_model: str = "text-embedding-3-small"
+    openai_figure_model: str | None = None
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -122,6 +131,8 @@ class Settings(BaseSettings):
         "ad_ca_cert_file",
         "sync_source_dir",
         "sync_catalog_file",
+        "gemini_figure_model",
+        "openai_figure_model",
         mode="before",
     )
     @classmethod

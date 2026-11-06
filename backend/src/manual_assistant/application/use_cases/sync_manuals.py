@@ -168,9 +168,13 @@ class ApplyManualSyncUseCase:
         *,
         limit: int | None = None,
         on_progress: Callable[[SyncOutcome], None] | None = None,
+        describe_figures: bool = False,
     ) -> list[SyncOutcome]:
         """``limit`` restringe quantos manuais são (re)indexados nesta execução, útil
-        para testar com poucos antes de gastar API com a pasta inteira."""
+        para testar com poucos antes de gastar API com a pasta inteira.
+
+        ``describe_figures``: os manuais (re)indexados também têm as figuras descritas
+        pela IA (ADR 0014), uma chamada por página com figuras ainda não descrita."""
         outcomes: list[SyncOutcome] = []
         indexed = 0
         for item in plan.items:
@@ -180,26 +184,26 @@ class ApplyManualSyncUseCase:
                 outcome = SyncOutcome(item, ok=False, detail="adiado: limite desta execução")
             else:
                 indexed += item.costs_indexing
-                outcome = await self._apply_safely(item)
+                outcome = await self._apply_safely(item, describe_figures)
             outcomes.append(outcome)
             if on_progress is not None:
                 on_progress(outcome)
         return outcomes
 
-    async def _apply_safely(self, item: SyncItem) -> SyncOutcome:
+    async def _apply_safely(self, item: SyncItem, describe_figures: bool) -> SyncOutcome:
         try:
-            detail = await self._apply(item)
+            detail = await self._apply(item, describe_figures)
         except (ApplicationError, DomainError) as error:
             logger.warning("Falha ao sincronizar %s: %s", item.file_name, error)
             return SyncOutcome(item, ok=False, detail=str(error))
         return SyncOutcome(item, ok=True, detail=detail)
 
-    async def _apply(self, item: SyncItem) -> str:
+    async def _apply(self, item: SyncItem, describe_figures: bool) -> str:
         match item.action:
             case SyncAction.ADD:
-                return await self._add(item)
+                return await self._add(item, describe_figures)
             case SyncAction.UPDATE:
-                return await self._update(item)
+                return await self._update(item, describe_figures)
             case SyncAction.RETITLE:
                 manual = _required(item.manual)
                 manual.update_from_source(
@@ -213,7 +217,7 @@ class ApplyManualSyncUseCase:
             case _:
                 return "nada a fazer"
 
-    async def _add(self, item: SyncItem) -> str:
+    async def _add(self, item: SyncItem, describe_figures: bool) -> str:
         document = _required(item.document)
         content = await self._source.read(document.path)
         manual = await self._register.execute(
@@ -222,9 +226,11 @@ class ApplyManualSyncUseCase:
             content=content,
             source=_source_file(_required(item.key), document, content),
         )
-        return _indexing_result(await self._index.execute(manual.id))
+        return _indexing_result(
+            await self._index.execute(manual.id, describe_figures=describe_figures)
+        )
 
-    async def _update(self, item: SyncItem) -> str:
+    async def _update(self, item: SyncItem, describe_figures: bool) -> str:
         document, manual = _required(item.document), _required(item.manual)
         if manual.status is ManualStatus.PROCESSING:
             raise SyncIndexingError(f"'{manual.title}' já está sendo indexado; fica para a próxima")
@@ -239,7 +245,9 @@ class ApplyManualSyncUseCase:
         await self._repository.save(manual)
         if same_content:
             return "conteúdo igual ao já indexado: não precisou reindexar"
-        return _indexing_result(await self._index.execute(manual.id))
+        return _indexing_result(
+            await self._index.execute(manual.id, describe_figures=describe_figures)
+        )
 
 
 def _compare(key: str, document: SourceDocument, manual: Manual | None) -> SyncItem:
@@ -287,7 +295,8 @@ def _source_file(key: str, document: SourceDocument, content: bytes) -> SourceFi
 
 def _indexing_result(manual: Manual) -> str:
     if manual.status is ManualStatus.INDEXED:
-        return f"indexado: {manual.page_count} páginas, {manual.chunk_count} trechos"
+        figures = f", {manual.figure_count} páginas com figuras" if manual.figure_count else ""
+        return f"indexado: {manual.page_count} páginas, {manual.chunk_count} trechos{figures}"
     raise SyncIndexingError(manual.failure_reason or "falha na indexação")
 
 
@@ -309,6 +318,7 @@ class SyncRun:
     started_at: datetime
     started_by: str
     total: int  # itens do plano que serão aplicados
+    describe_figures: bool = False  # as figuras dos manuais indexados vão para a IA
     outcomes: list[SyncOutcome] = field(default_factory=list)
     finished_at: datetime | None = None
     error: str | None = None  # falha que interrompeu a sincronização inteira
@@ -359,7 +369,7 @@ class ManualSyncService:
             raise SyncNotConfiguredError()
         return await self._plan.execute()
 
-    async def start(self, *, started_by: str) -> SyncRun:
+    async def start(self, *, started_by: str, describe_figures: bool = False) -> SyncRun:
         """Refaz o plano (a pasta pode ter mudado desde a verificação) e o aplica em
         segundo plano. Devolve logo depois de iniciar.
 
@@ -381,7 +391,12 @@ class ManualSyncService:
         pending = [
             i for i in plan.items if i.action not in (SyncAction.UNCHANGED, SyncAction.IGNORE)
         ]
-        run = SyncRun(started_at=self._clock(), started_by=started_by, total=len(pending))
+        run = SyncRun(
+            started_at=self._clock(),
+            started_by=started_by,
+            total=len(pending),
+            describe_figures=describe_figures,
+        )
         self.last_run = run
         self._task = asyncio.create_task(self._execute(self._apply, plan, run))
         return run
@@ -403,7 +418,9 @@ class ManualSyncService:
     async def _execute(self, apply: ApplyManualSyncUseCase, plan: SyncPlan, run: SyncRun) -> None:
         logger.info("Sincronização iniciada por %s: %d item(ns)", run.started_by, run.total)
         try:
-            await apply.execute(plan, on_progress=run.outcomes.append)
+            await apply.execute(
+                plan, on_progress=run.outcomes.append, describe_figures=run.describe_figures
+            )
         except asyncio.CancelledError:
             run.error = "a API foi desligada no meio da sincronização"
             raise

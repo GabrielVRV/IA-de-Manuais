@@ -68,6 +68,7 @@ def _to_row(manual: Manual) -> dict[str, Any]:
         "status": manual.status.value,
         "page_count": manual.page_count,
         "chunk_count": manual.chunk_count,
+        "figure_count": manual.figure_count,
         "failure_reason": manual.failure_reason,
         "source_key": manual.source.key if manual.source else None,
         "source_fingerprint": manual.source.fingerprint if manual.source else None,
@@ -85,6 +86,7 @@ def _to_entity(record: ManualRecord) -> Manual:
         status=ManualStatus(record.status),
         page_count=record.page_count,
         chunk_count=record.chunk_count,
+        figure_count=record.figure_count,
         failure_reason=record.failure_reason,
         source=_source_of(record),
     )

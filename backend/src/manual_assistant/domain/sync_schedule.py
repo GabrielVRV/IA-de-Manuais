@@ -17,6 +17,8 @@ TRIGGER_ERROR_MAX_LENGTH = 500
 class SyncSchedule:
     enabled: bool = False
     time_of_day: time = time(0, 0)
+    # A sincronização agendada também descreve as figuras dos manuais (ADR 0014).
+    describe_figures: bool = False
     updated_at: datetime | None = None
     updated_by: str | None = None
     last_triggered_at: datetime | None = None
@@ -29,11 +31,20 @@ class SyncSchedule:
         if self.time_of_day.second or self.time_of_day.microsecond:
             raise InvalidValueError("O horário da sincronização é em horas e minutos")
 
-    def change(self, *, enabled: bool, time_of_day: time, now: datetime, author: str) -> Self:
+    def change(
+        self,
+        *,
+        enabled: bool,
+        time_of_day: time,
+        now: datetime,
+        author: str,
+        describe_figures: bool = False,
+    ) -> Self:
         """Novo agendamento. Um horário que já passou hoje só vale a partir de amanhã."""
         return type(self)(
             enabled=enabled,
             time_of_day=time_of_day,
+            describe_figures=describe_figures,
             updated_at=now,
             updated_by=author,
             last_triggered_at=self.last_triggered_at,
@@ -60,6 +71,7 @@ class SyncSchedule:
         return type(self)(
             enabled=self.enabled,
             time_of_day=self.time_of_day,
+            describe_figures=self.describe_figures,
             updated_at=self.updated_at,
             updated_by=self.updated_by,
             last_triggered_at=now,

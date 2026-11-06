@@ -23,6 +23,12 @@ class AiConfigurationError(ValueError):
 class AiProviders:
     embeddings: EmbeddingProvider
     language_model: LanguageModel
+    # Descreve as figuras das páginas (ADR 0014); None = o mesmo modelo das respostas.
+    figure_model: LanguageModel | None = None
+
+    @property
+    def figure_describer_model(self) -> LanguageModel:
+        return self.figure_model or self.language_model
 
 
 def build_ai_providers(settings: Settings, *, embedding_dimensions: int) -> AiProviders:
@@ -48,6 +54,15 @@ def build_ai_providers(settings: Settings, *, embedding_dimensions: int) -> AiPr
                 model=settings.gemini_chat_model,
                 thinking_budget=settings.gemini_thinking_budget,
             ),
+            figure_model=(
+                GeminiLanguageModel(
+                    gemini,
+                    model=settings.gemini_figure_model,
+                    thinking_budget=settings.gemini_thinking_budget,
+                )
+                if settings.gemini_figure_model
+                else None
+            ),
         )
 
     if settings.openai_api_key is None:
@@ -62,4 +77,9 @@ def build_ai_providers(settings: Settings, *, embedding_dimensions: int) -> AiPr
             client, model=settings.openai_embedding_model, dimensions=embedding_dimensions
         ),
         language_model=OpenAILanguageModel(client, model=settings.openai_chat_model),
+        figure_model=(
+            OpenAILanguageModel(client, model=settings.openai_figure_model)
+            if settings.openai_figure_model
+            else None
+        ),
     )

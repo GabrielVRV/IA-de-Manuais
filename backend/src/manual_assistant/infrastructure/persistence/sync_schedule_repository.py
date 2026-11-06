@@ -25,6 +25,7 @@ class SqlAlchemySyncScheduleRepository:
         return SyncSchedule(
             enabled=record.enabled,
             time_of_day=record.time_of_day,
+            describe_figures=record.describe_figures,
             updated_at=record.updated_at,
             updated_by=record.updated_by,
             last_triggered_at=record.last_triggered_at,
@@ -35,6 +36,7 @@ class SqlAlchemySyncScheduleRepository:
         values: dict[str, Any] = {
             "enabled": schedule.enabled,
             "time_of_day": schedule.time_of_day,
+            "describe_figures": schedule.describe_figures,
             "updated_at": schedule.updated_at,
             "updated_by": schedule.updated_by,
             "last_triggered_at": schedule.last_triggered_at,

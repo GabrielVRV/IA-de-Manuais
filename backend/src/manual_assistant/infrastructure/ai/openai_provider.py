@@ -1,11 +1,13 @@
 """Adaptadores da OpenAI (SDK ``openai``)."""
 
+import base64
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 
 import httpx2
 import openai
 from openai import AsyncOpenAI, omit
+from openai.types.chat import ChatCompletionContentPartParam
 
 from manual_assistant.application.errors import ExternalServiceError
 from manual_assistant.application.ports.embedding_provider import Embedding
@@ -109,7 +111,7 @@ class OpenAILanguageModel:
                 model=self._model,
                 messages=[
                     {"role": "system", "content": request.system_instruction},
-                    {"role": "user", "content": request.prompt},
+                    {"role": "user", "content": _user_content(request)},
                 ],
                 max_completion_tokens=request.max_output_tokens,
                 temperature=temperature,
@@ -130,3 +132,21 @@ class OpenAILanguageModel:
                 output_tokens=usage.completion_tokens if usage else 0,
             ),
         )
+
+
+def _user_content(request: CompletionRequest) -> str | list[ChatCompletionContentPartParam]:
+    if not request.images:
+        return request.prompt
+    parts: list[ChatCompletionContentPartParam] = [
+        {
+            "type": "image_url",
+            "image_url": {
+                "url": f"data:{image.mime_type};base64,"
+                + base64.b64encode(image.data).decode("ascii"),
+                "detail": "high",
+            },
+        }
+        for image in request.images
+    ]
+    parts.append({"type": "text", "text": request.prompt})
+    return parts

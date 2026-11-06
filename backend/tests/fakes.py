@@ -19,6 +19,7 @@ from manual_assistant.application.ports.embedding_provider import Embedding
 from manual_assistant.application.ports.language_model import (
     Completion,
     CompletionRequest,
+    ImageInput,
     TokenUsage,
 )
 from manual_assistant.application.ports.manual_source import SourceDocument
@@ -26,13 +27,14 @@ from manual_assistant.application.ports.text_chunker import TextFragment
 from manual_assistant.application.ports.usage_repository import UsageAggregate
 from manual_assistant.application.ports.vector_store import EmbeddedChunk
 from manual_assistant.domain.assistant import AccessPolicy, AssistantId, UserAccess
-from manual_assistant.domain.chunk import ScoredChunk
+from manual_assistant.domain.chunk import ChunkKind, ScoredChunk
 from manual_assistant.domain.conversation import (
     Conversation,
     ConversationId,
     ConversationSummary,
     Exchange,
 )
+from manual_assistant.domain.figures import FigureDescription
 from manual_assistant.domain.login_attempts import LoginAttempts
 from manual_assistant.domain.manual import Manual, ManualId
 from manual_assistant.domain.pages import Page, PageRange
@@ -155,8 +157,12 @@ class InMemoryVectorStore:
     ) -> Sequence[ScoredChunk]:
         return [r for r in self.search_results if r.score >= min_score][:limit]
 
-    async def delete_by_manual(self, manual_id: ManualId) -> None:
-        self.items.pop(manual_id, None)
+    async def delete_by_manual(self, manual_id: ManualId, *, kind: ChunkKind | None = None) -> None:
+        if kind is None:
+            self.items.pop(manual_id, None)
+        else:
+            kept = [i for i in self.items.get(manual_id, []) if i.chunk.kind is not kind]
+            self.items[manual_id] = kept
 
 
 @dataclass
@@ -164,11 +170,23 @@ class FakeLanguageModel:
     answer: str = "Resposta gerada."
     error: Exception | None = None
     requests: list[CompletionRequest] = field(default_factory=list)
+    # Falha só a partir da chamada de número ``fail_from_call`` (1 = a primeira).
+    fail_from_call: int | None = None
+    # Respostas por chamada, em ordem; quando acabam, vale ``answer``.
+    answers: list[str] = field(default_factory=list)
 
     async def complete(self, request: CompletionRequest) -> Completion:
         self.requests.append(request)
-        if self.error is not None:
+        if self.error is not None and (
+            self.fail_from_call is None or len(self.requests) >= self.fail_from_call
+        ):
             raise self.error
+        if self.answers:
+            return Completion(
+                text=self.answers.pop(0),
+                model="fake-model",
+                usage=TokenUsage(input_tokens=1, output_tokens=1),
+            )
         return Completion(
             text=self.answer, model="fake-model", usage=TokenUsage(input_tokens=1, output_tokens=1)
         )
@@ -449,3 +467,40 @@ class InMemoryAssistantAccessRepository:
             items.pop(assistant_id, None)
         else:
             items[assistant_id] = access
+
+
+@dataclass
+class FakePageRenderer:
+    """Páginas com figuras definidas pelo teste; a "imagem" diz qual página é."""
+
+    figure_pages: list[int] = field(default_factory=list)
+    rendered: list[int] = field(default_factory=list)
+
+    async def pages_with_figures(self, content: bytes) -> Sequence[int]:
+        return list(self.figure_pages)
+
+    async def render(self, content: bytes, pages: Sequence[int]) -> Sequence[ImageInput]:
+        self.rendered.extend(pages)
+        return [ImageInput(data=f"página {page}".encode()) for page in pages]
+
+
+@dataclass
+class InMemoryFigureDescriptionRepository:
+    # manual -> página -> (hash do arquivo, descrição)
+    rows: dict[ManualId, dict[int, tuple[str, FigureDescription]]] = field(default_factory=dict)
+
+    async def list(self, manual_id: ManualId, content_hash: str) -> Sequence[FigureDescription]:
+        pages = self.rows.get(manual_id, {})
+        return [d for page, (h, d) in sorted(pages.items()) if h == content_hash]
+
+    async def add(
+        self, manual_id: ManualId, content_hash: str, description: FigureDescription
+    ) -> None:
+        self.rows.setdefault(manual_id, {})[description.page] = (content_hash, description)
+
+    async def delete_other_versions(self, manual_id: ManualId, content_hash: str) -> int:
+        pages = self.rows.get(manual_id, {})
+        stale = [page for page, (h, _) in pages.items() if h != content_hash]
+        for page in stale:
+            del pages[page]
+        return len(stale)

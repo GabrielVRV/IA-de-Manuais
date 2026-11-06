@@ -1,6 +1,8 @@
 """Testa o adaptador da OpenAI interceptando o HTTP do SDK (que usa httpx2)."""
 
+import base64
 import json
+from dataclasses import replace
 from typing import Any
 
 import httpx2
@@ -8,7 +10,7 @@ import pytest
 from openai import AsyncOpenAI
 
 from manual_assistant.application.errors import ExternalServiceError
-from manual_assistant.application.ports.language_model import CompletionRequest
+from manual_assistant.application.ports.language_model import CompletionRequest, ImageInput
 from manual_assistant.infrastructure.ai.openai_provider import (
     OpenAIEmbeddingProvider,
     OpenAILanguageModel,
@@ -102,6 +104,19 @@ async def test_completes_with_temperature_for_regular_models(api: FakeOpenAIApi)
     assert body["temperature"] == 0.2
     assert body["messages"][0] == {"role": "system", "content": "Sistema"}
     assert (completion.text, completion.usage.total_tokens) == ("180 bar.", 15)
+
+
+async def test_sends_images_with_the_prompt(api: FakeOpenAIApi) -> None:
+    image = ImageInput(data=b"jpeg-bytes", mime_type="image/jpeg")
+
+    await OpenAILanguageModel(api.client(), model="gpt-4.1-mini").complete(
+        replace(REQUEST, images=(image,))
+    )
+
+    content = api.requests[0][1]["messages"][1]["content"]
+    encoded = base64.b64encode(b"jpeg-bytes").decode()
+    assert content[0]["image_url"]["url"] == f"data:image/jpeg;base64,{encoded}"
+    assert content[1] == {"type": "text", "text": REQUEST.prompt}
 
 
 @pytest.mark.parametrize("model", ["gpt-5.4-mini", "gpt-6-luna"])

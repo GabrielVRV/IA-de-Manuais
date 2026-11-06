@@ -52,7 +52,9 @@ class Manual:
     created_at: datetime
     status: ManualStatus = ManualStatus.PENDING
     page_count: int | None = None
-    chunk_count: int | None = None
+    chunk_count: int | None = None  # trechos de texto
+    # Páginas cujas figuras foram descritas pela IA (cada uma vira um trecho a mais).
+    figure_count: int | None = None
     failure_reason: str | None = None
     # Preenchido só nos manuais vindos da pasta da Engenharia (None = enviado pela tela).
     source: SourceFile | None = None
@@ -91,17 +93,32 @@ class Manual:
         self.status = ManualStatus.PROCESSING
         self.page_count = None
         self.chunk_count = None
+        self.figure_count = None
         self.failure_reason = None
 
-    def mark_indexed(self, *, page_count: int, chunk_count: int) -> None:
+    def mark_indexed(self, *, page_count: int, chunk_count: int, figure_count: int = 0) -> None:
+        """Um manual escaneado não tem trechos de texto: só as figuras descritas."""
         self._ensure_processing()
-        if page_count < 1 or chunk_count < 1:
+        if chunk_count < 0 or figure_count < 0:
+            raise InvalidValueError("A quantidade de trechos não pode ser negativa")
+        if page_count < 1 or chunk_count + figure_count < 1:
             raise InvalidValueError(
                 "Um manual indexado precisa ter ao menos uma página e um trecho"
             )
         self.status = ManualStatus.INDEXED
         self.page_count = page_count
         self.chunk_count = chunk_count
+        self.figure_count = figure_count
+
+    def record_figures(self, figure_count: int) -> None:
+        """Figuras descritas depois da indexação, sem refazer os trechos de texto."""
+        if self.status is not ManualStatus.INDEXED:
+            raise InvalidStateTransitionError(
+                f"O manual '{self.title}' não está indexado (status: {self.status})"
+            )
+        if figure_count < 0:
+            raise InvalidValueError("A quantidade de figuras não pode ser negativa")
+        self.figure_count = figure_count
 
     def mark_failed(self, reason: str) -> None:
         self._ensure_processing()

@@ -123,7 +123,8 @@ async def test_fails_when_there_is_no_usable_text(ctx: Context) -> None:
 
     result = await ctx.use_case.execute(manual.id)
 
-    assert result.failure_reason == "O documento não contém texto aproveitável"
+    assert result.failure_reason is not None
+    assert "Descrever figuras" in result.failure_reason
 
 
 async def test_keeps_the_previous_index_when_embeddings_fail(ctx: Context) -> None:

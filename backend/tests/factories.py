@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from manual_assistant.domain.chunk import Chunk
+from manual_assistant.domain.chunk import Chunk, ChunkKind
 from manual_assistant.domain.manual import Manual
 from manual_assistant.domain.pages import PageRange
 
@@ -19,10 +19,12 @@ def make_chunk(
     text: str = "Verifique a pressão do óleo antes de ligar.",
     pages: PageRange | None = None,
     position: int = 0,
+    kind: ChunkKind = ChunkKind.TEXT,
 ) -> Chunk:
     return Chunk.create(
         manual=manual or make_manual(),
         text=text,
         pages=pages or PageRange.single(1),
         position=position,
+        kind=kind,
     )

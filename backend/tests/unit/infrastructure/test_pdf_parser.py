@@ -27,9 +27,11 @@ async def test_rejects_files_that_are_not_pdfs() -> None:
         await parser.parse(b"%PDF-1.4 isso nao e um pdf de verdade")
 
 
-async def test_rejects_pdfs_without_text() -> None:
-    with pytest.raises(UnreadableDocumentError, match="OCR"):
-        await parser.parse(build_pdf("", ""))
+async def test_returns_blank_pages_for_pdfs_without_text() -> None:
+    """Escaneado: quem decide é a indexação, que pode descrever as páginas como imagem."""
+    pages = await parser.parse(build_pdf("", ""))
+
+    assert [page.is_blank for page in pages] == [True, True]
 
 
 async def test_handles_concurrent_parsing() -> None:

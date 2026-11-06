@@ -22,6 +22,7 @@ from sqlalchemy import (
     Text,
     Time,
     UniqueConstraint,
+    false,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -53,6 +54,7 @@ class ManualRecord(Base):
     status: Mapped[str] = mapped_column(String(20))
     page_count: Mapped[int | None]
     chunk_count: Mapped[int | None]
+    figure_count: Mapped[int | None]
     failure_reason: Mapped[str | None] = mapped_column(Text)
     # Origem na pasta da Engenharia (ADR 0009); nulas nos manuais enviados pela tela.
     source_key: Mapped[str | None] = mapped_column(String(50), unique=True)
@@ -84,11 +86,14 @@ class ChunkRecord(Base):
     text: Mapped[str] = mapped_column(Text)
     page_start: Mapped[int]
     page_end: Mapped[int]
+    # "text" (do PDF) ou "figure" (descrição das figuras de uma página, ADR 0014).
+    kind: Mapped[str] = mapped_column(String(10), server_default="text")
     embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIMENSIONS))
 
     __table_args__ = (
-        UniqueConstraint("manual_id", "position", name="uq_chunks_manual_id_position"),
+        UniqueConstraint("manual_id", "kind", "position", name="uq_chunks_manual_id_kind_position"),
         CheckConstraint("page_start >= 1 AND page_end >= page_start", name="valid_pages"),
+        CheckConstraint("kind IN ('text', 'figure')", name="valid_kind"),
         # HNSW: índice aproximado que mantém a busca rápida mesmo com milhares de trechos.
         Index(
             "ix_chunks_embedding_hnsw",
@@ -96,6 +101,29 @@ class ChunkRecord(Base):
             postgresql_using="hnsw",
             postgresql_ops={"embedding": "vector_cosine_ops"},
         ),
+    )
+
+
+class FigureDescriptionRecord(Base):
+    """Descrição das figuras de uma página, guardada para não pagar duas vezes (ADR 0014)."""
+
+    __tablename__ = "figure_descriptions"
+
+    manual_id: Mapped[UUID] = mapped_column(
+        ForeignKey("manuals.id", ondelete="CASCADE"), primary_key=True
+    )
+    page: Mapped[int] = mapped_column(primary_key=True)
+    # SHA-256 do arquivo descrito: outra versão do arquivo precisa de novas descrições.
+    content_hash: Mapped[str] = mapped_column(String(64))
+    text: Mapped[str | None] = mapped_column(Text)  # nula = sem conteúdo técnico
+    model: Mapped[str] = mapped_column(String(100))
+    input_tokens: Mapped[int]
+    output_tokens: Mapped[int]
+    described_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        CheckConstraint("page >= 1", name="valid_page"),
+        CheckConstraint("input_tokens >= 0 AND output_tokens >= 0", name="valid_tokens"),
     )
 
 
@@ -227,6 +255,7 @@ class SyncScheduleRecord(Base):
     id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=False)
     enabled: Mapped[bool] = mapped_column(Boolean)
     time_of_day: Mapped[time] = mapped_column(Time())  # no relógio da empresa (APP_TIMEZONE)
+    describe_figures: Mapped[bool] = mapped_column(Boolean, server_default=false())
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     updated_by: Mapped[str | None] = mapped_column(String(100))
     last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

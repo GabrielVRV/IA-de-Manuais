@@ -36,6 +36,10 @@ from manual_assistant.application.use_cases.conversations import (
     RenameConversationUseCase,
 )
 from manual_assistant.application.use_cases.delete_manual import DeleteManualUseCase
+from manual_assistant.application.use_cases.describe_figures import (
+    DescribeFiguresUseCase,
+    FigureDescriptionService,
+)
 from manual_assistant.application.use_cases.get_manual import GetManualUseCase
 from manual_assistant.application.use_cases.get_manual_file import GetManualFileUseCase
 from manual_assistant.application.use_cases.index_manual import IndexManualUseCase
@@ -82,6 +86,7 @@ from manual_assistant.infrastructure.active_directory.ldap_credential_verifier i
 from manual_assistant.infrastructure.ai.factory import AiProviders, build_ai_providers
 from manual_assistant.infrastructure.documents.line_chunker import LineChunker
 from manual_assistant.infrastructure.documents.pdf_parser import PdfiumDocumentParser
+from manual_assistant.infrastructure.figures import build_figure_describer
 from manual_assistant.infrastructure.persistence.assistant_access_repository import (
     SqlAlchemyAssistantAccessRepository,
 )
@@ -166,6 +171,7 @@ def create_app(
     register_manual = RegisterManualUseCase(
         repository, storage, max_bytes=settings.max_upload_bytes
     )
+    figure_describer = build_figure_describer(settings, session_factory, ai)
     index_manual = IndexManualUseCase(
         repository=repository,
         storage=storage,
@@ -173,6 +179,7 @@ def create_app(
         chunker=LineChunker(),
         embeddings=ai.embeddings,
         vector_store=vector_store,
+        figures=figure_describer,
     )
     delete_manual = DeleteManualUseCase(
         repository=repository, vector_store=vector_store, storage=storage
@@ -196,6 +203,17 @@ def create_app(
             ),
         )
 
+    figure_descriptions = FigureDescriptionService(
+        use_case=DescribeFiguresUseCase(
+            repository=repository,
+            storage=storage,
+            parser=PdfiumDocumentParser(),
+            figures=figure_describer,
+            embeddings=ai.embeddings,
+            vector_store=vector_store,
+        ),
+        repository=repository,
+    )
     schedules = SqlAlchemySyncScheduleRepository(session_factory)
     use_cases = UseCases(
         check_health=CheckHealthUseCase(indicators=[DatabaseHealthIndicator(engine)]),
@@ -206,6 +224,7 @@ def create_app(
         get_manual_file=GetManualFileUseCase(repository, storage, assistant_access),
         delete_manual=delete_manual,
         manual_sync=manual_sync,
+        figure_descriptions=figure_descriptions,
         get_sync_schedule=GetSyncScheduleUseCase(
             schedules=schedules, sync=manual_sync, timezone=settings.zone
         ),
@@ -288,6 +307,7 @@ def create_app(
             with suppress(asyncio.CancelledError):
                 await task
         await manual_sync.stop()
+        await figure_descriptions.stop()
         await engine.dispose()
 
     return create_http_app(
