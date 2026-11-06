@@ -1,6 +1,7 @@
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
+from math import ceil
 
 from manual_assistant.application.ports.embedding_provider import Embedding, EmbeddingProvider
 from manual_assistant.application.ports.language_model import (
@@ -18,7 +19,8 @@ from manual_assistant.application.rag_prompt import (
     retrieval_query,
 )
 from manual_assistant.domain.answer import Answer
-from manual_assistant.domain.chunk import ScoredChunk
+from manual_assistant.domain.chunk import ChunkId, ScoredChunk
+from manual_assistant.domain.codes import part_codes
 from manual_assistant.domain.conversation import Exchange
 from manual_assistant.domain.equipment import equipment_models
 from manual_assistant.domain.manual import ManualId
@@ -27,7 +29,15 @@ from manual_assistant.domain.question import Question
 logger = logging.getLogger(__name__)
 
 DEFAULT_TOP_K = 6  # ~6 x 1500 caracteres: contexto suficiente com custo baixo
-DEFAULT_MAX_OUTPUT_TOKENS = 1024
+# Pergunta sobre vários modelos: cada um recebe ao menos esta quantidade de trechos, e o
+# total pode crescer até MAX_TOP_K_FACTOR x top_k (3 modelos → 9 trechos com top_k 6).
+MIN_CHUNKS_PER_MODEL = 3
+MAX_TOP_K_FACTOR = 2
+# Trechos que contêm literalmente um código de peça citado na pergunta (ADR 0015).
+MAX_CODE_CHUNKS = 3
+# Teto, não meta: só os tokens gerados são cobrados. Com respostas mais completas
+# (regra 5 do prompt), 1024 cortava procedimentos longos no meio.
+DEFAULT_MAX_OUTPUT_TOKENS = 2048
 NO_USAGE = TokenUsage(input_tokens=0, output_tokens=0)
 
 
@@ -65,6 +75,7 @@ class AskQuestionUseCase:
         text = retrieval_query(question, history)
         query = await self._embeddings.embed_query(text)
         results = await self._search(query, await self._manuals_of_models_in(text))
+        results = await self._with_exact_codes(part_codes(text), results)
         if not results:
             # Nada indexado (ou nada acima do corte): não gasta tokens do modelo.
             return QuestionResult(Answer(NOT_FOUND_MESSAGE), model=None)
@@ -91,27 +102,60 @@ class AskQuestionUseCase:
         )
         return QuestionResult(answer, model=completion.model, usage=completion.usage)
 
-    async def _search(self, query: Embedding, focus: frozenset[ManualId]) -> Sequence[ScoredChunk]:
+    async def _search(
+        self, query: Embedding, groups: Sequence[frozenset[ManualId]]
+    ) -> Sequence[ScoredChunk]:
         """Com um modelo citado, os trechos dos manuais dele vêm primeiro; a busca geral
         completa as vagas. Sem isso, "o óleo do s70" perde para trechos de outros
-        equipamentos que falam mais de óleo, porque o embedding dá pouco peso ao "s70"."""
-        found = await self._vector_store.search(query, limit=self._top_k, min_score=self._min_score)
-        if not focus:
-            return found
-        focused = await self._vector_store.search(
-            query, limit=self._top_k, min_score=self._min_score, manual_ids=focus
-        )
-        chosen = {result.chunk.id for result in focused}
-        others = [result for result in found if result.chunk.id not in chosen]
-        return [*focused, *others][: self._top_k]
+        equipamentos que falam mais de óleo, porque o embedding dá pouco peso ao "s70".
 
-    async def _manuals_of_models_in(self, text: str) -> frozenset[ManualId]:
-        """Manuais indexados cujo título cita um modelo citado no texto (ex.: "s70")."""
+        Com vários modelos ("siloflex 55, 75 e 100"), cada um tem a sua cota de trechos:
+        numa busca só, o manual mais parecido com a pergunta ocupava todas as vagas e a
+        resposta dizia que os outros modelos "não constam"."""
+        if len(groups) <= 1:
+            limit = self._top_k
+            per_group = self._top_k
+        else:
+            per_group = max(MIN_CHUNKS_PER_MODEL, ceil(self._top_k / len(groups)))
+            limit = min(per_group * len(groups), self._top_k * MAX_TOP_K_FACTOR)
+        found = await self._vector_store.search(query, limit=limit, min_score=self._min_score)
+        if not groups:
+            return found
+        selected: list[ScoredChunk] = []
+        chosen: set[ChunkId] = set()
+        for manual_ids in groups:
+            focused = await self._vector_store.search(
+                query, limit=per_group, min_score=self._min_score, manual_ids=manual_ids
+            )
+            for result in focused:
+                if result.chunk.id not in chosen:
+                    chosen.add(result.chunk.id)
+                    selected.append(result)
+        others = [result for result in found if result.chunk.id not in chosen]
+        return [*selected, *others][:limit]
+
+    async def _with_exact_codes(
+        self, codes: frozenset[str], results: Sequence[ScoredChunk]
+    ) -> Sequence[ScoredChunk]:
+        """Trechos que contêm o código citado ("20.400.319") vêm primeiro: a busca por
+        sentido trata códigos parecidos quase como iguais e pode nem trazê-los."""
+        if not codes:
+            return results
+        exact = await self._vector_store.search_codes(codes, limit=MAX_CODE_CHUNKS)
+        chosen = {result.chunk.id for result in exact}
+        others = [result for result in results if result.chunk.id not in chosen]
+        return [*exact, *others][: max(len(results), len(exact))]
+
+    async def _manuals_of_models_in(self, text: str) -> list[frozenset[ManualId]]:
+        """Para cada modelo citado no texto (ex.: "s70"), os manuais indexados cujo título
+        cita esse modelo. Modelos sem manual ficam de fora."""
         models = equipment_models(text)
         if not models or self._manuals is None:
-            return frozenset()
-        return frozenset(
-            manual.id
-            for manual in await self._manuals.list_all()
-            if manual.is_searchable and models & equipment_models(manual.title)
-        )
+            return []
+        searchable = [manual for manual in await self._manuals.list_all() if manual.is_searchable]
+        groups: list[frozenset[ManualId]] = []
+        for model in sorted(models):
+            ids = frozenset(m.id for m in searchable if model in equipment_models(m.title))
+            if ids and ids not in groups:
+                groups.append(ids)
+        return groups

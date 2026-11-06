@@ -28,6 +28,7 @@ from manual_assistant.application.ports.usage_repository import UsageAggregate
 from manual_assistant.application.ports.vector_store import EmbeddedChunk
 from manual_assistant.domain.assistant import AccessPolicy, AssistantId, UserAccess
 from manual_assistant.domain.chunk import ChunkKind, ScoredChunk
+from manual_assistant.domain.codes import compact
 from manual_assistant.domain.conversation import (
     Conversation,
     ConversationId,
@@ -148,6 +149,7 @@ class InMemoryVectorStore:
     items: dict[ManualId, list[EmbeddedChunk]] = field(default_factory=dict)
     search_results: list[ScoredChunk] = field(default_factory=list)
     searched_manual_ids: list[set[ManualId] | None] = field(default_factory=list)
+    searched_codes: list[set[str]] = field(default_factory=list)
 
     async def upsert(self, items: Sequence[EmbeddedChunk]) -> None:
         for item in items:
@@ -167,6 +169,23 @@ class InMemoryVectorStore:
             for r in self.search_results
             if r.score >= min_score and (manual_ids is None or r.chunk.manual_id in manual_ids)
         ][:limit]
+
+    async def search_codes(
+        self,
+        codes: Collection[str],
+        *,
+        limit: int,
+        manual_ids: Collection[ManualId] | None = None,
+    ) -> Sequence[ScoredChunk]:
+        self.searched_codes.append(set(codes))
+        found = [
+            (sum(code in compact(r.chunk.text) for code in codes), r)
+            for r in self.search_results
+            if manual_ids is None or r.chunk.manual_id in manual_ids
+        ]
+        found = [item for item in found if item[0]]
+        found.sort(key=lambda item: -item[0])
+        return [ScoredChunk(r.chunk, 1.0) for _, r in found][:limit]
 
     async def delete_by_manual(self, manual_id: ManualId, *, kind: ChunkKind | None = None) -> None:
         if kind is None:

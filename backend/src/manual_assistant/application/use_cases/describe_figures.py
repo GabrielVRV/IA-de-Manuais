@@ -11,7 +11,7 @@ from manual_assistant.application.errors import (
     ExternalServiceError,
     ManualNotFoundError,
 )
-from manual_assistant.application.figures import FigureDescriber, content_hash, figure_chunk_text
+from manual_assistant.application.figures import FigureDescriber, content_hash
 from manual_assistant.application.ports.document_parser import DocumentParser
 from manual_assistant.application.ports.embedding_provider import EmbeddingProvider
 from manual_assistant.application.ports.file_storage import FileStorage
@@ -121,9 +121,7 @@ class DescribeFiguresUseCase:
             manual, content, pages, version=version, on_page=collect
         )
         chunks = figure_chunks(manual, descriptions)
-        embeddings = await self._embeddings.embed_documents(
-            [figure_chunk_text(d) for d in descriptions if d.has_content]
-        )
+        embeddings = await self._embeddings.embed_documents([c.embedding_text for c in chunks])
         if len(embeddings) != len(chunks):
             raise ExternalServiceError(
                 f"O provedor retornou {len(embeddings)} embeddings para {len(chunks)} trechos"

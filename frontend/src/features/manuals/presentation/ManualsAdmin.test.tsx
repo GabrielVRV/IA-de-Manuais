@@ -107,6 +107,17 @@ describe('<ManualsAdmin />', () => {
       expect(screen.getByRole('button', { name: 'Descrever figuras' })).toBeDisabled()
     })
 
+    it('warns when an indexed manual has almost no text (scanned)', async () => {
+      const manuals = fakeManualsGateway([
+        manual({ id: 'm1', title: 'Siloflex 75', pageCount: 61, chunkCount: 1 }),
+        manual({ id: 'm2', title: 'Siloflex 55', pageCount: 62, chunkCount: 60 }),
+      ])
+      renderApp({ manuals, path: '/admin/manuais' })
+
+      expect(await screen.findByText(/quase não tem texto/)).toBeInTheDocument()
+      expect(screen.getAllByText(/quase não tem texto/)).toHaveLength(1)
+    })
+
     it('reprocesses a failed manual (e.g. scanned) describing the figures', async () => {
       const user = userEvent.setup()
       const manuals = fakeManualsGateway([manual({ status: 'failed', pageCount: null })])

@@ -263,7 +263,10 @@ class TestDescribeIndexedManual:
         assert pages == [2, 3]
         assert result.figure_count == 2
         assert (result.input_tokens, result.output_tokens) == (2, 2)
-        assert all(text.startswith("[Figuras") for text in ctx.embeddings.embedded_texts)
+        # Só as figuras vão para o embedding, cada uma com o título do manual na frente.
+        assert all(
+            text.startswith(f"{manual.title}\n[Figuras") for text in ctx.embeddings.embedded_texts
+        )
         assert ctx.chunks(manual, ChunkKind.TEXT) == text_chunks
         assert len(ctx.chunks(manual, ChunkKind.FIGURE)) == 2
         stored = await ctx.repository.get(manual.id)

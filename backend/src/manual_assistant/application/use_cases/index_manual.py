@@ -122,17 +122,16 @@ class IndexManualUseCase:
         if not fragments and not figures:
             raise UnreadableDocumentError(_no_content_message(describe))
 
-        texts = [f.text for f in fragments] + [figure_chunk_text(d) for d in figures]
-        embeddings = await self._embeddings.embed_documents(texts)
-        if len(embeddings) != len(texts):
-            raise ExternalServiceError(
-                f"O provedor retornou {len(embeddings)} embeddings para {len(texts)} trechos"
-            )
-
         chunks = [
             Chunk.create(manual=manual, text=fragment.text, pages=fragment.pages, position=index)
             for index, fragment in enumerate(fragments)
         ] + figure_chunks(manual, figures)
+        embeddings = await self._embeddings.embed_documents([c.embedding_text for c in chunks])
+        if len(embeddings) != len(chunks):
+            raise ExternalServiceError(
+                f"O provedor retornou {len(embeddings)} embeddings para {len(chunks)} trechos"
+            )
+
         # Os embeddings são gerados antes de apagar os trechos antigos: se o provedor
         # falhar, o índice anterior continua intacto.
         await self._vector_store.delete_by_manual(manual.id)

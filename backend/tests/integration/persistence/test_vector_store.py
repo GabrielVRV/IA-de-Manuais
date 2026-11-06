@@ -122,6 +122,33 @@ async def test_searches_only_the_given_manuals(
     assert await store.search(vector(a=1), limit=10, manual_ids=set()) == []
 
 
+async def test_finds_chunks_by_exact_code_ignoring_dots_and_dashes(
+    store: PgVectorStore, repository: SqlAlchemyManualRepository
+) -> None:
+    siloflex = await indexed_manual(repository, "Siloflex 55")
+    other = await indexed_manual(repository, "Siloflex 75")
+    await store.upsert(
+        [
+            EmbeddedChunk(make_chunk(siloflex, text="1,0CV 20.400.319", position=0), vector(a=1)),
+            EmbeddedChunk(
+                make_chunk(siloflex, text="20.400.319 e 20.400.323", position=1), vector(a=1)
+            ),
+            EmbeddedChunk(make_chunk(siloflex, text="20.400.391", position=2), vector(a=1)),
+            EmbeddedChunk(make_chunk(other, text="Redutor GA56/71", position=0), vector(a=1)),
+        ]
+    )
+
+    both = await store.search_codes({"20400319", "20400323"}, limit=10)
+    reducer = await store.search_codes({"ga5671"}, limit=10)
+    elsewhere = await store.search_codes({"20400319"}, limit=10, manual_ids={other.id})
+
+    assert [r.chunk.text for r in both] == ["20.400.319 e 20.400.323", "1,0CV 20.400.319"]
+    assert both[0].score == 1.0
+    assert [r.chunk.text for r in reducer] == ["Redutor GA56/71"]
+    assert elsewhere == []
+    assert await store.search_codes(set(), limit=10) == []
+
+
 async def test_upsert_replaces_an_existing_chunk(
     store: PgVectorStore, repository: SqlAlchemyManualRepository
 ) -> None:

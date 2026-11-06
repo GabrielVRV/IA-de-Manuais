@@ -3,7 +3,12 @@ import { type DragEvent, useState } from 'react'
 import { cx } from '@/shared/cx'
 import ui from '@/styles/ui.module.css'
 
-import type { FigurePlan, ManualStatus, ManualSummary } from '../domain/manuals'
+import {
+  type FigurePlan,
+  type ManualStatus,
+  type ManualSummary,
+  needsFigureDescription,
+} from '../domain/manuals'
 import styles from './ManualsAdmin.module.css'
 import { FigureCheckbox } from './FigureCheckbox'
 import { SyncPanel } from './SyncPanel'
@@ -252,6 +257,12 @@ function ManualItem({ manual, fileUrl, onReindex, onDescribeFigures, onRemove }:
             `, ${plural(manual.figureCount, 'página com figuras', 'páginas com figuras')}`}
         </span>
         {manual.failureReason && <span className={styles.reason}>{manual.failureReason}</span>}
+        {needsFigureDescription(manual) && !manual.describingFigures && (
+          <span className={styles.reason}>
+            Este PDF quase não tem texto (parece escaneado): a IA só enxerga a capa. Clique em
+            Descrever figuras para ela ler as páginas.
+          </span>
+        )}
         {manual.figuresError && !manual.describingFigures && (
           <span className={styles.reason}>
             A descrição das figuras parou: {manual.figuresError}

@@ -37,6 +37,14 @@ class Chunk:
         if self.position < 0:
             raise InvalidValueError("A posição do trecho não pode ser negativa")
 
+    @property
+    def embedding_text(self) -> str:
+        """Texto que vira embedding: o trecho com o título do manual na frente.
+
+        O meio de uma tabela de códigos não diz de que equipamento é; com o título, a
+        busca por "acionamentos do Siloflex 75" acha os trechos do manual do 75."""
+        return f"{self.manual_title}\n{self.text}"
+
     @classmethod
     def create(
         cls,

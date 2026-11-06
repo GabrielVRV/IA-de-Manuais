@@ -14,6 +14,14 @@ from manual_assistant.domain.equipment import equipment_models
         ("Comedouro terminação CSI 600 R", {"csi600"}),
         ("diferença entre o s70 e o s-700", {"s70", "s700"}),
         ("Qual a pressão máxima?", set()),
+        (
+            "quais os acionamentos utilizados nos siloflex diametros 55, 75 e 100",
+            {"siloflex55", "siloflex75", "siloflex100"},
+        ),
+        ("Siloflex 55/75", {"siloflex55", "siloflex75"}),
+        ("siloflex modelo 75 ou 100", {"siloflex75", "siloflex100"}),
+        ("SILOFLEX Ø75", {"siloflex75"}),
+        ("o s70 e o s90", {"s70", "s90"}),
     ],
 )
 def test_finds_equipment_models_however_they_are_written(text: str, models: set[str]) -> None:

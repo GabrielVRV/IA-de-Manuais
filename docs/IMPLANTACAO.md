@@ -311,6 +311,14 @@ docker compose exec -it api python -m manual_assistant.cli describe-figures --li
 
 Na sincronização pelo comando, use `sync-manuals --figures`.
 
+Depois de uma atualização que muda a divisão em trechos (ex.: a ADR 0015, que pôs o título
+da seção e do manual nos trechos), reindexe todos os manuais. Isso só gera embeddings de
+novo e reaproveita as figuras já descritas:
+
+```bash
+docker compose exec -it api python -m manual_assistant.cli reindex-manuals
+```
+
 ---
 
 ## 7. Atualizar, parar e religar

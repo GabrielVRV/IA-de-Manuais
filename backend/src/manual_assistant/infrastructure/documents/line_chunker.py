@@ -1,3 +1,4 @@
+import re
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 
@@ -6,6 +7,13 @@ from manual_assistant.domain.pages import Page, PageRange
 
 DEFAULT_MAX_CHARS = 1500  # ~375 tokens: contexto suficiente sem diluir o significado
 DEFAULT_OVERLAP_CHARS = 200  # repete o fim do trecho anterior para não cortar uma ideia ao meio
+SECTION_PREFIX = "[Seção: "
+MAX_HEADING_CHARS = 90
+
+# Título numerado de seção: "1.2.5 Acionamento:", "4.3 Acionamento", "10.2 - Troca de Óleo".
+# Exige um ponto na numeração e letra maiúscula depois, para não confundir com códigos
+# ("20.400.319 Acionamento"), itens de lista de peças ("4 Parafuso") ou medidas ("3.30 m").
+_HEADING = re.compile(r"(?=\d{1,2}\.)(\d{1,2}(?:\.\d{1,2})*)\.?\s*[-–]?\s*[A-ZÀ-Ý]")  # noqa: RUF001
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,6 +28,10 @@ class LineChunker:
     Trabalha com linhas (e não parágrafos) porque o texto extraído de PDFs não preserva
     linhas em branco, e porque assim listas e tabelas mantêm sua estrutura. Um trecho
     pode atravessar páginas; o intervalo de páginas é registrado para a citação.
+
+    Um trecho que começa no meio de uma seção leva na primeira linha os títulos dela
+    ("[Seção: 1.2.5 Acionamento: > 1.2.5.1 Acionamento Motoredutor:]"): sem isso, o
+    meio de uma tabela de códigos chegava à IA sem dizer de que tabela era.
     """
 
     def __init__(
@@ -37,15 +49,19 @@ class LineChunker:
     def split(self, pages: Sequence[Page]) -> list[TextFragment]:
         fragments: list[TextFragment] = []
         current: list[_Line] = []
+        context = ""  # seção em que o trecho atual começa
+        headings: dict[int, str] = {}  # nível → título, ex.: {1: "1. Montagem", 2: ...}
 
         for line in self._lines(pages):
             if current and _length(current) + 1 + len(line.text) > self._max_chars:
-                fragments.append(_to_fragment(current))
+                fragments.append(_to_fragment(current, context))
                 current = self._overlap(current, incoming=len(line.text))
+                context = " > ".join(headings[level] for level in sorted(headings))
             current.append(line)
+            _track_heading(line.text, headings)
 
         if current:
-            fragments.append(_to_fragment(current))
+            fragments.append(_to_fragment(current, context))
         return fragments
 
     def _lines(self, pages: Sequence[Page]) -> Iterator[_Line]:
@@ -95,8 +111,22 @@ def _length(lines: Sequence[_Line]) -> int:
     return sum(len(line.text) for line in lines) + max(len(lines) - 1, 0)
 
 
-def _to_fragment(lines: Sequence[_Line]) -> TextFragment:
+def _track_heading(text: str, headings: dict[int, str]) -> None:
+    match = _HEADING.match(text)
+    if match is None or len(text) > MAX_HEADING_CHARS:
+        return
+    level = match.group(1).count(".") + 1
+    for deeper in [known for known in headings if known >= level]:
+        del headings[deeper]
+    headings[level] = text
+
+
+def _to_fragment(lines: Sequence[_Line], context: str = "") -> TextFragment:
+    text = "\n".join(line.text for line in lines)
+    # Se o trecho já começa pelo título, repeti-lo só gastaria espaço.
+    if context and not context.endswith(lines[0].text):
+        text = f"{SECTION_PREFIX}{context}]\n{text}"
     return TextFragment(
-        text="\n".join(line.text for line in lines),
+        text=text,
         pages=PageRange(min(line.page for line in lines), max(line.page for line in lines)),
     )

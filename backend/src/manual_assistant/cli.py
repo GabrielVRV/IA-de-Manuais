@@ -250,6 +250,52 @@ async def describe_figures(
     return 1 if failures else 0
 
 
+async def reindex_manuals(settings: Settings, *, limit: int | None, yes: bool) -> int:
+    """Refaz os trechos e embeddings dos manuais indexados (ex.: depois de mudar a divisão
+    em trechos). As figuras já descritas são reaproveitadas: só os embeddings custam."""
+    engine = create_database_engine(settings.database_url)
+    try:
+        session_factory = create_session_factory(engine)
+        repository = SqlAlchemyManualRepository(session_factory)
+        manuals = [m for m in await repository.list_all() if m.status is ManualStatus.INDEXED]
+        if limit is not None:
+            manuals = manuals[:limit]
+        if not manuals:
+            print("Nenhum manual indexado.")
+            return 0
+        question = (
+            f"Reindexar {len(manuals)} manual(is)? Gasta embeddings (barato); as figuras "
+            "já descritas são reaproveitadas. [s/N] "
+        )
+        if not yes and input(question).strip().lower() != "s":
+            print("Cancelado: nada foi alterado.")
+            return 0
+
+        ai = build_ai_providers(settings, embedding_dimensions=EMBEDDING_DIMENSIONS)
+        index = IndexManualUseCase(
+            repository=repository,
+            storage=LocalFileStorage(settings.storage_dir),
+            parser=PdfiumDocumentParser(),
+            chunker=LineChunker(),
+            embeddings=ai.embeddings,
+            vector_store=PgVectorStore(session_factory, dimensions=EMBEDDING_DIMENSIONS),
+            figures=build_figure_describer(settings, session_factory, ai),
+        )
+        failures = 0
+        for number, manual in enumerate(manuals, start=1):
+            result = await index.execute(manual.id)
+            ok = result.status is ManualStatus.INDEXED
+            failures += not ok
+            detail = f"{result.chunk_count} trechos" if ok else result.failure_reason
+            mark = "ok" if ok else "FALHA"
+            print(f"  [{mark}] {number}/{len(manuals)} {manual.file_name}: {detail}")
+    finally:
+        await engine.dispose()
+
+    print(f"\nConcluído: {len(manuals) - failures} ok, {failures} com falha.")
+    return 1 if failures else 0
+
+
 def _print_figure(description: FigureDescription) -> None:
     summary = "descrita" if description.has_content else "sem conteúdo técnico"
     print(f"    p. {description.page}: {summary}")
@@ -314,9 +360,17 @@ def main(argv: list[str] | None = None) -> int:
     )
     figures.add_argument("--limit", type=int, help="Máximo de manuais nesta execução")
     figures.add_argument("--yes", action="store_true", help="Não pede confirmação")
+    reindex = commands.add_parser(
+        "reindex-manuals",
+        help="Refaz trechos e embeddings dos manuais indexados (reaproveita as figuras)",
+    )
+    reindex.add_argument("--limit", type=int, help="Máximo de manuais nesta execução")
+    reindex.add_argument("--yes", action="store_true", help="Não pede confirmação")
     args = parser.parse_args(argv)
 
     try:
+        if args.command == "reindex-manuals":
+            return asyncio.run(reindex_manuals(Settings(), limit=args.limit, yes=args.yes))
         if args.command == "describe-figures":
             return asyncio.run(
                 describe_figures(Settings(), dry_run=args.dry_run, limit=args.limit, yes=args.yes)

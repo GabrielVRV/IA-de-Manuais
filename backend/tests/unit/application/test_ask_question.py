@@ -143,6 +143,83 @@ async def test_prioritizes_the_manuals_of_the_equipment_model_in_the_question() 
     assert result.answer.citations[0].manual_title == s70.title
 
 
+async def test_each_model_in_the_question_gets_its_share_of_chunks() -> None:
+    """Em "siloflex 55, 75 e 100", o manual do 55 ocupava todas as vagas e a resposta
+    dizia que o 75 e o 100 "não constam"."""
+    s55 = _indexed("MANUAL MONTAGEM E PECAS SILOFLEX 55")
+    s75 = _indexed("MANUAL MONTAGEM E PECAS SILOFLEX 75")
+    s100 = _indexed("MANUAL MONTAGEM E PECAS SILOFLEX 100")
+    manuals = InMemoryManualRepository()
+    for manual in (s55, s75, s100):
+        await manuals.save(manual)
+    results = [
+        ScoredChunk(make_chunk(manual, text=f"Acionamento {manual.title} {n}.", position=n), score)
+        for manual, score in ((s55, 0.9), (s75, 0.6), (s100, 0.5))
+        for n in range(6)
+    ]
+    vector_store = InMemoryVectorStore(search_results=results)
+    language_model = FakeLanguageModel(answer="Acionamentos [1].")
+    use_case = AskQuestionUseCase(
+        embeddings=FakeEmbeddingProvider(),
+        vector_store=vector_store,
+        language_model=language_model,
+        top_k=6,
+        manuals=manuals,
+    )
+
+    await use_case.execute(
+        Question("quais os acionamentos utilizados nos siloflex diametros 55, 75 e 100")
+    )
+
+    assert vector_store.searched_manual_ids[0] is None
+    searched = [frozenset(ids or ()) for ids in vector_store.searched_manual_ids[1:]]
+    assert sorted(searched, key=str) == sorted(
+        [frozenset({s55.id}), frozenset({s75.id}), frozenset({s100.id})], key=str
+    )
+    prompt = language_model.requests[0].prompt
+    for manual in (s55, s75, s100):
+        assert prompt.count(f"Acionamento {manual.title}") == 3  # 3 modelos x 3 = 9 trechos
+
+
+async def test_chunks_with_the_exact_part_code_come_first() -> None:
+    """A busca por sentido trata "20.400.319" e "20.400.391" quase como iguais."""
+    manual = _indexed("MANUAL MONTAGEM E PECAS SILOFLEX 55")
+    similar = [
+        ScoredChunk(make_chunk(manual, text=f"Código 20.400.39{n}.", position=n), 0.8)
+        for n in range(3)
+    ]
+    exact = ScoredChunk(make_chunk(manual, text="Acionamento 1,0CV: 20.400.319", position=9), 0.4)
+    vector_store = InMemoryVectorStore(search_results=[*similar, exact])
+    language_model = FakeLanguageModel(answer="É o acionamento 1,0CV [1].")
+    use_case = AskQuestionUseCase(
+        embeddings=FakeEmbeddingProvider(),
+        vector_store=vector_store,
+        language_model=language_model,
+        top_k=2,
+    )
+
+    result = await use_case.execute(Question("o que é o código 20400319?"))
+
+    assert vector_store.searched_codes == [{"20400319"}]
+    prompt = language_model.requests[0].prompt
+    assert prompt.index("20.400.319") < prompt.index("20.400.390")
+    assert "20.400.391" not in prompt  # top_k continua 2
+    assert result.answer.citations
+
+
+async def test_questions_without_codes_do_not_search_by_code() -> None:
+    vector_store = InMemoryVectorStore(search_results=list(RESULTS))
+    use_case = AskQuestionUseCase(
+        embeddings=FakeEmbeddingProvider(),
+        vector_store=vector_store,
+        language_model=FakeLanguageModel(),
+    )
+
+    await use_case.execute(Question("Qual o óleo do s70?"))
+
+    assert vector_store.searched_codes == []
+
+
 async def test_searches_everything_when_no_manual_matches_the_model() -> None:
     manuals = InMemoryManualRepository()
     await manuals.save(_indexed("Manual da Prensa P-200"))

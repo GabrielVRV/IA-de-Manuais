@@ -88,3 +88,40 @@ def test_no_fragment_exceeds_the_limit() -> None:
 def test_rejects_invalid_configuration(max_chars: int, overlap: int) -> None:
     with pytest.raises(ValueError, match="precisa"):
         LineChunker(max_chars=max_chars, overlap_chars=overlap)
+
+
+def test_a_fragment_that_starts_mid_section_carries_the_section_titles() -> None:
+    chunker = LineChunker(max_chars=120, overlap_chars=0)
+    page = Page(
+        1,
+        "1.2 Relações de Códigos:\n"
+        "1.2.5.1 Acionamento Motoredutor:\n"
+        "Trifásico 220/380V Monofásico 110/220V\n"
+        "20.400.309 Acionamento 0,5CV 60Hz\n"
+        "20.400.311 Acionamento 1,0CV 60Hz\n"
+        "20.400.317 Acionamento 0,5CV 50Hz",
+    )
+
+    first, second = texts(chunker, page)
+
+    assert first.startswith("1.2 Relações")  # o primeiro já começa pelo título
+    assert second.splitlines()[0] == (
+        "[Seção: 1.2 Relações de Códigos: > 1.2.5.1 Acionamento Motoredutor:]"
+    )
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "20.400.319 Acionamento 1,0CV 50Hz",  # código de peça
+        "4 Saídas Retas Paralelas",  # item de lista, sem ponto
+        "3.30 m de altura",  # medida
+        "22 02.017.076 5m CABO PP",  # linha de lista de peças
+    ],
+)
+def test_codes_and_part_lists_are_not_section_titles(line: str) -> None:
+    chunker = LineChunker(max_chars=40, overlap_chars=0)
+
+    fragments = texts(chunker, Page(1, f"{line}\n{'x' * 30}\n{'y' * 30}"))
+
+    assert not any(text.startswith("[Seção") for text in fragments)

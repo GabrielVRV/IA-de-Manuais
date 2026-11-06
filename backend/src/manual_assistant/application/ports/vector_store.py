@@ -37,6 +37,17 @@ class VectorStore(Protocol):
         """
         ...
 
+    async def search_codes(
+        self,
+        codes: Collection[str],
+        *,
+        limit: int,
+        manual_ids: Collection[ManualId] | None = None,
+    ) -> Sequence[ScoredChunk]:
+        """Trechos que contêm literalmente algum dos códigos (``domain.codes.compact``:
+        pontos, hífens e barras não contam), os que contêm mais códigos primeiro."""
+        ...
+
     async def delete_by_manual(self, manual_id: ManualId, *, kind: ChunkKind | None = None) -> None:
         """Apaga os trechos do manual; com ``kind``, só os desse tipo."""
         ...

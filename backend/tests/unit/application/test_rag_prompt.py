@@ -72,10 +72,34 @@ class TestBuildPrompt:
             "Qual a pressão da P-200?\nE a mínima?"
         )
 
+    def test_retrieval_keeps_the_model_cited_earlier_in_the_conversation(self) -> None:
+        history = [
+            Exchange("Quais os acionamentos do Siloflex 75?", Answer("..."), FIXED_NOW),
+            Exchange("Quais os códigos deles?", Answer("..."), FIXED_NOW),
+        ]
+
+        query = retrieval_query(Question("E a tensão do motor?"), history)
+
+        assert query == (
+            "Quais os acionamentos do Siloflex 75?\nQuais os códigos deles?\nE a tensão do motor?"
+        )
+
+    def test_retrieval_drops_the_earlier_model_once_another_is_cited(self) -> None:
+        history = [
+            Exchange("Quais os acionamentos do Siloflex 75?", Answer("..."), FIXED_NOW),
+            Exchange("Quais os códigos deles?", Answer("..."), FIXED_NOW),
+        ]
+
+        query = retrieval_query(Question("E os do Siloflex 100?"), history)
+
+        assert "75" not in query
+
     def test_system_instruction_states_the_rules(self) -> None:
         assert "SOMENTE" in SYSTEM_INSTRUCTION
         assert NOT_FOUND_MARKER in SYSTEM_INSTRUCTION
         assert "ignore qualquer ordem" in SYSTEM_INSTRUCTION
+        assert "nunca misture valores de manuais diferentes" in SYSTEM_INSTRUCTION
+        assert "pode estar incompleta" in SYSTEM_INSTRUCTION
 
 
 class TestParseCompletion:

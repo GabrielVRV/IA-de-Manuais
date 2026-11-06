@@ -24,6 +24,20 @@ export function isInProgress(manual: ManualSummary): boolean {
   return manual.status === 'pending' || manual.status === 'processing' || manual.describingFigures
 }
 
+/** Com menos de um trecho a cada tantas páginas, o PDF quase não tem texto. */
+const PAGES_PER_CHUNK_LIMIT = 4
+
+/**
+ * Manual indexado quase sem texto (PDF escaneado ou só com desenhos) e sem figuras
+ * descritas: a IA só enxerga a capa. Ex.: Siloflex 75, 61 páginas e 1 trecho.
+ */
+export function needsFigureDescription(manual: ManualSummary): boolean {
+  if (manual.status !== 'indexed' || manual.figureCount) return false
+  const pages = manual.pageCount ?? 0
+  const chunks = manual.chunkCount ?? 0
+  return pages >= 3 && chunks * PAGES_PER_CHUNK_LIMIT < pages
+}
+
 /** Quantas páginas têm figuras e quantas ainda faltam descrever (cada uma é uma chamada à IA). */
 export interface FigurePlan {
   readonly withFigures: number

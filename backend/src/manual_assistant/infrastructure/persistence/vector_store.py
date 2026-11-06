@@ -1,6 +1,7 @@
 from collections.abc import Collection, Sequence
+from typing import Any
 
-from sqlalchemy import ColumnElement, Float, delete, select
+from sqlalchemy import ColumnElement, Float, Integer, case, delete, func, literal, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -17,6 +18,16 @@ from manual_assistant.infrastructure.persistence.models import (
 )
 
 _UPDATABLE_COLUMNS = ("position", "kind", "text", "page_start", "page_end", "embedding")
+_CHUNK_COLUMNS = (
+    ChunkRecord.id,
+    ChunkRecord.manual_id,
+    ChunkRecord.position,
+    ChunkRecord.text,
+    ChunkRecord.page_start,
+    ChunkRecord.page_end,
+    ChunkRecord.kind,
+    ManualRecord.title,
+)
 
 
 class PgVectorStore:
@@ -62,17 +73,7 @@ class PgVectorStore:
 
         distance = _cosine_distance(query)
         statement = (
-            select(
-                ChunkRecord.id,
-                ChunkRecord.manual_id,
-                ChunkRecord.position,
-                ChunkRecord.text,
-                ChunkRecord.page_start,
-                ChunkRecord.page_end,
-                ChunkRecord.kind,
-                ManualRecord.title,
-                distance.label("distance"),
-            )
+            select(*_CHUNK_COLUMNS, distance.label("distance"))
             .join(ManualRecord, ManualRecord.id == ChunkRecord.manual_id)
             # Regra do domínio: só manuais indexados aparecem nas respostas.
             .where(ManualRecord.status == ManualStatus.INDEXED.value)
@@ -85,21 +86,41 @@ class PgVectorStore:
         async with translate_database_errors("buscar trechos"), self._session_factory() as session:
             rows = (await session.execute(statement)).all()
 
-        return [
-            ScoredChunk(
-                chunk=Chunk(
-                    id=ChunkId(row.id),
-                    manual_id=ManualId(row.manual_id),
-                    manual_title=row.title,
-                    text=row.text,
-                    pages=PageRange(row.page_start, row.page_end),
-                    position=row.position,
-                    kind=ChunkKind(row.kind),
-                ),
-                score=_similarity(row.distance),
-            )
-            for row in rows
-        ]
+        return [ScoredChunk(chunk=_to_chunk(row), score=_similarity(row.distance)) for row in rows]
+
+    async def search_codes(
+        self,
+        codes: Collection[str],
+        *,
+        limit: int,
+        manual_ids: Collection[ManualId] | None = None,
+    ) -> Sequence[ScoredChunk]:
+        if limit < 1:
+            raise ValueError("O limite de resultados deve ser ao menos 1")
+        if not codes or (manual_ids is not None and not manual_ids):
+            return []
+
+        # Mesma normalização de ``domain.codes.compact``: "20.400.319" = "20400319".
+        compact_text = func.regexp_replace(func.lower(ChunkRecord.text), r"[.\-/]", "", "g")
+        matches = [compact_text.contains(literal(code)) for code in sorted(codes)]
+        hits = sum(
+            (case((match, 1), else_=0) for match in matches), start=literal(0, type_=Integer)
+        )
+        statement = (
+            select(*_CHUNK_COLUMNS, hits.label("hits"))
+            .join(ManualRecord, ManualRecord.id == ChunkRecord.manual_id)
+            .where(ManualRecord.status == ManualStatus.INDEXED.value)
+            .where(or_(*matches))
+            .order_by(hits.desc(), ChunkRecord.manual_id, ChunkRecord.position)
+            .limit(limit)
+        )
+        if manual_ids is not None:
+            statement = statement.where(ChunkRecord.manual_id.in_(list(manual_ids)))
+        async with translate_database_errors("buscar códigos"), self._session_factory() as session:
+            rows = (await session.execute(statement)).all()
+
+        # Relevância 1: o código está literalmente no trecho.
+        return [ScoredChunk(chunk=_to_chunk(row), score=1.0) for row in rows]
 
     async def delete_by_manual(self, manual_id: ManualId, *, kind: ChunkKind | None = None) -> None:
         statement = delete(ChunkRecord).where(ChunkRecord.manual_id == manual_id)
@@ -130,6 +151,18 @@ class PgVectorStore:
             raise ValueError(
                 f"Embedding com {len(embedding)} dimensões; o índice espera {self._dimensions}"
             )
+
+
+def _to_chunk(row: Any) -> Chunk:  # Row do SQLAlchemy com as colunas de _CHUNK_COLUMNS
+    return Chunk(
+        id=ChunkId(row.id),
+        manual_id=ManualId(row.manual_id),
+        manual_title=row.title,
+        text=row.text,
+        pages=PageRange(row.page_start, row.page_end),
+        position=row.position,
+        kind=ChunkKind(row.kind),
+    )
 
 
 def _cosine_distance(query: Embedding) -> ColumnElement[float]:
