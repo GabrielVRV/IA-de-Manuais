@@ -134,6 +134,23 @@ anteriores e o que sair da pasta é removido do sistema.
 Com `APP_SYNC_SOURCE_DIR` no `.env`, o `--folder` pode ser omitido. `--yes` dispensa a
 confirmação (para agendar).
 
+### Descrição das figuras por IA
+
+Fotos, diagramas e desenhos técnicos viram texto pesquisável, e PDFs escaneados passam a
+ser lidos ([ADR 0014](../docs/adr/0014-descricao-de-figuras-por-ia.md)). É uma chamada de
+IA por página com figuras; o que já foi descrito nunca é pago de novo.
+
+```powershell
+# 1. Conta as páginas com figuras dos manuais já indexados, sem chamar a IA
+.venv\Scripts\python -m manual_assistant.cli describe-figures --dry-run
+
+# 2. Descreve as figuras de no máximo 3 manuais, sem refazer o texto (pede confirmação)
+.venv\Scripts\python -m manual_assistant.cli describe-figures --limit 3
+```
+
+Na sincronização pelo comando, `sync-manuals --figures` também descreve as figuras dos
+manuais (re)indexados. Pela tela, cada importação tem a opção (desmarcada por padrão).
+
 ## Provedores de IA
 
 Configurados no `.env` (ver `.env.example` e o [ADR 0005](../docs/adr/0005-provedores-de-ia.md)):

@@ -209,6 +209,7 @@ Todo push e pull request passa por pipelines no GitHub Actions:
 | 10b | Sincronização diária agendada pela tela de administração                             | ✅ |
 | 11a | Consumo de tokens e custo por usuário, limite de perguntas, configurações pela tela   | ✅ |
 | 11b | Acesso por assistente (padrão + exceções por usuário), sem liberação manual          | ✅ |
+| 11d | Descrição das figuras por IA e leitura de PDFs escaneados (`describe-figures`)       | ✅ |
 | 11c | Observabilidade: logs estruturados e feedback 👍/👎 nas respostas                       | ⏳ |
 | 12  | Assistente da TI (ajuda o usuário e abre chamado) e escolha do assistente no chat     | ⏳ |
 

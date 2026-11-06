@@ -279,6 +279,38 @@ Só entram os PDFs que estão **direto** dentro de cada subpasta (`ARMAZENAGEM/`
 não são lidas. Sincronize de novo sempre que quiser atualizar: só o que mudou é
 reindexado, e o manual que saiu da pasta é removido do sistema.
 
+### Figuras e manuais escaneados (descrição por IA)
+
+O texto do PDF não diz o que mostram as fotos, os diagramas e os desenhos técnicos. Com a
+descrição de figuras ([ADR 0014](adr/0014-descricao-de-figuras-por-ia.md)), cada página com
+figuras é enviada como imagem ao modelo com visão, e a descrição vira um trecho pesquisável,
+citado pela página. Os PDFs escaneados também passam a ser lidos.
+
+> 💰 É **uma chamada de IA por página com figuras**, e mais da metade das páginas desses
+> manuais tem figuras. O que já foi descrito fica guardado e nunca é pago de novo. Comece
+> com poucos manuais e confira as respostas no chat antes de seguir.
+
+Vem **desligada**: quem decide, a cada importação, é o administrador, na tela **Manuais**:
+
+| Onde | Como |
+| ---- | ---- |
+| Enviar PDFs | Marque **Descrever as figuras com IA** antes de escolher os arquivos |
+| Um manual já cadastrado | Botão **Descrever figuras** na linha dele. Mostra quantas páginas têm figuras e quantas faltam antes de confirmar. Num manual indexado, só acrescenta as figuras (o texto não é refeito); num com falha (ex.: escaneado), reprocessa com as figuras |
+| Sincronizar | Depois de **Verificar**, marque **Descrever as figuras dos manuais novos e alterados** |
+| Sincronização automática | Marque **Na sincronização automática, descrever também as figuras** e salve o agendamento |
+
+Enquanto as figuras de um manual são descritas, a linha dele mostra **Descrevendo
+figuras…** com o número de páginas já feitas. Se parar no meio (ex.: cota da IA), o motivo
+aparece ali, e um novo clique continua de onde parou.
+
+Pelo comando, para vários manuais já indexados de uma vez (`--dry-run` só conta as páginas):
+
+```bash
+docker compose exec -it api python -m manual_assistant.cli describe-figures --limit 3
+```
+
+Na sincronização pelo comando, use `sync-manuals --figures`.
+
 ---
 
 ## 7. Atualizar, parar e religar
@@ -311,7 +343,7 @@ reindexado, e o manual que saiu da pasta é removido do sistema.
 | Tela mostra **"Offline"** no cabeçalho | API fora do ar | Teste o passo 3 e veja `docker compose logs api` |
 | Entra e **é deslogado em seguida** | Tela aberta por um endereço que não passa pelo container `web` (ex.: XAMPP em outro servidor) | Acesse a tela pela porta 8084 do servidor da API |
 | Manual **"Falhou: serviço externo"** | Limite ou cota do plano gratuito do Gemini | Aguarde a cota renovar (diária) ou use a chave paga, e clique em **Reprocessar** |
-| Manual **"Falhou: ... OCR"** | PDF escaneado (imagem, sem texto) | Ainda não suportado; use a versão digital do PDF |
+| Manual **"Falhou: ... não contém texto selecionável"** | PDF escaneado (imagem, sem texto) | Clique em **Descrever figuras** na linha do manual (veja "Figuras e manuais escaneados") |
 | Sincronização: **"O arquivo excede o limite de N MB"** | PDF maior que `APP_MAX_UPLOAD_MB` | Aumente `APP_MAX_UPLOAD_MB` em `backend/.env` (os maiores manuais têm ~96 MB; o padrão é 100) e sincronize de novo |
 | Chat: **"Você ainda não tem acesso a este assistente"** | O assistente está "só para quem for liberado" e a pessoa não foi liberada | Na tela **Usuários**, clique em **Gerenciar** na linha da pessoa e libere o assistente, ou mude o padrão em **Acessos** |
 | Chat: **"Você atingiu o limite de N pergunta(s)…"** | Limite de perguntas por usuário | Aguarde, ou ajuste o limite em **Configurações** (`0` desliga) |

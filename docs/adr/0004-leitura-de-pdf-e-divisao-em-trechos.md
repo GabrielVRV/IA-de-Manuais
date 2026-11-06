@@ -2,6 +2,8 @@
 
 - **Status:** aceito
 - **Data:** 2026-10-06
+- **Complementada por:** a [ADR 0014](0014-descricao-de-figuras-por-ia.md), que descreve as
+  figuras por IA e passa a ler os PDFs escaneados
 
 ## Contexto
 
