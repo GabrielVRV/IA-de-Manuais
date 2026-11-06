@@ -67,11 +67,81 @@ describe('<ManualsAdmin />', () => {
     renderApp({ manuals, path: '/admin/manuais' })
 
     await user.click(await screen.findByRole('button', { name: 'Reprocessar' }))
-    expect(manuals.reindex).toHaveBeenCalledWith('m1')
+    expect(manuals.reindex).toHaveBeenCalledWith('m1', undefined)
 
     await user.click(screen.getByRole('button', { name: 'Excluir' }))
     expect(confirm).toHaveBeenCalled()
     expect(await screen.findByText(/Nenhum manual cadastrado/)).toBeInTheDocument()
+  })
+
+  describe('figures described by AI', () => {
+    it('uploads describing the figures only when the option is checked', async () => {
+      const user = userEvent.setup()
+      const manuals = fakeManualsGateway([])
+      renderApp({ manuals, path: '/admin/manuais' })
+
+      await user.upload(await screen.findByLabelText('Escolher PDFs'), pdf('a.pdf'))
+      await user.click(screen.getByRole('checkbox', { name: 'Descrever as figuras com IA' }))
+      await user.upload(screen.getByLabelText('Escolher PDFs'), pdf('b.pdf'))
+
+      expect(manuals.upload).toHaveBeenNthCalledWith(1, expect.any(File), {
+        describeFigures: false,
+      })
+      expect(manuals.upload).toHaveBeenNthCalledWith(2, expect.any(File), {
+        describeFigures: true,
+      })
+    })
+
+    it('shows the pages to describe and describes an indexed manual', async () => {
+      const user = userEvent.setup()
+      const manuals = fakeManualsGateway([manual({ figureCount: 1 })])
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+      renderApp({ manuals, path: '/admin/manuais' })
+      expect(await screen.findByText(/12 trechos, 1 página com figuras/)).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Descrever figuras' }))
+
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('3 faltam descrever'))
+      expect(manuals.describeFigures).toHaveBeenCalledWith('m1')
+      expect(await screen.findByText(/Descrevendo figuras…/)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Descrever figuras' })).toBeDisabled()
+    })
+
+    it('reprocesses a failed manual (e.g. scanned) describing the figures', async () => {
+      const user = userEvent.setup()
+      const manuals = fakeManualsGateway([manual({ status: 'failed', pageCount: null })])
+      vi.spyOn(window, 'confirm').mockReturnValue(true)
+      renderApp({ manuals, path: '/admin/manuais' })
+
+      await user.click(await screen.findByRole('button', { name: 'Descrever figuras' }))
+
+      expect(manuals.reindex).toHaveBeenCalledWith('m1', { describeFigures: true })
+      expect(manuals.describeFigures).not.toHaveBeenCalled()
+    })
+
+    it('does not call the AI when the figures are already described', async () => {
+      const user = userEvent.setup()
+      const manuals = fakeManualsGateway([manual()])
+      manuals.state.figurePlan = { withFigures: 4, pending: 0 }
+      const alert = vi.spyOn(window, 'alert').mockImplementation(() => undefined)
+      const confirm = vi.spyOn(window, 'confirm')
+      renderApp({ manuals, path: '/admin/manuais' })
+
+      await user.click(await screen.findByRole('button', { name: 'Descrever figuras' }))
+
+      expect(alert).toHaveBeenCalledWith(expect.stringContaining('já estão descritas'))
+      expect(confirm).not.toHaveBeenCalled()
+      expect(manuals.describeFigures).not.toHaveBeenCalled()
+    })
+
+    it('shows why the description of the figures stopped', async () => {
+      const manuals = fakeManualsGateway([manual({ figuresError: 'Cota excedida' })])
+      renderApp({ manuals, path: '/admin/manuais' })
+
+      expect(
+        await screen.findByText('A descrição das figuras parou: Cota excedida'),
+      ).toBeInTheDocument()
+    })
   })
 
   it('does not delete when the confirmation is cancelled', async () => {
@@ -134,6 +204,24 @@ describe('<ManualsAdmin />', () => {
       expect(manuals.startSync).toHaveBeenCalledTimes(1)
       expect(await screen.findByText(/Sincronizando… 0 de 1/)).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Verificar' })).toBeDisabled()
+    })
+
+    it('syncs describing the figures when the option is checked', async () => {
+      const user = userEvent.setup()
+      const manuals = fakeManualsGateway()
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+      renderApp({ manuals, path: '/admin/manuais' })
+
+      await user.click(await screen.findByRole('button', { name: 'Verificar' }))
+      await user.click(
+        await screen.findByRole('checkbox', {
+          name: 'Descrever as figuras dos manuais novos e alterados',
+        }),
+      )
+      await user.click(screen.getByRole('button', { name: 'Sincronizar' }))
+
+      expect(confirm.mock.calls[0]?.[0]).toMatch(/figuras também serão descritas/)
+      expect(manuals.startSync).toHaveBeenCalledWith({ describeFigures: true })
     })
 
     it('does not sync when the confirmation is cancelled', async () => {
@@ -226,10 +314,16 @@ describe('<ManualsAdmin />', () => {
       const save = within(form).getByRole('button', { name: 'Salvar agendamento' })
       expect(save).toBeDisabled()
 
-      await user.click(within(form).getByRole('checkbox'))
+      await user.click(
+        within(form).getByRole('checkbox', { name: 'Sincronizar automaticamente todo dia às' }),
+      )
       await user.click(save)
 
-      expect(manuals.updateSyncSchedule).toHaveBeenCalledWith({ enabled: true, time: '00:00' })
+      expect(manuals.updateSyncSchedule).toHaveBeenCalledWith({
+        enabled: true,
+        time: '00:00',
+        describeFigures: false,
+      })
       expect(
         await within(form).findByText(/Próxima sincronização: 06\/11\/2026,? 00:00/),
       ).toBeInTheDocument()
@@ -246,7 +340,31 @@ describe('<ManualsAdmin />', () => {
       await user.type(time, '06:30')
       await user.click(screen.getByRole('button', { name: 'Salvar agendamento' }))
 
-      expect(manuals.updateSyncSchedule).toHaveBeenCalledWith({ enabled: true, time: '06:30' })
+      expect(manuals.updateSyncSchedule).toHaveBeenCalledWith({
+        enabled: true,
+        time: '06:30',
+        describeFigures: false,
+      })
+    })
+
+    it('saves the option to also describe the figures', async () => {
+      const manuals = fakeManualsGateway(undefined, undefined, syncSchedule({ enabled: true }))
+      const user = userEvent.setup()
+      renderApp({ manuals, path: '/admin/manuais' })
+      const form = await screen.findByRole('form', { name: 'Sincronização automática' })
+
+      await user.click(
+        within(form).getByRole('checkbox', {
+          name: 'Na sincronização automática, descrever também as figuras',
+        }),
+      )
+      await user.click(within(form).getByRole('button', { name: 'Salvar agendamento' }))
+
+      expect(manuals.updateSyncSchedule).toHaveBeenCalledWith({
+        enabled: true,
+        time: '00:00',
+        describeFigures: true,
+      })
     })
 
     it('warns when the last scheduled sync did not start', async () => {
@@ -277,7 +395,9 @@ describe('<ManualsAdmin />', () => {
       renderApp({ manuals, path: '/admin/manuais' })
       const form = await screen.findByRole('form', { name: 'Sincronização automática' })
 
-      await user.click(within(form).getByRole('checkbox'))
+      await user.click(
+        within(form).getByRole('checkbox', { name: 'Sincronizar automaticamente todo dia às' }),
+      )
       await user.click(within(form).getByRole('button', { name: 'Salvar agendamento' }))
 
       expect(await within(form).findByRole('alert')).toHaveTextContent('APP_SYNC_SOURCE_DIR')

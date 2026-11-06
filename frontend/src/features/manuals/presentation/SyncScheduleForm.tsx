@@ -5,6 +5,7 @@ import { describeError } from '@/shared/http/describe-error'
 import ui from '@/styles/ui.module.css'
 
 import type { SyncSchedule } from '../domain/manuals'
+import { FigureCheckbox } from './FigureCheckbox'
 import styles from './ManualsAdmin.module.css'
 import { useManualsGateway } from './manuals-gateway-context'
 
@@ -25,6 +26,7 @@ export function SyncScheduleForm() {
   const [schedule, setSchedule] = useState<SyncSchedule | null>(null)
   const [enabled, setEnabled] = useState(false)
   const [time, setTime] = useState('00:00')
+  const [describeFigures, setDescribeFigures] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
@@ -33,6 +35,7 @@ export function SyncScheduleForm() {
     setSchedule(loaded)
     setEnabled(loaded.enabled)
     setTime(loaded.time)
+    setDescribeFigures(loaded.describeFigures)
   }
 
   // Carga inicial: o estado só muda nos callbacks da promessa, nunca no corpo do efeito.
@@ -60,14 +63,17 @@ export function SyncScheduleForm() {
   }
 
   const validTime = TIME_PATTERN.test(time)
-  const changed = enabled !== schedule.enabled || time !== schedule.time
+  const changed =
+    enabled !== schedule.enabled ||
+    time !== schedule.time ||
+    describeFigures !== schedule.describeFigures
 
   const save = async () => {
     setSaving(true)
     setError(null)
     setSaved(false)
     try {
-      show(await gateway.updateSyncSchedule({ enabled, time }))
+      show(await gateway.updateSyncSchedule({ enabled, time, describeFigures }))
       setSaved(true)
     } catch (caught) {
       setError(describeError(caught))
@@ -116,6 +122,15 @@ export function SyncScheduleForm() {
           {saving ? 'Salvando…' : 'Salvar agendamento'}
         </button>
       </div>
+
+      <FigureCheckbox
+        checked={describeFigures}
+        label="Na sincronização automática, descrever também as figuras"
+        onChange={(value) => {
+          setDescribeFigures(value)
+          setSaved(false)
+        }}
+      />
 
       <span className={ui.hint}>
         Horário de {schedule.timezone}. Faz o mesmo que o botão Sincronizar e gasta API de IA só com

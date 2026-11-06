@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { describeError } from '@/shared/http/describe-error'
 import { HttpError } from '@/shared/http/errors'
 
-import type { SyncCheck, SyncStatus } from '../domain/manuals'
+import type { FigureOption, SyncCheck, SyncStatus } from '../domain/manuals'
 import { useManualsGateway } from './manuals-gateway-context'
 import { POLL_INTERVAL_MS } from './use-manuals'
 
@@ -71,21 +71,24 @@ export function useManualSync(onProgress: () => void) {
     }
   }, [gateway])
 
-  const start = useCallback(async () => {
-    setBusy('starting')
-    setError(null)
-    try {
-      const run = await gateway.startSync()
-      if (!mounted.current) return
-      setCheck(null)
-      setStatus((current) => ({ enabled: current?.enabled ?? true, running: true, lastRun: run }))
-      progress.current()
-    } catch (caught) {
-      if (mounted.current) setError(describeSyncError(caught))
-    } finally {
-      if (mounted.current) setBusy(null)
-    }
-  }, [gateway])
+  const start = useCallback(
+    async (option?: FigureOption) => {
+      setBusy('starting')
+      setError(null)
+      try {
+        const run = await gateway.startSync(option)
+        if (!mounted.current) return
+        setCheck(null)
+        setStatus((current) => ({ enabled: current?.enabled ?? true, running: true, lastRun: run }))
+        progress.current()
+      } catch (caught) {
+        if (mounted.current) setError(describeSyncError(caught))
+      } finally {
+        if (mounted.current) setBusy(null)
+      }
+    },
+    [gateway],
+  )
 
   return {
     status,

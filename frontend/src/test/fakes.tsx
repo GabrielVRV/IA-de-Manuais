@@ -25,6 +25,7 @@ import { QuestionGatewayContext } from '@/features/chat/presentation/question-ga
 import type { HealthGateway } from '@/features/health/domain/api-health'
 import { HealthGatewayContext } from '@/features/health/presentation/health-gateway-context'
 import type {
+  FigurePlan,
   ManualsGateway,
   ManualSummary,
   SyncCheck,
@@ -113,6 +114,10 @@ export function manual(overrides: Partial<ManualSummary> = {}): ManualSummary {
     status: 'indexed',
     pageCount: 7,
     chunkCount: 12,
+    figureCount: 0,
+    describingFigures: false,
+    figuresDescribed: 0,
+    figuresError: null,
     failureReason: null,
     createdAt: new Date('2026-10-07T10:00:00Z'),
     ...overrides,
@@ -143,6 +148,7 @@ export function syncRun(overrides: Partial<SyncRun> = {}): SyncRun {
     finishedAt: null,
     running: true,
     total: 1,
+    describeFigures: false,
     done: 0,
     succeeded: 0,
     failures: [],
@@ -155,6 +161,7 @@ export function syncSchedule(overrides: Partial<SyncSchedule> = {}): SyncSchedul
   return {
     enabled: false,
     time: '00:00',
+    describeFigures: false,
     timezone: 'America/Sao_Paulo',
     nextRunAt: null,
     lastTriggeredAt: null,
@@ -170,7 +177,12 @@ export function fakeManualsGateway(
   sync: SyncStatus = { enabled: true, running: false, lastRun: null },
   schedule: SyncSchedule = syncSchedule(),
 ) {
-  const state = { manuals: [...initial], sync, schedule }
+  const state = {
+    manuals: [...initial],
+    sync,
+    schedule,
+    figurePlan: { withFigures: 4, pending: 3 } as FigurePlan,
+  }
   const gateway = {
     state,
     list: vi.fn(() => Promise.resolve([...state.manuals])),
@@ -185,6 +197,13 @@ export function fakeManualsGateway(
       return Promise.resolve(created)
     }),
     reindex: vi.fn((id: string) => Promise.resolve(manual({ id, status: 'processing' }))),
+    figurePlan: vi.fn(() => Promise.resolve(state.figurePlan)),
+    describeFigures: vi.fn((id: string) => {
+      state.manuals = state.manuals.map((m) =>
+        m.id === id ? { ...m, describingFigures: true } : m,
+      )
+      return Promise.resolve(manual({ id, describingFigures: true }))
+    }),
     remove: vi.fn((id: string) => {
       state.manuals = state.manuals.filter((m) => m.id !== id)
       return Promise.resolve()

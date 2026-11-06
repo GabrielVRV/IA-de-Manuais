@@ -2,7 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { describeError } from '@/shared/http/describe-error'
 
-import { isInProgress, type ManualSummary } from '../domain/manuals'
+import {
+  type FigureOption,
+  type FigurePlan,
+  isInProgress,
+  type ManualSummary,
+} from '../domain/manuals'
 import { useManualsGateway } from './manuals-gateway-context'
 
 /** Enquanto houver manual sendo indexado, a lista se atualiza sozinha neste intervalo. */
@@ -58,13 +63,13 @@ export function useManuals() {
   }, [hasWorkInProgress, refresh])
 
   const upload = useCallback(
-    async (files: readonly File[]) => {
+    async (files: readonly File[], option?: FigureOption) => {
       setUploads(files.map((file) => ({ fileName: file.name, status: 'sending' })))
       // Um por vez: o servidor indexa em segundo plano, e o envio sequencial não o sobrecarrega.
       for (const [index, file] of files.entries()) {
         let result: UploadResult
         try {
-          await gateway.upload(file)
+          await gateway.upload(file, option)
           result = { fileName: file.name, status: 'sent' }
         } catch (caught) {
           result = { fileName: file.name, status: 'rejected', message: describeError(caught) }
@@ -94,7 +99,17 @@ export function useManuals() {
     uploads,
     upload,
     refresh,
-    reindex: (id: string) => act(() => gateway.reindex(id)),
+    reindex: (id: string, option?: FigureOption) => act(() => gateway.reindex(id, option)),
+    describeFigures: (id: string) => act(() => gateway.describeFigures(id)),
+    /** Conta as páginas com figuras (sem chamar a IA); null se não deu para ler o PDF. */
+    figurePlan: async (id: string): Promise<FigurePlan | null> => {
+      try {
+        return await gateway.figurePlan(id)
+      } catch (caught) {
+        setError(describeError(caught))
+        return null
+      }
+    },
     remove: (id: string) => act(() => gateway.remove(id)),
     fileUrl: (id: string) => gateway.fileUrl(id),
     clearUploads: () => {

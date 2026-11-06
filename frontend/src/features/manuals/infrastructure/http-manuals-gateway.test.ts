@@ -13,6 +13,10 @@ const apiManual = {
   status: 'failed',
   page_count: null,
   chunk_count: null,
+  figure_count: null,
+  describing_figures: false,
+  figures_described: 0,
+  figures_error: null,
   failure_reason: 'PDF protegido por senha',
   created_at: '2026-10-07T10:00:00Z',
 }
@@ -49,6 +53,10 @@ describe('HttpManualsGateway', () => {
       status: 'failed',
       pageCount: null,
       chunkCount: null,
+      figureCount: null,
+      describingFigures: false,
+      figuresDescribed: 0,
+      figuresError: null,
       failureReason: 'PDF protegido por senha',
       createdAt: new Date('2026-10-07T10:00:00Z'),
     })
@@ -74,6 +82,33 @@ describe('HttpManualsGateway', () => {
     expect(gateway.fileUrl('m 1')).toBe('http://api/api/v1/manuals/m%201/file')
   })
 
+  it('sends the figure option only when asked and calls the figure routes', async () => {
+    const fetchFn = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json(apiManual))
+      .mockResolvedValueOnce(Response.json(apiManual))
+      .mockResolvedValueOnce(Response.json({ with_figures: 4, pending: 3 }))
+      .mockResolvedValueOnce(Response.json({ ...apiManual, describing_figures: true }))
+    const gateway = new HttpManualsGateway(new HttpClient('http://api', { fetchFn }))
+
+    await gateway.upload(new File(['%PDF'], 'cx500.pdf'), { describeFigures: true })
+    await gateway.reindex('m1', { describeFigures: true })
+    const plan = await gateway.figurePlan('m1')
+    const describing = await gateway.describeFigures('m1')
+
+    const calls = fetchFn.mock.calls.map(([url, init]) => [init?.method, url])
+    expect(calls).toEqual([
+      ['POST', 'http://api/api/v1/manuals'],
+      ['POST', 'http://api/api/v1/manuals/m1/reindex?describe_figures=true'],
+      ['GET', 'http://api/api/v1/manuals/m1/figures'],
+      ['POST', 'http://api/api/v1/manuals/m1/figures'],
+    ])
+    const form = fetchFn.mock.calls[0]?.[1]?.body as FormData
+    expect(form.get('describe_figures')).toBe('true')
+    expect(plan).toEqual({ withFigures: 4, pending: 3 })
+    expect(describing.describingFigures).toBe(true)
+  })
+
   it('rejects unexpected payloads', async () => {
     await expect(new HttpManualsGateway(client({}).http).list()).rejects.toBeInstanceOf(
       InvalidResponseError,
@@ -87,6 +122,7 @@ describe('HttpManualsGateway', () => {
     const { http, fetchFn } = client({
       enabled: true,
       time: '06:30',
+      describe_figures: true,
       timezone: 'America/Sao_Paulo',
       next_run_at: '2026-11-06T09:30:00Z',
       last_triggered_at: null,
@@ -98,18 +134,20 @@ describe('HttpManualsGateway', () => {
     const schedule = await new HttpManualsGateway(http).updateSyncSchedule({
       enabled: true,
       time: '06:30',
+      describeFigures: true,
     })
 
     expect(fetchFn).toHaveBeenCalledWith(
       'http://api/api/v1/sync/schedule',
       expect.objectContaining({
         method: 'PUT',
-        body: JSON.stringify({ enabled: true, time: '06:30' }),
+        body: JSON.stringify({ enabled: true, time: '06:30', describe_figures: true }),
       }),
     )
     expect(schedule).toMatchObject({
       enabled: true,
       time: '06:30',
+      describeFigures: true,
       nextRunAt: new Date('2026-11-06T09:30:00Z'),
       lastTriggeredAt: null,
       updatedBy: 'Ana Admin',
@@ -124,6 +162,7 @@ describe('HttpManualsGateway sync', () => {
     finished_at: null,
     running: true,
     total: 3,
+    describe_figures: true,
     done: 1,
     succeeded: 1,
     failures: [{ action: 'add', file_name: 'ruim.pdf', detail: 'não é um PDF' }],
@@ -146,7 +185,7 @@ describe('HttpManualsGateway sync', () => {
 
     const status = await gateway.syncStatus()
     const check = await gateway.checkSync()
-    const run = await gateway.startSync()
+    const run = await gateway.startSync({ describeFigures: true })
 
     expect(status.lastRun).toMatchObject({
       startedAt: new Date('2026-10-16T10:00:00Z'),
@@ -154,12 +193,12 @@ describe('HttpManualsGateway sync', () => {
       failures: [{ action: 'add', fileName: 'ruim.pdf', detail: 'não é um PDF' }],
     })
     expect(check).toMatchObject({ toIndex: 1, items: [{ fileName: 'a.pdf' }] })
-    expect(run.done).toBe(1)
+    expect(run).toMatchObject({ done: 1, describeFigures: true })
     const calls = fetchFn.mock.calls.map(([url, init]) => [init?.method, url])
     expect(calls).toEqual([
       ['GET', 'http://api/api/v1/sync'],
       ['POST', 'http://api/api/v1/sync/check'],
-      ['POST', 'http://api/api/v1/sync/run'],
+      ['POST', 'http://api/api/v1/sync/run?describe_figures=true'],
     ])
   })
 

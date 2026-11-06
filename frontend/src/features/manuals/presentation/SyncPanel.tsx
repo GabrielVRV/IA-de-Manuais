@@ -1,7 +1,10 @@
+import { useState } from 'react'
+
 import { cx } from '@/shared/cx'
 import ui from '@/styles/ui.module.css'
 
 import { hasPendingChanges, type SyncAction, type SyncCheck, type SyncRun } from '../domain/manuals'
+import { FigureCheckbox } from './FigureCheckbox'
 import styles from './ManualsAdmin.module.css'
 import { SyncScheduleForm } from './SyncScheduleForm'
 import { useManualSync } from './use-manual-sync'
@@ -29,6 +32,7 @@ const ACTION: Record<SyncAction, { label: string; tone: string }> = {
 /** Verificar e sincronizar com a pasta de manuais da Engenharia (só leitura). */
 export function SyncPanel({ onProgress }: { readonly onProgress: () => void }) {
   const { status, check, busy, error, verify, start, dismissCheck } = useManualSync(onProgress)
+  const [describeFigures, setDescribeFigures] = useState(false)
 
   // Pasta não configurada no servidor: o painel não aparece.
   if (status && !status.enabled) return null
@@ -41,11 +45,14 @@ export function SyncPanel({ onProgress }: { readonly onProgress: () => void }) {
       'Sincronizar com a pasta da Engenharia?',
       `${String(pending.toIndex)} manual(is) serão indexados (gasta API de IA).`,
     ]
+    if (describeFigures) {
+      lines.push('As figuras também serão descritas: uma chamada de IA por página com figuras.')
+    }
     if (pending.counts.remove > 0) {
       lines.push(`${String(pending.counts.remove)} manual(is) sairão do sistema.`)
     }
     lines.push('A pasta não é alterada.')
-    if (window.confirm(lines.join('\n'))) void start()
+    if (window.confirm(lines.join('\n'))) void start({ describeFigures })
   }
 
   return (
@@ -79,6 +86,8 @@ export function SyncPanel({ onProgress }: { readonly onProgress: () => void }) {
         <CheckResult
           check={check}
           starting={busy === 'starting'}
+          describeFigures={describeFigures}
+          onDescribeFiguresChange={setDescribeFigures}
           onStart={() => {
             confirmAndStart(check)
           }}
@@ -94,11 +103,15 @@ export function SyncPanel({ onProgress }: { readonly onProgress: () => void }) {
 function CheckResult({
   check,
   starting,
+  describeFigures,
+  onDescribeFiguresChange,
   onStart,
   onDismiss,
 }: {
   readonly check: SyncCheck
   readonly starting: boolean
+  readonly describeFigures: boolean
+  readonly onDescribeFiguresChange: (value: boolean) => void
   readonly onStart: () => void
   readonly onDismiss: () => void
 }) {
@@ -156,6 +169,15 @@ function CheckResult({
         </details>
       )}
 
+      {check.toIndex > 0 && (
+        <FigureCheckbox
+          checked={describeFigures}
+          disabled={starting}
+          label="Descrever as figuras dos manuais novos e alterados"
+          onChange={onDescribeFiguresChange}
+        />
+      )}
+
       <div className={styles.actions}>
         {pending && (
           <button
@@ -179,8 +201,9 @@ function RunResult({ run }: { readonly run: SyncRun }) {
   if (run.running) {
     return (
       <p className={ui.alert} data-tone="info" role="status">
-        Sincronizando… {run.done} de {run.total} (iniciada por {run.startedBy}). Pode sair da tela:
-        ela continua no servidor.
+        Sincronizando… {run.done} de {run.total} (iniciada por {run.startedBy}
+        {run.describeFigures && ', descrevendo as figuras'}). Pode sair da tela: ela continua no
+        servidor.
       </p>
     )
   }

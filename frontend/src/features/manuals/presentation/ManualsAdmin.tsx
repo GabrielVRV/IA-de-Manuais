@@ -3,8 +3,9 @@ import { type DragEvent, useState } from 'react'
 import { cx } from '@/shared/cx'
 import ui from '@/styles/ui.module.css'
 
-import type { ManualStatus, ManualSummary } from '../domain/manuals'
+import type { FigurePlan, ManualStatus, ManualSummary } from '../domain/manuals'
 import styles from './ManualsAdmin.module.css'
+import { FigureCheckbox } from './FigureCheckbox'
 import { SyncPanel } from './SyncPanel'
 import { useManuals } from './use-manuals'
 
@@ -20,10 +21,50 @@ const dateFormat = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeSt
 const plural = (count: number | null, one: string, many: string) =>
   `${String(count)} ${count === 1 ? one : many}`
 
+/** Texto da confirmação antes de mandar as figuras para a IA (cada página é uma chamada). */
+function figureQuestion(manual: ManualSummary, plan: FigurePlan): string {
+  const lines = [
+    `Descrever as figuras de "${manual.title}" com IA?`,
+    `${plural(plan.withFigures, 'página tem', 'páginas têm')} figuras; ${plural(plan.pending, 'falta', 'faltam')} descrever (uma chamada de IA por página).`,
+  ]
+  if (manual.status !== 'indexed') lines.push('O manual será reprocessado.')
+  return lines.join('\n')
+}
+
 export function ManualsAdmin() {
-  const { manuals, error, uploads, upload, reindex, remove, fileUrl, clearUploads, refresh } =
-    useManuals()
+  const {
+    manuals,
+    error,
+    uploads,
+    upload,
+    reindex,
+    describeFigures,
+    figurePlan,
+    remove,
+    fileUrl,
+    clearUploads,
+    refresh,
+  } = useManuals()
+  const [describeOnUpload, setDescribeOnUpload] = useState(false)
   const sending = uploads.some((u) => u.status === 'sending')
+
+  const askAndDescribe = async (manual: ManualSummary) => {
+    const plan = await figurePlan(manual.id)
+    if (!plan) return
+    if (plan.withFigures === 0) {
+      window.alert(`Nenhuma página de "${manual.title}" tem figuras para descrever.`)
+      return
+    }
+    if (manual.status === 'indexed' && plan.pending === 0) {
+      window.alert(`As figuras de "${manual.title}" já estão descritas.`)
+      return
+    }
+    if (!window.confirm(figureQuestion(manual, plan))) return
+    // Indexado: só acrescenta as figuras. Com falha (ex.: escaneado): reprocessa com elas.
+    await (manual.status === 'indexed'
+      ? describeFigures(manual.id)
+      : reindex(manual.id, { describeFigures: true }))
+  }
 
   return (
     <div className={ui.page}>
@@ -37,8 +78,10 @@ export function ManualsAdmin() {
 
         <DropZone
           disabled={sending}
+          describeFigures={describeOnUpload}
+          onDescribeFiguresChange={setDescribeOnUpload}
           onFiles={(files) => {
-            void upload(files)
+            void upload(files, { describeFigures: describeOnUpload })
           }}
         />
 
@@ -82,6 +125,7 @@ export function ManualsAdmin() {
                 manual={manual}
                 fileUrl={fileUrl(manual.id)}
                 onReindex={() => void reindex(manual.id)}
+                onDescribeFigures={() => void askAndDescribe(manual)}
                 onRemove={() => {
                   if (window.confirm(`Excluir "${manual.title}"? Ele deixará de ser consultado.`)) {
                     void remove(manual.id)
@@ -112,9 +156,13 @@ function Summary({ manuals }: { readonly manuals: readonly ManualSummary[] }) {
 
 function DropZone({
   disabled,
+  describeFigures,
+  onDescribeFiguresChange,
   onFiles,
 }: {
   readonly disabled: boolean
+  readonly describeFigures: boolean
+  readonly onDescribeFiguresChange: (value: boolean) => void
   readonly onFiles: (files: File[]) => void
 }) {
   const [dragging, setDragging] = useState(false)
@@ -160,6 +208,11 @@ function DropZone({
           }}
         />
       </label>
+      <FigureCheckbox
+        checked={describeFigures}
+        disabled={disabled}
+        onChange={onDescribeFiguresChange}
+      />
     </div>
   )
 }
@@ -168,10 +221,11 @@ interface ManualItemProps {
   readonly manual: ManualSummary
   readonly fileUrl: string
   readonly onReindex: () => void
+  readonly onDescribeFigures: () => void
   readonly onRemove: () => void
 }
 
-function ManualItem({ manual, fileUrl, onReindex, onRemove }: ManualItemProps) {
+function ManualItem({ manual, fileUrl, onReindex, onDescribeFigures, onRemove }: ManualItemProps) {
   const status = STATUS[manual.status]
   const busy = manual.status === 'pending' || manual.status === 'processing'
 
@@ -183,13 +237,26 @@ function ManualItem({ manual, fileUrl, onReindex, onRemove }: ManualItemProps) {
           <span className={ui.badge} data-tone={status.tone}>
             {status.label}
           </span>
+          {manual.describingFigures && (
+            <span className={ui.badge} data-tone="info">
+              Descrevendo figuras… {manual.figuresDescribed}
+            </span>
+          )}
         </div>
         <span className={ui.muted}>
           {manual.fileName} · enviado em {dateFormat.format(manual.createdAt)}
           {manual.status === 'indexed' &&
             ` · ${plural(manual.pageCount, 'página', 'páginas')}, ${plural(manual.chunkCount, 'trecho', 'trechos')}`}
+          {manual.status === 'indexed' &&
+            Boolean(manual.figureCount) &&
+            `, ${plural(manual.figureCount, 'página com figuras', 'páginas com figuras')}`}
         </span>
         {manual.failureReason && <span className={styles.reason}>{manual.failureReason}</span>}
+        {manual.figuresError && !manual.describingFigures && (
+          <span className={styles.reason}>
+            A descrição das figuras parou: {manual.figuresError}
+          </span>
+        )}
       </div>
       <div className={styles.actions}>
         <a className={ui.button} href={fileUrl} target="_blank" rel="noopener noreferrer">
@@ -197,6 +264,14 @@ function ManualItem({ manual, fileUrl, onReindex, onRemove }: ManualItemProps) {
         </a>
         <button type="button" className={ui.button} onClick={onReindex} disabled={busy}>
           Reprocessar
+        </button>
+        <button
+          type="button"
+          className={ui.button}
+          onClick={onDescribeFigures}
+          disabled={busy || manual.describingFigures}
+        >
+          Descrever figuras
         </button>
         <button
           type="button"

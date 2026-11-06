@@ -146,3 +146,11 @@
 .timeInput {
   width: 7.5rem;
 }
+
+/* Opção de descrever as figuras por IA, com o aviso de custo logo abaixo. */
+.figureOption {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 40rem;
+}
