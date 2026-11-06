@@ -18,8 +18,8 @@ from manual_assistant.infrastructure.ai.batching import batched
 
 EMBEDDING_BATCH_SIZE = 512
 
-# Modelos de raciocínio (o1, o3, gpt-5...) não aceitam o parâmetro temperature.
-_REASONING_MODEL_PREFIXES = ("o1", "o3", "o4", "gpt-5")
+# Modelos de raciocínio (o1, o3, gpt-5, gpt-6...) não aceitam o parâmetro temperature.
+_REASONING_MODEL_PREFIXES = ("o1", "o3", "o4", "gpt-5", "gpt-6")
 
 
 def create_openai_client(

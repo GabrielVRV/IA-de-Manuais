@@ -104,8 +104,9 @@ async def test_completes_with_temperature_for_regular_models(api: FakeOpenAIApi)
     assert (completion.text, completion.usage.total_tokens) == ("180 bar.", 15)
 
 
-async def test_omits_temperature_for_reasoning_models(api: FakeOpenAIApi) -> None:
-    await OpenAILanguageModel(api.client(), model="gpt-5.4-mini").complete(REQUEST)
+@pytest.mark.parametrize("model", ["gpt-5.4-mini", "gpt-6-luna"])
+async def test_omits_temperature_for_reasoning_models(api: FakeOpenAIApi, model: str) -> None:
+    await OpenAILanguageModel(api.client(), model=model).complete(REQUEST)
 
     assert "temperature" not in api.requests[0][1]
 
