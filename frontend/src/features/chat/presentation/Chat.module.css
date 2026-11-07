@@ -248,6 +248,9 @@
 
 .markdown th,
 .markdown td {
+  /* Com o "anywhere" da resposta, a coluna larga espremia as curtas até quebrar
+     "Siloflex" em "Silo/flex". Aqui as palavras ficam inteiras; a tabela rola de lado. */
+  overflow-wrap: normal;
   padding: var(--space-2);
   border: 1px solid var(--color-border);
   text-align: left;

@@ -30,9 +30,28 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_TOP_K = 6  # ~6 x 1500 caracteres: contexto suficiente com custo baixo
 # Pergunta sobre vários modelos: cada um recebe ao menos esta quantidade de trechos, e o
-# total pode crescer até MAX_TOP_K_FACTOR x top_k (3 modelos → 9 trechos com top_k 6).
-MIN_CHUNKS_PER_MODEL = 3
+# total pode crescer até MAX_TOP_K_FACTOR x top_k (3 modelos → 12 trechos com top_k 6).
+# Com 3 por modelo, a tabela de códigos de um modelo podia ficar de fora (Siloflex 55).
+MIN_CHUNKS_PER_MODEL = 4
 MAX_TOP_K_FACTOR = 2
+# Seção "Especificações Técnicas" (potência, comprimento, vazão...): o resumo do
+# equipamento vai sempre junto quando a pergunta cita o modelo. Sem ela, "quais os
+# acionamentos do Siloflex" trazia só tabelas de códigos, que repetem "acionamento"
+# dezenas de vezes, e perdia "0,5 CV para linhas de 0 a 80 m". O PDF às vezes extrai
+# "Especificaç ões", com espaço; as maiúsculas acentuadas vão explícitas porque o ~* do
+# PostgreSQL não as iguala às minúsculas em todo locale.
+# Nos manuais da pasta o resumo se chama "Especificações Técnicas", "Dados Técnicos (do
+# equipamento)" ou "(Principais) Características". Só vale como título: no começo da
+# linha (com ou sem numeração) e terminando a linha, com ":" ou ".". Assim ficam de fora
+# o sumário ("Técnicas........3") e a frase padrão "especificações técnicas contidas
+# neste manual, sem prévio aviso".
+SPECIFICATIONS_PATTERN = (
+    r"(^|\n)[0-9. \t-]*"
+    r"(especifica[cçÇ]\s*[oõÕ]es\s+t[eéÉ]cnicas|dados\s+t[eéÉ]cnicos"
+    r"|(principais\s+)?caracter[iíÍ]sticas)"
+    # Complemento curto ("do Equipamento", "e Características"); frases longas não são título.
+    r"[^\n.:]{0,25}[.:]?[ \t]*(\n|$)"
+)
 # Trechos que contêm literalmente um código de peça citado na pergunta (ADR 0015).
 MAX_CODE_CHUNKS = 3
 # Teto, não meta: só os tokens gerados são cobrados. Com respostas mais completas
@@ -124,10 +143,15 @@ class AskQuestionUseCase:
         selected: list[ScoredChunk] = []
         chosen: set[ChunkId] = set()
         for manual_ids in groups:
+            # O resumo do equipamento vai junto, fora da cota (ver SPECIFICATIONS_PATTERN).
+            specifications = await self._vector_store.search_pattern(
+                SPECIFICATIONS_PATTERN, manual_ids=manual_ids, limit=1
+            )
+            limit += len(specifications)
             focused = await self._vector_store.search(
                 query, limit=per_group, min_score=self._min_score, manual_ids=manual_ids
             )
-            for result in focused:
+            for result in [*specifications, *focused]:
                 if result.chunk.id not in chosen:
                     chosen.add(result.chunk.id)
                     selected.append(result)

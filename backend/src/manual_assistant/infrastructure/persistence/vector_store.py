@@ -122,6 +122,34 @@ class PgVectorStore:
         # Relevância 1: o código está literalmente no trecho.
         return [ScoredChunk(chunk=_to_chunk(row), score=1.0) for row in rows]
 
+    async def search_pattern(
+        self,
+        pattern: str,
+        *,
+        manual_ids: Collection[ManualId],
+        limit: int,
+    ) -> Sequence[ScoredChunk]:
+        if limit < 1:
+            raise ValueError("O limite de resultados deve ser ao menos 1")
+        if not manual_ids:
+            return []
+        statement = (
+            select(*_CHUNK_COLUMNS)
+            .join(ManualRecord, ManualRecord.id == ChunkRecord.manual_id)
+            .where(ManualRecord.status == ManualStatus.INDEXED.value)
+            .where(ChunkRecord.manual_id.in_(list(manual_ids)))
+            .where(ChunkRecord.text.op("~*")(pattern))
+            .order_by(
+                ChunkRecord.kind == ChunkKind.FIGURE.value,  # falso (texto) vem primeiro
+                ChunkRecord.manual_id,
+                ChunkRecord.position,
+            )
+            .limit(limit)
+        )
+        async with translate_database_errors("buscar trechos"), self._session_factory() as session:
+            rows = (await session.execute(statement)).all()
+        return [ScoredChunk(chunk=_to_chunk(row), score=1.0) for row in rows]
+
     async def delete_by_manual(self, manual_id: ManualId, *, kind: ChunkKind | None = None) -> None:
         statement = delete(ChunkRecord).where(ChunkRecord.manual_id == manual_id)
         if kind is not None:

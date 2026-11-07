@@ -27,7 +27,7 @@ curtas e, às vezes, erradas. Os casos analisados:
 
 1. **Listas de modelos.** "Siloflex 55, 75 e 100", "55/75", "modelo 75 ou 100" e "Ø75" viram
    um modelo por número. Com mais de um modelo, **cada um tem a sua cota** de trechos (ao
-   menos 3). O total pode passar do `top_k`, até o dobro dele.
+   menos 4). O total pode passar do `top_k`, até o dobro dele.
 2. **Busca por código exato.** Palavras com 5 dígitos ou mais (ou letras e 3 dígitos, como
    "GA56/71") são buscadas também literalmente no texto dos trechos, sem contar pontos,
    hífens e barras. Até 3 trechos encontrados assim vão na frente. Tensões e frequências
@@ -44,7 +44,16 @@ curtas e, às vezes, erradas. Os casos analisados:
    códigos). Sem modelo na pergunta e com trechos de manuais diferentes, separar a resposta
    por manual e pedir o modelo. Em pedidos de lista completa, avisar que pode estar
    incompleta e indicar as páginas.
-7. **Aviso de PDF sem texto.** A tela de manuais avisa quando um manual indexado tem menos
+7. **Especificações do modelo citado.** Quando a pergunta cita um modelo, o trecho da seção
+   *Especificações Técnicas* do manual dele vai sempre junto, fora da cota (um trecho a
+   mais por modelo). Em "quais os acionamentos do Siloflex", as tabelas de códigos repetem
+   "acionamento" dezenas de vezes e ocupavam todas as vagas, e a resposta perdia "0,5 CV
+   para linhas de 0 a 80 m". Valem os títulos "Especificações Técnicas", "Dados Técnicos"
+   e "(Principais) Características", só como título de linha: o sumário (pontinhos) e a
+   frase padrão "especificações técnicas contidas neste manual" ficam de fora. Na pasta,
+   44 de 229 manuais com texto têm essa seção (mais os escaneados com figuras descritas);
+   os outros ficam como antes.
+8. **Aviso de PDF sem texto.** A tela de manuais avisa quando um manual indexado tem menos
    de um trecho a cada 4 páginas e nenhuma figura descrita: é para clicar em
    *Descrever figuras* (ADR 0014).
 
@@ -57,7 +66,7 @@ curtas e, às vezes, erradas. Os casos analisados:
 - A busca por código lê o texto de todos os trechos (`regexp_replace` + `LIKE`, sem índice).
   Com alguns milhares de trechos é rápido. Se o acervo crescer muito, cabe um índice de
   trigramas (`pg_trgm`) sobre o texto normalizado.
-- Perguntas sobre vários modelos mandam mais trechos à IA (9 em vez de 6 para três
+- Perguntas sobre vários modelos mandam mais trechos à IA (12 em vez de 6 para três
   modelos) e custam um pouco mais.
 - O reconhecimento dos títulos de seção é heurístico: títulos sem numeração não são
   reconhecidos.

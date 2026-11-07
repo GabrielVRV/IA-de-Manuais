@@ -48,6 +48,20 @@ class VectorStore(Protocol):
         pontos, hífens e barras não contam), os que contêm mais códigos primeiro."""
         ...
 
+    async def search_pattern(
+        self,
+        pattern: str,
+        *,
+        manual_ids: Collection[ManualId],
+        limit: int,
+    ) -> Sequence[ScoredChunk]:
+        """Trechos desses manuais cujo texto casa com a expressão regular (sem diferenciar
+        maiúsculas nas letras sem acento), na ordem do manual: texto antes de figuras.
+
+        A expressão precisa valer igual no Python e no PostgreSQL: só classes ``[...]``,
+        ``\\s`` e quantificadores simples."""
+        ...
+
     async def delete_by_manual(self, manual_id: ManualId, *, kind: ChunkKind | None = None) -> None:
         """Apaga os trechos do manual; com ``kind``, só os desse tipo."""
         ...

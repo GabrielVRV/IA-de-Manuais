@@ -178,7 +178,66 @@ async def test_each_model_in_the_question_gets_its_share_of_chunks() -> None:
     )
     prompt = language_model.requests[0].prompt
     for manual in (s55, s75, s100):
-        assert prompt.count(f"Acionamento {manual.title}") == 3  # 3 modelos x 3 = 9 trechos
+        assert prompt.count(f"Acionamento {manual.title}") == 4  # 3 modelos x 4 = 12 trechos
+
+
+async def test_the_specifications_of_the_cited_model_always_go_along() -> None:
+    """ "quais os acionamentos do Siloflex" trazia só as tabelas de códigos, que repetem
+    "acionamento" dezenas de vezes, e perdia "0,5 CV para linhas de 0 a 80 m"."""
+    manual = _indexed("MANUAL MONTAGEM E PECAS SILOFLEX 55")
+    summary = make_chunk(manual, text="1.1 Especificações Técnicas.........3", position=0)
+    specs = make_chunk(
+        manual,
+        text="1.1 Especificaç ões Técnicas:\n2- Acionamento: 0,5 CV - Comprimento 0 - 80 metros",
+        position=7,
+    )
+    codes = [
+        make_chunk(manual, text=f"20.400.30{n} Acionamento 0,5CV", position=8 + n) for n in range(3)
+    ]
+    vector_store = InMemoryVectorStore(
+        search_results=[
+            *(ScoredChunk(chunk, 0.9) for chunk in codes),
+            ScoredChunk(summary, 0.2),
+            ScoredChunk(specs, 0.1),
+        ]
+    )
+    manuals = InMemoryManualRepository()
+    await manuals.save(manual)
+    language_model = FakeLanguageModel(answer="0,5 CV [1].")
+    use_case = AskQuestionUseCase(
+        embeddings=FakeEmbeddingProvider(),
+        vector_store=vector_store,
+        language_model=language_model,
+        top_k=3,
+        manuals=manuals,
+    )
+
+    await use_case.execute(Question("quais os acionamentos do siloflex 55?"))
+
+    prompt = language_model.requests[0].prompt
+    assert prompt.index("Comprimento 0 - 80 metros") < prompt.index("20.400.300")
+    assert all(f"20.400.30{n}" in prompt for n in range(3))  # fora da cota de 3
+    assert "Técnicas....." not in prompt  # o sumário não conta
+
+
+async def test_questions_without_a_model_do_not_add_specifications() -> None:
+    manual = _indexed("MANUAL MONTAGEM E PECAS SILOFLEX 55")
+    specs = make_chunk(manual, text="Especificações Técnicas: 120 metros", position=0)
+    vector_store = InMemoryVectorStore(search_results=[*RESULTS, ScoredChunk(specs, 0.1)])
+    manuals = InMemoryManualRepository()
+    await manuals.save(manual)
+    language_model = FakeLanguageModel()
+    use_case = AskQuestionUseCase(
+        embeddings=FakeEmbeddingProvider(),
+        vector_store=vector_store,
+        language_model=language_model,
+        top_k=2,
+        manuals=manuals,
+    )
+
+    await use_case.execute(Question("Qual a pressão máxima?"))
+
+    assert "120 metros" not in language_model.requests[0].prompt
 
 
 async def test_chunks_with_the_exact_part_code_come_first() -> None:

@@ -4,6 +4,7 @@ O mypy garante que cada fake segue o contrato da porta que substitui.
 """
 
 import asyncio
+import re
 from collections import defaultdict
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field, replace
@@ -186,6 +187,21 @@ class InMemoryVectorStore:
         found = [item for item in found if item[0]]
         found.sort(key=lambda item: -item[0])
         return [ScoredChunk(r.chunk, 1.0) for _, r in found][:limit]
+
+    async def search_pattern(
+        self,
+        pattern: str,
+        *,
+        manual_ids: Collection[ManualId],
+        limit: int,
+    ) -> Sequence[ScoredChunk]:
+        found = [
+            r.chunk
+            for r in self.search_results
+            if r.chunk.manual_id in manual_ids and re.search(pattern, r.chunk.text, re.IGNORECASE)
+        ]
+        found.sort(key=lambda c: (c.kind is ChunkKind.FIGURE, str(c.manual_id), c.position))
+        return [ScoredChunk(c, 1.0) for c in found[:limit]]
 
     async def delete_by_manual(self, manual_id: ManualId, *, kind: ChunkKind | None = None) -> None:
         if kind is None:

@@ -1,10 +1,12 @@
 import math
+from dataclasses import replace
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from manual_assistant.application.ports.embedding_provider import Embedding
 from manual_assistant.application.ports.vector_store import EmbeddedChunk
+from manual_assistant.application.use_cases.ask_question import SPECIFICATIONS_PATTERN
 from manual_assistant.domain.chunk import ChunkKind
 from manual_assistant.domain.manual import Manual
 from manual_assistant.domain.pages import PageRange
@@ -147,6 +149,28 @@ async def test_finds_chunks_by_exact_code_ignoring_dots_and_dashes(
     assert [r.chunk.text for r in reducer] == ["Redutor GA56/71"]
     assert elsewhere == []
     assert await store.search_codes(set(), limit=10) == []
+
+
+async def test_finds_chunks_by_pattern_text_before_figures(
+    store: PgVectorStore, repository: SqlAlchemyManualRepository
+) -> None:
+    manual = await indexed_manual(repository, "Siloflex 55")
+    other = await indexed_manual(repository, "Siloflex 75")
+    figure = make_chunk(manual, text="ESPECIFICAÇÕES TÉCNICAS\nVazão: 75", position=0)
+    figure = replace(figure, kind=ChunkKind.FIGURE)
+    summary = make_chunk(manual, text="1.1 Especificações Técnicas.....3", position=0)
+    specs = make_chunk(manual, text="1.1 Especificaç ões Técnicas:\n120 m", position=5)
+    elsewhere = make_chunk(other, text="Especificações Técnicas:\n80 m", position=1)
+    await store.upsert(
+        [EmbeddedChunk(chunk, vector(a=1)) for chunk in (summary, figure, specs, elsewhere)]
+    )
+    pattern = SPECIFICATIONS_PATTERN
+
+    found = await store.search_pattern(pattern, manual_ids={manual.id}, limit=5)
+
+    # Texto antes de figura; o sumário (pontinhos) e o outro manual ficam de fora.
+    assert [r.chunk.text for r in found] == [specs.text, figure.text]
+    assert await store.search_pattern(pattern, manual_ids=set(), limit=5) == []
 
 
 async def test_upsert_replaces_an_existing_chunk(
