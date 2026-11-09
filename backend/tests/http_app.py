@@ -186,6 +186,8 @@ class FakeBackend:
                     index_manual=index_manual,
                     delete_manual=delete_manual,
                 ),
+                repository=self.repository,
+                figures=self.figure_descriptions.use_case,
             )
         use_cases = UseCases(
             check_health=CheckHealthUseCase(self.health_indicators),

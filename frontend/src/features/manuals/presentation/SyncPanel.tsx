@@ -27,6 +27,7 @@ const ACTION: Record<SyncAction, { label: string; tone: string }> = {
   remove: { label: 'Remover', tone: 'danger' },
   unchanged: { label: 'Sem mudança', tone: 'neutral' },
   ignore: { label: 'Ignorado', tone: 'neutral' },
+  figures: { label: 'Figuras', tone: 'info' },
 }
 
 /** Verificar e sincronizar com a pasta de manuais da Engenharia (só leitura). */
@@ -46,7 +47,9 @@ export function SyncPanel({ onProgress }: { readonly onProgress: () => void }) {
       `${String(pending.toIndex)} manual(is) serão indexados (gasta API de IA).`,
     ]
     if (describeFigures) {
-      lines.push('As figuras também serão descritas: uma chamada de IA por página com figuras.')
+      lines.push(
+        'As figuras também serão descritas, inclusive as que faltam nos manuais já cadastrados: uma chamada de IA por página com figuras.',
+      )
     }
     if (pending.counts.remove > 0) {
       lines.push(`${String(pending.counts.remove)} manual(is) sairão do sistema.`)

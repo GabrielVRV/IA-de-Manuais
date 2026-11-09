@@ -64,7 +64,15 @@ function toManual(body: unknown): ManualSummary {
   }
 }
 
-const syncActionSchema = z.enum(['add', 'update', 'retitle', 'remove', 'unchanged', 'ignore'])
+const syncActionSchema = z.enum([
+  'add',
+  'update',
+  'retitle',
+  'remove',
+  'unchanged',
+  'ignore',
+  'figures',
+])
 
 const syncCheckSchema = z.object({
   counts: z.record(syncActionSchema, z.number().int()),

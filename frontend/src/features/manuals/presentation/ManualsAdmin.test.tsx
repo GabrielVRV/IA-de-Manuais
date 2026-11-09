@@ -252,7 +252,7 @@ describe('<ManualsAdmin />', () => {
       const manuals = fakeManualsGateway()
       manuals.checkSync.mockResolvedValueOnce(
         syncCheck({
-          counts: { add: 0, update: 0, retitle: 0, remove: 0, unchanged: 5, ignore: 0 },
+          counts: { add: 0, update: 0, retitle: 0, remove: 0, unchanged: 5, ignore: 0, figures: 0 },
           toIndex: 0,
           items: [],
         }),

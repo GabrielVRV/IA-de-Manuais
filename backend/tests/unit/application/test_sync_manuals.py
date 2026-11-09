@@ -3,7 +3,9 @@ import asyncio
 import pytest
 
 from manual_assistant.application.errors import ExternalServiceError
+from manual_assistant.application.figures import FigureDescriber
 from manual_assistant.application.use_cases.delete_manual import DeleteManualUseCase
+from manual_assistant.application.use_cases.describe_figures import DescribeFiguresUseCase
 from manual_assistant.application.use_cases.index_manual import IndexManualUseCase
 from manual_assistant.application.use_cases.manual_files import original_file_key
 from manual_assistant.application.use_cases.register_manual import RegisterManualUseCase
@@ -23,7 +25,10 @@ from tests.factories import FIXED_NOW
 from tests.fakes import (
     FakeDocumentParser,
     FakeEmbeddingProvider,
+    FakeLanguageModel,
     FakeManualSource,
+    FakePageRenderer,
+    InMemoryFigureDescriptionRepository,
     InMemoryFileStorage,
     InMemoryManualRepository,
     InMemoryVectorStore,
@@ -342,6 +347,50 @@ class TestManualSyncService:
         assert not run.running
         assert run.error is not None
         assert "desligada" in run.error
+
+    async def test_figures_of_unchanged_manuals_are_described(self, ctx: Context) -> None:
+        # Manuais já indexados só com o texto: a pasta não mudou, mas faltam as figuras.
+        ctx.source.put("ARMAZENAGEM/95000001-00P.pdf", V1)
+        await ctx.sync()
+        renderer = FakePageRenderer(figure_pages=[1])
+        model = FakeLanguageModel(answer="Motor M1 com polia.")
+        service = ManualSyncService(
+            plan=ctx.plan_use_case,
+            apply=ctx.apply_use_case,
+            repository=ctx.repository,
+            figures=DescribeFiguresUseCase(
+                repository=ctx.repository,
+                storage=ctx.storage,
+                parser=FakeDocumentParser(),
+                figures=FigureDescriber(
+                    renderer=renderer,
+                    model=model,
+                    repository=InMemoryFigureDescriptionRepository(),
+                    clock=lambda: FIXED_NOW,
+                ),
+                embeddings=ctx.embeddings,
+                vector_store=ctx.vector_store,
+            ),
+            clock=lambda: FIXED_NOW,
+        )
+
+        await service.start(started_by="Maria")  # sem figuras: nada vai para a IA
+        await service.wait()
+        assert service.last_run is not None
+        assert service.last_run.outcomes == []
+        assert model.requests == []
+
+        run = await service.start(started_by="Agendamento", describe_figures=True)
+        await service.wait()
+        [outcome] = run.outcomes
+        assert (outcome.item.action, outcome.ok, run.total) == (SyncAction.FIGURES, True, 1)
+        assert ctx.only_manual().figure_count == 1
+        assert len(model.requests) == 1
+
+        again = await service.start(started_by="Agendamento", describe_figures=True)
+        await service.wait()
+        assert (again.outcomes, again.total) == ([], 0)  # já descritas: não paga de novo
+        assert len(model.requests) == 1
 
     async def test_disabled_without_a_folder(self) -> None:
         service = ManualSyncService(plan=None, apply=None)

@@ -79,6 +79,7 @@ _ACTION_LABELS = {
     SyncAction.REMOVE: "a remover do sistema (saíram da pasta)",
     SyncAction.UNCHANGED: "sem mudança",
     SyncAction.IGNORE: "ignorados (use --verbose para ver o motivo)",
+    SyncAction.FIGURES: "com figuras a descrever (use describe-figures)",
 }
 
 

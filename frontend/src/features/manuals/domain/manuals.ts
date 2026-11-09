@@ -50,7 +50,8 @@ export interface FigureOption {
 }
 
 /** O que a sincronização com a pasta da Engenharia faz com cada manual. */
-export type SyncAction = 'add' | 'update' | 'retitle' | 'remove' | 'unchanged' | 'ignore'
+export type SyncAction =
+  'add' | 'update' | 'retitle' | 'remove' | 'unchanged' | 'ignore' | 'figures'
 
 export interface SyncPlanItem {
   readonly action: SyncAction

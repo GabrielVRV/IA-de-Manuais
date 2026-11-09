@@ -184,6 +184,14 @@ def create_app(
     delete_manual = DeleteManualUseCase(
         repository=repository, vector_store=vector_store, storage=storage
     )
+    describe_figures = DescribeFiguresUseCase(
+        repository=repository,
+        storage=storage,
+        parser=PdfiumDocumentParser(),
+        figures=figure_describer,
+        embeddings=ai.embeddings,
+        vector_store=vector_store,
+    )
     manual_sync = ManualSyncService(plan=None, apply=None)
     if settings.sync_source_dir:
         source = FolderManualSource(
@@ -201,19 +209,11 @@ def create_app(
                 index_manual=index_manual,
                 delete_manual=delete_manual,
             ),
+            repository=repository,
+            figures=describe_figures,
         )
 
-    figure_descriptions = FigureDescriptionService(
-        use_case=DescribeFiguresUseCase(
-            repository=repository,
-            storage=storage,
-            parser=PdfiumDocumentParser(),
-            figures=figure_describer,
-            embeddings=ai.embeddings,
-            vector_store=vector_store,
-        ),
-        repository=repository,
-    )
+    figure_descriptions = FigureDescriptionService(use_case=describe_figures, repository=repository)
     schedules = SqlAlchemySyncScheduleRepository(session_factory)
     use_cases = UseCases(
         check_health=CheckHealthUseCase(indicators=[DatabaseHealthIndicator(engine)]),

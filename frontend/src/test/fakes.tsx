@@ -126,7 +126,7 @@ export function manual(overrides: Partial<ManualSummary> = {}): ManualSummary {
 
 export function syncCheck(overrides: Partial<SyncCheck> = {}): SyncCheck {
   return {
-    counts: { add: 1, update: 0, retitle: 0, remove: 0, unchanged: 5, ignore: 1 },
+    counts: { add: 1, update: 0, retitle: 0, remove: 0, unchanged: 5, ignore: 1, figures: 0 },
     toIndex: 1,
     items: [
       { action: 'add', fileName: '95000001-00P.pdf', title: 'SILO 500 T', reason: null },

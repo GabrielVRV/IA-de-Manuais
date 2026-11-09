@@ -134,7 +134,8 @@ export function SyncScheduleForm() {
 
       <span className={ui.hint}>
         Horário de {schedule.timezone}. Faz o mesmo que o botão Sincronizar e gasta API de IA só com
-        manuais novos ou alterados. Se o servidor estiver desligado no horário, roda quando ele
+        manuais novos ou alterados e, com a opção acima, com as figuras que ainda faltam descrever
+        nos manuais já cadastrados. Se o servidor estiver desligado no horário, roda quando ele
         voltar.
       </span>
 

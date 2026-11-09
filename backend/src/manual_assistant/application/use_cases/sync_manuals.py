@@ -2,7 +2,8 @@
 
 Duas etapas: ``PlanManualSyncUseCase`` compara a pasta com o que já está cadastrado
 sem alterar nada (é o modo simulação); ``ApplyManualSyncUseCase`` executa o plano.
-``ManualSyncService`` dispara as duas pela tela, com a sincronização em segundo plano.
+``ManualSyncService`` dispara as duas pela tela, com a sincronização em segundo plano, e,
+pedindo as figuras, também descreve as que faltam nos manuais já indexados (ADR 0014).
 A pasta de origem só é lida, nunca alterada.
 """
 
@@ -23,6 +24,10 @@ from manual_assistant.application.ports.file_storage import FileStorage
 from manual_assistant.application.ports.manual_repository import ManualRepository
 from manual_assistant.application.ports.manual_source import ManualSource, SourceDocument
 from manual_assistant.application.use_cases.delete_manual import DeleteManualUseCase
+from manual_assistant.application.use_cases.describe_figures import (
+    DescribeFiguresUseCase,
+    FigurePlanItem,
+)
 from manual_assistant.application.use_cases.index_manual import IndexManualUseCase
 from manual_assistant.application.use_cases.manual_files import original_file_key
 from manual_assistant.application.use_cases.register_manual import (
@@ -61,6 +66,7 @@ class SyncAction(StrEnum):
     REMOVE = "remove"  # saiu da pasta (ou foi para "Versões Obsoletas")
     UNCHANGED = "unchanged"
     IGNORE = "ignore"  # fora das regras: nome fora do padrão, outro idioma, revisão antiga
+    FIGURES = "figures"  # já indexado, com figuras ainda sem descrição (só ao sincronizar)
 
 
 @dataclass(frozen=True, slots=True)
@@ -335,6 +341,10 @@ class ManualSyncService:
     muito mais que uma requisição HTTP. O andamento e o resultado da última ficam em
     memória (a API roda num processo só); reiniciar a API apaga esse resumo, não os
     manuais. Sem a pasta configurada, o serviço existe mas fica desligado.
+
+    Com ``describe_figures``, depois de aplicar o plano ele descreve as figuras que
+    faltam nos manuais já indexados, inclusive os que não mudaram na pasta: sem isso,
+    só os manuais novos ou alterados teriam as figuras descritas.
     """
 
     def __init__(
@@ -342,10 +352,14 @@ class ManualSyncService:
         *,
         plan: PlanManualSyncUseCase | None,
         apply: ApplyManualSyncUseCase | None,
+        repository: ManualRepository | None = None,
+        figures: DescribeFiguresUseCase | None = None,
         clock: Clock = utc_now,
     ) -> None:
         self._plan = plan
         self._apply = apply
+        self._repository = repository
+        self._figures = figures
         self._clock = clock
         self._starting = False
         self._task: asyncio.Task[None] | None = None
@@ -421,6 +435,8 @@ class ManualSyncService:
             await apply.execute(
                 plan, on_progress=run.outcomes.append, describe_figures=run.describe_figures
             )
+            if run.describe_figures:
+                await self._describe_pending_figures(run)
         except asyncio.CancelledError:
             run.error = "a API foi desligada no meio da sincronização"
             raise
@@ -434,3 +450,45 @@ class ManualSyncService:
         logger.info(
             "Sincronização concluída: %d ok, %d com falha", len(run.outcomes) - failures, failures
         )
+
+    async def _describe_pending_figures(self, run: SyncRun) -> None:
+        """Descreve as figuras que faltam nos manuais indexados. O que já foi descrito
+        fica guardado: só a primeira vez com a pasta inteira custa caro."""
+        if self._figures is None or self._repository is None:
+            return
+        figures = self._figures
+        manuals = [m for m in await self._repository.list_all() if m.status is ManualStatus.INDEXED]
+        pending: list[FigurePlanItem] = []
+        for manual in manuals:
+            try:
+                item = await figures.plan(manual)
+            except (ApplicationError, DomainError) as error:
+                logger.warning("Falha ao procurar figuras em %s: %s", manual.file_name, error)
+                run.total += 1
+                run.outcomes.append(SyncOutcome(_figures_item(manual), ok=False, detail=str(error)))
+                continue
+            if item.pending:
+                pending.append(item)
+        run.total += len(pending)
+        logger.info("Figuras a descrever em %d manual(is) já indexado(s)", len(pending))
+        for item in pending:
+            run.outcomes.append(await _describe_safely(figures, item))
+
+
+async def _describe_safely(figures: DescribeFiguresUseCase, item: FigurePlanItem) -> SyncOutcome:
+    sync_item = _figures_item(item.manual)
+    try:
+        result = await figures.execute(item.manual)
+    except (ApplicationError, DomainError) as error:
+        logger.warning("Falha ao descrever as figuras de %s: %s", item.manual.file_name, error)
+        return SyncOutcome(sync_item, ok=False, detail=str(error))
+    return SyncOutcome(
+        sync_item,
+        ok=True,
+        detail=f"figuras: {len(result.described)} página(s) descrita(s) agora, "
+        f"{result.figure_count} no índice",
+    )
+
+
+def _figures_item(manual: Manual) -> SyncItem:
+    return SyncItem(SyncAction.FIGURES, manual.file_name, manual.title, manual=manual)

@@ -175,7 +175,7 @@ describe('HttpManualsGateway sync', () => {
       .mockResolvedValueOnce(Response.json({ enabled: true, running: true, last_run: apiRun }))
       .mockResolvedValueOnce(
         Response.json({
-          counts: { add: 1, update: 0, retitle: 0, remove: 0, unchanged: 2, ignore: 0 },
+          counts: { add: 1, update: 0, retitle: 0, remove: 0, unchanged: 2, ignore: 0, figures: 0 },
           to_index: 1,
           items: [{ action: 'add', file_name: 'a.pdf', title: 'A', reason: null }],
         }),
