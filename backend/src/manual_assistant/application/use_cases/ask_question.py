@@ -23,6 +23,7 @@ from manual_assistant.domain.chunk import ChunkId, ScoredChunk
 from manual_assistant.domain.codes import part_codes
 from manual_assistant.domain.conversation import Exchange
 from manual_assistant.domain.equipment import equipment_models
+from manual_assistant.domain.keywords import keywords
 from manual_assistant.domain.manual import ManualId
 from manual_assistant.domain.question import Question
 
@@ -54,6 +55,8 @@ SPECIFICATIONS_PATTERN = (
 )
 # Trechos que contêm literalmente um código de peça citado na pergunta (ADR 0015).
 MAX_CODE_CHUNKS = 3
+# Trechos que só a busca por palavras da pergunta trouxe, somados aos da busca por sentido.
+MAX_KEYWORD_CHUNKS = 4
 # Teto, não meta: só os tokens gerados são cobrados. Com respostas mais completas
 # (regra 5 do prompt), 1024 cortava procedimentos longos no meio.
 DEFAULT_MAX_OUTPUT_TOKENS = 2048
@@ -79,7 +82,9 @@ class AskQuestionUseCase:
         top_k: int = DEFAULT_TOP_K,
         min_score: float = 0.0,
         manuals: ManualRepository | None = None,
+        keyword_chunks: int = MAX_KEYWORD_CHUNKS,
     ) -> None:
+        self._keyword_chunks = keyword_chunks
         self._embeddings = embeddings
         self._manuals = manuals
         self._vector_store = vector_store
@@ -95,6 +100,7 @@ class AskQuestionUseCase:
         query = await self._embeddings.embed_query(text)
         results = await self._search(query, await self._manuals_of_models_in(text))
         results = await self._with_exact_codes(part_codes(text), results)
+        results = await self._with_keyword_matches(keywords(text), results)
         if not results:
             # Nada indexado (ou nada acima do corte): não gasta tokens do modelo.
             return QuestionResult(Answer(NOT_FOUND_MESSAGE), model=None)
@@ -169,6 +175,23 @@ class AskQuestionUseCase:
         chosen = {result.chunk.id for result in exact}
         others = [result for result in results if result.chunk.id not in chosen]
         return [*exact, *others][: max(len(results), len(exact))]
+
+    async def _with_keyword_matches(
+        self, words: Sequence[str], results: Sequence[ScoredChunk]
+    ) -> Sequence[ScoredChunk]:
+        """Completa com trechos que trazem as palavras da pergunta, além dos que a busca por
+        sentido trouxe. "Com quantos dias o leitão deixa a maternidade" não achava o trecho
+        "Idade ao desmame: 21 ou 28 dias": o sentido do trecho é outro, mas as palavras
+        batem. Vão ao fim da lista e não tiram vaga dos mais parecidos."""
+        if not words or self._keyword_chunks < 1:
+            return results
+        chosen = {result.chunk.id for result in results}
+        # Pede a mais: os já escolhidos podem ocupar as primeiras posições do ranking.
+        found = await self._vector_store.search_text(
+            words, limit=self._keyword_chunks + len(chosen)
+        )
+        extra = [result for result in found if result.chunk.id not in chosen]
+        return [*results, *extra[: self._keyword_chunks]]
 
     async def _manuals_of_models_in(self, text: str) -> list[frozenset[ManualId]]:
         """Para cada modelo citado no texto (ex.: "s70"), os manuais indexados cujo título

@@ -238,3 +238,24 @@ async def test_text_and_figure_chunks_share_positions_and_are_removed_by_kind(
 
     await store.delete_by_manual(manual.id, kind=ChunkKind.FIGURE)
     assert [r.chunk.text for r in await store.search(vector(a=1), limit=10)] == ["texto"]
+
+
+async def test_finds_chunks_by_the_words_using_their_stem(
+    store: PgVectorStore, repository: SqlAlchemyManualRepository
+) -> None:
+    manual = await indexed_manual(repository, "Manual de Suínos")
+    other = await indexed_manual(repository, "Outro manual")
+    both = make_chunk(manual, text="Período de aleitamento: 21 dias na maternidade.", position=0)
+    one = make_chunk(manual, text="Os leitões ficam na baia.", position=1)
+    none = make_chunk(manual, text="Ventilação das instalações.", position=2)
+    elsewhere = make_chunk(other, text="Dias na maternidade.", position=0)
+    await store.upsert([EmbeddedChunk(c, vector(a=1)) for c in (one, none, both, elsewhere)])
+
+    found = await store.search_text(
+        ["leitão", "maternidade", "dias"], limit=10, manual_ids={manual.id}
+    )
+
+    # "leitão" acha "leitões"; mais palavras juntas vêm primeiro; o outro manual fica de fora.
+    assert [r.chunk.text for r in found] == [both.text, one.text]
+    assert await store.search_text([], limit=10) == []
+    assert await store.search_text(["dias"], limit=10, manual_ids=set()) == []

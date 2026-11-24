@@ -48,6 +48,18 @@ class VectorStore(Protocol):
         pontos, hífens e barras não contam), os que contêm mais códigos primeiro."""
         ...
 
+    async def search_text(
+        self,
+        words: Collection[str],
+        *,
+        limit: int,
+        manual_ids: Collection[ManualId] | None = None,
+    ) -> Sequence[ScoredChunk]:
+        """Trechos que contêm alguma das palavras (``domain.keywords``), considerando a
+        raiz delas ("leitão" acha "leitões"), os que reúnem mais palavras juntas primeiro.
+        Sem palavras úteis, devolve vazio."""
+        ...
+
     async def search_pattern(
         self,
         pattern: str,

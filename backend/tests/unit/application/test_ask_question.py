@@ -165,6 +165,7 @@ async def test_each_model_in_the_question_gets_its_share_of_chunks() -> None:
         language_model=language_model,
         top_k=6,
         manuals=manuals,
+        keyword_chunks=0,
     )
 
     await use_case.execute(
@@ -255,6 +256,7 @@ async def test_chunks_with_the_exact_part_code_come_first() -> None:
         vector_store=vector_store,
         language_model=language_model,
         top_k=2,
+        keyword_chunks=0,
     )
 
     result = await use_case.execute(Question("o que é o código 20400319?"))
@@ -309,3 +311,59 @@ async def test_ignores_manuals_that_are_not_indexed_yet() -> None:
     await use_case.execute(Question("Qual o óleo do s70?"))
 
     assert vector_store.searched_manual_ids == [None]
+
+
+async def test_adds_chunks_that_contain_the_words_of_the_question() -> None:
+    """A pergunta sobre o leitão e a maternidade trazia só o trecho do desmame; o trecho
+    "Idade ao desmame: 21 ou 28 dias" tem outro sentido, mas as mesmas palavras."""
+    similar = ScoredChunk(
+        make_chunk(
+            manual, text="Os leitões vão direto para a recria.", position=0, pages=PageRange(26, 27)
+        ),
+        0.9,
+    )
+    by_words = ScoredChunk(
+        make_chunk(
+            manual,
+            text="Idade ao desmame: usar 21 ou 28 dias.",
+            position=1,
+            pages=PageRange(80, 80),
+        ),
+        0.2,
+    )
+    vector_store = InMemoryVectorStore(search_results=[similar, by_words])
+    language_model = FakeLanguageModel(answer="Use 21 ou 28 dias [2].")
+    use_case = AskQuestionUseCase(
+        embeddings=FakeEmbeddingProvider(),
+        vector_store=vector_store,
+        language_model=language_model,
+        top_k=1,
+        min_score=0.5,  # a busca por sentido só alcança o primeiro
+    )
+
+    result = await use_case.execute(Question("Com quantos dias o leitão deixa a maternidade?"))
+
+    assert {"dias", "maternidade"} <= vector_store.searched_words[0]
+    prompt = language_model.requests[0].prompt
+    assert prompt.index("recria") < prompt.index("21 ou 28 dias")  # os por sentido vêm antes
+    assert [c.pages for c in result.answer.citations] == [(80,)]
+
+
+async def test_keyword_chunks_are_limited_and_never_repeat_chunks_already_found() -> None:
+    chunks = [
+        ScoredChunk(make_chunk(manual, text=f"Troca do óleo {n}.", position=n), 0.9)
+        for n in range(8)
+    ]
+    vector_store = InMemoryVectorStore(search_results=chunks)
+    language_model = FakeLanguageModel()
+    use_case = AskQuestionUseCase(
+        embeddings=FakeEmbeddingProvider(),
+        vector_store=vector_store,
+        language_model=language_model,
+        top_k=2,
+        keyword_chunks=3,
+    )
+
+    await use_case.execute(Question("Como é a troca do óleo?"))
+
+    assert language_model.requests[0].prompt.count("<trecho ") == 2 + 3

@@ -151,6 +151,7 @@ class InMemoryVectorStore:
     search_results: list[ScoredChunk] = field(default_factory=list)
     searched_manual_ids: list[set[ManualId] | None] = field(default_factory=list)
     searched_codes: list[set[str]] = field(default_factory=list)
+    searched_words: list[set[str]] = field(default_factory=list)
 
     async def upsert(self, items: Sequence[EmbeddedChunk]) -> None:
         for item in items:
@@ -181,6 +182,23 @@ class InMemoryVectorStore:
         self.searched_codes.append(set(codes))
         found = [
             (sum(code in compact(r.chunk.text) for code in codes), r)
+            for r in self.search_results
+            if manual_ids is None or r.chunk.manual_id in manual_ids
+        ]
+        found = [item for item in found if item[0]]
+        found.sort(key=lambda item: -item[0])
+        return [ScoredChunk(r.chunk, 1.0) for _, r in found][:limit]
+
+    async def search_text(
+        self,
+        words: Collection[str],
+        *,
+        limit: int,
+        manual_ids: Collection[ManualId] | None = None,
+    ) -> Sequence[ScoredChunk]:
+        self.searched_words.append(set(words))
+        found = [
+            (sum(word in r.chunk.text.lower() for word in words), r)
             for r in self.search_results
             if manual_ids is None or r.chunk.manual_id in manual_ids
         ]

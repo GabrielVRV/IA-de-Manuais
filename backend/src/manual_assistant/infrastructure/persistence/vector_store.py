@@ -1,7 +1,18 @@
 from collections.abc import Collection, Sequence
 from typing import Any
 
-from sqlalchemy import ColumnElement, Float, Integer, case, delete, func, literal, or_, select
+from sqlalchemy import (
+    ColumnElement,
+    Float,
+    Integer,
+    case,
+    delete,
+    func,
+    literal,
+    literal_column,
+    or_,
+    select,
+)
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -17,6 +28,12 @@ from manual_assistant.infrastructure.persistence.models import (
     ManualRecord,
 )
 
+# Busca por palavras (PostgreSQL full text). A expressão do vetor precisa ser idêntica à do
+# índice GIN da migração 0012, senão o banco não usa o índice.
+_TEXT_CONFIG: ColumnElement[Any] = literal_column("'portuguese'::regconfig")
+_TEXT_VECTOR = func.to_tsvector(_TEXT_CONFIG, ChunkRecord.text)
+# 1 = trechos longos não ganham só por serem longos; 32 = nota de 0 a 1.
+_RANK_NORMALIZATION = 1 | 32
 _UPDATABLE_COLUMNS = ("position", "kind", "text", "page_start", "page_end", "embedding")
 _CHUNK_COLUMNS = (
     ChunkRecord.id,
@@ -120,6 +137,38 @@ class PgVectorStore:
             rows = (await session.execute(statement)).all()
 
         # Relevância 1: o código está literalmente no trecho.
+        return [ScoredChunk(chunk=_to_chunk(row), score=1.0) for row in rows]
+
+    async def search_text(
+        self,
+        words: Collection[str],
+        *,
+        limit: int,
+        manual_ids: Collection[ManualId] | None = None,
+    ) -> Sequence[ScoredChunk]:
+        if limit < 1:
+            raise ValueError("O limite de resultados deve ser ao menos 1")
+        if not words or (manual_ids is not None and not manual_ids):
+            return []
+
+        # Palavras de ``domain.keywords`` só têm letras: podem ir direto na consulta.
+        query = func.to_tsquery(_TEXT_CONFIG, " | ".join(sorted(words)))
+        rank = func.ts_rank_cd(_TEXT_VECTOR, query, _RANK_NORMALIZATION)
+        statement = (
+            select(*_CHUNK_COLUMNS, rank.label("rank"))
+            .join(ManualRecord, ManualRecord.id == ChunkRecord.manual_id)
+            .where(ManualRecord.status == ManualStatus.INDEXED.value)
+            .where(_TEXT_VECTOR.op("@@")(query))
+            .order_by(rank.desc(), ChunkRecord.manual_id, ChunkRecord.position)
+            .limit(limit)
+        )
+        if manual_ids is not None:
+            statement = statement.where(ChunkRecord.manual_id.in_(list(manual_ids)))
+        async with translate_database_errors("buscar trechos"), self._session_factory() as session:
+            rows = (await session.execute(statement)).all()
+
+        # A relevância do ranking de texto não é comparável à da similaridade: 1 = achou
+        # as palavras no texto, como nas buscas por código e por padrão.
         return [ScoredChunk(chunk=_to_chunk(row), score=1.0) for row in rows]
 
     async def search_pattern(
