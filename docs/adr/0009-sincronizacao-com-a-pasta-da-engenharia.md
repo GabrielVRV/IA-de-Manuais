@@ -40,8 +40,10 @@ lista no padrão normal (`95021401-02P`). O sistema trata as duas formas como o 
    reindexação usa exatamente o arquivo que gerou os trechos.
 2. **Só contam os PDFs do primeiro nível de cada subpasta.** Isso deixa de fora, sem regra
    extra, as `Versões Anteriores` e `Versões Obsoletas`: a IA nunca responde com um manual
-   desatualizado. Arquivos fora do padrão de nome (ex.: o procedimento `P&D 08`) são
-   ignorados.
+   desatualizado. Arquivos fora do padrão de nome (livros, procedimentos como `P&D 08`) são
+   sincronizados mesmo assim, identificados pelo caminho (hash em `source_key`, prefixo
+   `arq-`), sem regra de revisão nem de idioma. Renomear ou mover um deles na pasta conta
+   como remover um e adicionar outro.
 3. **O manual é identificado por código + idioma, não pelo caminho** (`source_key`, ex.:
    `95007003P`). Quando sai a revisão `-02P` e a `-01P` vai para "Versões Anteriores", o
    sistema atualiza o mesmo manual (arquivo, nome, reindexação) em vez de apagar um e criar

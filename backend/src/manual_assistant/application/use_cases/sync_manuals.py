@@ -65,7 +65,7 @@ class SyncAction(StrEnum):
     RETITLE = "retitle"  # só a descrição na planilha mudou
     REMOVE = "remove"  # saiu da pasta (ou foi para "Versões Obsoletas")
     UNCHANGED = "unchanged"
-    IGNORE = "ignore"  # fora das regras: nome fora do padrão, outro idioma, revisão antiga
+    IGNORE = "ignore"  # fora das regras: outro idioma, revisão antiga
     FIGURES = "figures"  # já indexado, com figuras ainda sem descrição (só ao sincronizar)
 
 
@@ -121,10 +121,13 @@ class PlanManualSyncUseCase:
 
         items: list[SyncItem] = []
         current: dict[str, tuple[ManualCode, SourceDocument]] = {}
+        # Fora do padrão de nome (livros, procedimentos): sem revisão nem idioma para
+        # comparar, então o arquivo entra como está, identificado pelo caminho.
+        unnamed: dict[str, SourceDocument] = {}
         for document in sorted(documents, key=lambda d: d.path):
             code = ManualCode.from_file_name(document.file_name)
             if code is None:
-                items.append(_ignored(document, "nome fora do padrão código-revisãoIdioma.pdf"))
+                unnamed[_path_key(document.path)] = document
             elif code.language not in self._languages:
                 items.append(_ignored(document, f"idioma '{code.language}' não sincronizado"))
             elif (best := current.get(code.key)) is None or code.revision > best[0].revision:
@@ -135,7 +138,8 @@ class PlanManualSyncUseCase:
                 items.append(_ignored(document, f"revisão anterior ou repetida de {best[1].path}"))
 
         synced = {m.source.key: m for m in await self._repository.list_all() if m.source}
-        for key, (_, document) in sorted(current.items()):
+        candidates = {key: document for key, (_, document) in current.items()} | unnamed
+        for key, document in sorted(candidates.items()):
             items.append(_compare(key, document, synced.pop(key, None)))
         items.extend(
             SyncItem(SyncAction.REMOVE, m.file_name, m.title, manual=m, key=m.source.key)
@@ -279,6 +283,12 @@ def _with_action(item: SyncItem, action: SyncAction) -> SyncItem:
         manual=item.manual,
         key=item.key,
     )
+
+
+def _path_key(path: str) -> str:
+    """Chave de um arquivo fora do padrão de nome. O hash cabe nos 50 caracteres da
+    coluna e nunca colide com a chave "código+idioma" dos manuais de produto."""
+    return "arq-" + hashlib.sha256(path.casefold().encode()).hexdigest()[:16]
 
 
 def _ignored(document: SourceDocument, reason: str) -> SyncItem:

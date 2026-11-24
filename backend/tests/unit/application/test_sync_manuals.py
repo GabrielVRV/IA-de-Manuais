@@ -114,7 +114,7 @@ async def test_planning_reads_no_file_and_changes_nothing(ctx: Context) -> None:
 async def test_ignores_files_outside_the_rules(ctx: Context) -> None:
     ctx.source.put("PROTEÍNA/95007003-01P.pdf")
     ctx.source.put("PROTEÍNA/95007003-01E.pdf")  # inglês: não sincronizado
-    ctx.source.put("PROTEÍNA/P&D 08 - Manuais.pdf")  # fora do padrão de nome
+    ctx.source.put("LIVROS SUINOCULTURA/72.pdf")  # fora do padrão de nome: entra mesmo assim
     ctx.source.put("PROTEÍNA/95007008-00P.pdf")
     ctx.source.put("PROTEÍNA/95007008-05P.pdf")  # vale só a revisão mais nova
     ctx.source.put("PROTEÍNA/95007008-01P.pdf")
@@ -124,7 +124,7 @@ async def test_ignores_files_outside_the_rules(ctx: Context) -> None:
     assert _actions(plan) == {
         "95007003-01P.pdf": SyncAction.ADD,
         "95007003-01E.pdf": SyncAction.IGNORE,
-        "P&D 08 - Manuais.pdf": SyncAction.IGNORE,
+        "72.pdf": SyncAction.ADD,
         "95007008-00P.pdf": SyncAction.IGNORE,
         "95007008-01P.pdf": SyncAction.IGNORE,
         "95007008-05P.pdf": SyncAction.ADD,
